@@ -293,6 +293,20 @@ def training_env(spec, base=None):
     return env
 
 
+def wave_obs_history(arms):
+    """The move-history depth a wave's arms agree on (`SNEK_OBS_HISTORY`, '0' when unset), or None
+    when they disagree.
+
+    A shared stage-A eval worker is one process serving every arm on the box, and `env.constants`
+    sizes the observation at import, so one worker can serve one depth. A wave whose arms agree gets
+    workers built for that depth; a wave that mixes depths gets none, and its arms evaluate in-process
+    instead (`run_wave` sets `SNEK_EVAL_QUEUE=0` on them) -- slower, but correct. Batches that sweep
+    the depth should therefore put one depth per wave of eight (b27: eight seeds per depth).
+    """
+    depths = {str(spec['env'].get('SNEK_OBS_HISTORY', '0') or '0') for spec in arms}
+    return depths.pop() if len(depths) == 1 else None
+
+
 def trainer_count(runs_dir=None):
     return len(live_runs.live(runs_dir))
 
@@ -601,11 +615,18 @@ class Driver(object):
             self._tick()
 
     def _start_workers(self, arms):
-        """The wave's shared stage-A workers, started before its arms so no arm has to race for a slot."""
+        """The wave's shared stage-A workers, started before its arms so no arm has to race for a slot.
+        Built for the wave's move-history depth; a wave that mixes depths gets none (see
+        `wave_obs_history`)."""
         wanted = wave_workers(arms)
         if wanted <= 0:
             return
-        started = self.ensure_workers(wanted, self.runs_dir)
+        depth = wave_obs_history(arms)
+        if depth is None:
+            _log('wave arms disagree on SNEK_OBS_HISTORY; no shared eval workers for it')
+            return
+        env = {**os.environ, 'SNEK_OBS_HISTORY': depth}
+        started = self.ensure_workers(wanted, self.runs_dir, env=env)
         self.workers.extend(started)
         _log('{0} eval worker(s) wanted for the wave, {1} started here'.format(wanted, len(started)))
 
@@ -625,6 +646,13 @@ class Driver(object):
             to_launch.append(spec)
         if to_launch:
             self._wait_while_held('wave {0}'.format(number))
+            if wave_obs_history(to_launch) is None:
+                # One shared worker cannot serve two observation widths, so this wave's arms run their
+                # stage A in-process. Correct and ~3x costlier; a depth sweep should not do this.
+                _log('wave {0}: arms mix SNEK_OBS_HISTORY depths; stage A runs in-process for all of them'
+                     .format(number))
+                for spec in to_launch:
+                    spec['env']['SNEK_EVAL_QUEUE'] = '0'
             self._start_workers(to_launch)
         for spec in to_launch:
             started.append((spec, self._launch(spec)))

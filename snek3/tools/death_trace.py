@@ -20,6 +20,9 @@ import time
 
 import numpy as np
 
+from tools import sidecar_env  # noqa: E402  -- must precede anything that imports env.constants
+sidecar_env.adopt_from_argv(sys.argv)  # a history checkpoint's depth, from its sidecar
+
 from vectorized.vec_env import VecSnake
 
 

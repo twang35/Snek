@@ -70,6 +70,7 @@ FREE_SPACE_GATE = _c.FREE_SPACE_GATE
 ZERO_OBS_INDICES = tuple(_c.ZERO_OBS_INDICES)
 
 OBS_LEN = _c.OBS_LEN
+OBS_HISTORY = _c.OBS_HISTORY
 NUM_ACTIONS = _c.NUM_ACTIONS
 
 # ---------------------------------------------------------------- guards
@@ -91,8 +92,8 @@ def describe():
     Worth printing rather than assuming: these come from the environment, so two runs of the same
     checkpoint can legitimately produce different `avg_reward`.
     """
-    return ('grid {0}x{0}, max score {1}, food {2}, death {3}, starve {4}, perfect {5}, '
-            'step {11}, dist {6}, chase_safe c={7} gate={8}, free_space c={9} gate={10}'.format(
+    return ('grid {0}x{0}, max score {1}, obs {12} (history {13}), food {2}, death {3}, starve {4}, '
+            'perfect {5}, step {11}, dist {6}, chase_safe c={7} gate={8}, free_space c={9} gate={10}'.format(
                 PLAY, MAX_POSSIBLE_SCORE, FOOD_REWARD, DEATH_REWARD, STARVE_REWARD,
                 PERFECT_GAME_REWARD, FOOD_DISTANCE_REWARD, CHASE_SAFE_SHAPING, CHASE_SAFE_GATE,
-                FREE_SPACE_SHAPING, FREE_SPACE_GATE, STEP_PENALTY))
+                FREE_SPACE_SHAPING, FREE_SPACE_GATE, STEP_PENALTY, OBS_LEN, OBS_HISTORY))

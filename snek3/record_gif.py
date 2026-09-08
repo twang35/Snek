@@ -53,6 +53,9 @@ imported, because every pixel constant is derived from it at import time.
 import os
 import sys
 
+from tools import sidecar_env  # noqa: E402  -- must precede anything that imports env.constants
+sidecar_env.adopt_from_argv(sys.argv)  # a history checkpoint's depth, from its sidecar
+
 # Before any pygame or `env.render` import. The dummy driver is what makes this headless *and* what
 # makes it fast; audio is silenced for the reason every entry point does it.
 os.environ['SDL_VIDEODRIVER'] = 'dummy'

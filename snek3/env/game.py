@@ -335,7 +335,9 @@ class Game:
                                          self.current_food,
                                          self.current_step,
                                          self.last_food_step,
-                                         len(self.snake_group)))
+                                         len(self.snake_group),
+                                         body_positions=(self.snake.get_positions()
+                                                         if constants.OBS_HISTORY else None)))
 
     def snapshot(self):
         """Everything needed to rebuild this game elsewhere, as plain data.

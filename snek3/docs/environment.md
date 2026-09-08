@@ -43,7 +43,7 @@ at a terminal step — which is exactly how snek2 silenced every perfect-game co
 **`PERFECT_GAME_REWARD` and `DISCOUNT` are coupled** and cannot be tuned independently:
 `W > 1/(1 − γ^k)`. See [`invariants.md`](invariants.md) invariant 6.
 
-## The observation — 26 values
+## The observation — 26 values, plus 2 per move of history when asked
 
 Anything "per action" is ordered by `ACTIONS` — **left, right, forward, as relative turns**, not
 compass directions.
@@ -58,8 +58,17 @@ compass directions.
 | 19 | 1 | fraction of the board the snake fills |
 | 20-22 | 3 | is the post-move head hugging a wall or body on its left or right |
 | 23-25 | 3 | is the move **NOT** a tail-chase (0 = it lands on the cell the tail is vacating) |
+| 26- | 2 per move | **only with `SNEK_OBS_HISTORY=N`**: `[turned left, turned right]` for each of the last N moves, most recent first; forward is `(0, 0)` |
 
-**1 means good or safe throughout.** New blocks go on the end, never in the middle — the order is
+**1 means good or safe throughout** — except the history block, which is *descriptive*: neither bit
+is good. It is read off the body, not kept in a buffer (the last N moves are the shape of the first
+N+2 body cells behind the head), so it is a pure function of the board like the rest, and a body too
+short to show a move reads forward for it — a length-5 snake shows three moves. The depth rides in the
+era marker (`obs26-20260907-hist4`) and so in every sidecar; the entry points that take a checkpoint
+set the knob from it before importing the env (`tools/sidecar_env.py`), and a wave's shared eval
+workers get the wave's depth from the scheduler, one depth per wave. Default 0: nothing changes for an
+arm that does not set it. Built 2026-09-07 for b27, against phase 1's prediction that it will not
+matter (`plans/obs-history.md`). New blocks go on the end, never in the middle — the order is
 chronological rather than logical and that is deliberate.
 
 **Era `obs26-20260907` (2026-09-07) removed two blocks from the 30-value `b09c616` layout**: "does

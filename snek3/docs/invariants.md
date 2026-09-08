@@ -65,6 +65,11 @@ were never meaningfully trained, the `game_over` shape of invariant 3 — were d
 went from 30 to 26 (`OBS_ERA` `b09c616` → `obs26-20260907`). Every earlier checkpoint fails to load
 by width, which is the loud failure; the era bump is what would catch a later change at 26.
 
+The era also carries an optional block: `SNEK_OBS_HISTORY=N` appends 2N values and `-histN` to the
+marker, so a history checkpoint's sidecar says what environment it needs. The tools that take a
+checkpoint on their command line set the knob from the sidecar before importing the env
+(`tools/sidecar_env.py`); a mismatch names the knob (`tools/arch.py`).
+
 **Not every block is a per-action triple.** Food-space, starve and board-fill are single values, so
 never assume index arithmetic in threes.
 

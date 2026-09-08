@@ -118,7 +118,14 @@ def assert_restorable(policy_dir, obs_len, obs_era, num_actions):
         problems.append('obs_len {0} != env {1} (the observation changed length)'.format(
             arch['obs_len'], obs_len))
     if arch['obs_era'] != str(obs_era):
-        if arch['obs_len'] == int(obs_len):
+        from tools import sidecar_env
+        wanted, have = sidecar_env.obs_history_of_era(arch['obs_era']), sidecar_env.obs_history_of_era(obs_era)
+        if wanted != have:
+            why = ('This checkpoint carries {0} move(s) of history and this process is built for {1}: '
+                   'set SNEK_OBS_HISTORY={0} before importing the env (the entry points do this from '
+                   'the sidecar via tools/sidecar_env.py; a shared eval worker takes it from whoever '
+                   'started it)'.format(wanted, have))
+        elif arch['obs_len'] == int(obs_len):
             why = ('The observation is the same length but its indices no longer mean the same '
                    'thing, so these weights would load cleanly and play badly')
         else:

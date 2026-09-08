@@ -49,6 +49,44 @@ TURN = np.array([[3, 2, 0],       # facing left  -> left=down,  right=up,    for
                 dtype=np.int64)
 NB = DELTA.copy()                 # the four orthogonal neighbour offsets
 
+# The relative action that turns heading p into heading n: REL[p, n] in {0 left, 1 right, 2 forward},
+# the inverse of TURN. A reversal (n opposite p) cannot occur in a legal body and reads forward.
+REL = np.full((4, 4), 2, dtype=np.int64)
+for _p in range(4):
+    for _a in range(3):
+        REL[_p, TURN[_p, _a]] = _a
+# Direction index of a one-cell step, keyed by the flat-index delta plus GRID so it is non-negative.
+DIRCODE = np.full(2 * GRID + 1, -1, dtype=np.int64)
+for _d, _delta in enumerate(DELTA):
+    DIRCODE[int(_delta) + GRID] = _d
+
+
+def move_history_bits(body, hp, length, depth):
+    """`(n, 2 * depth)` float32: [turned left, turned right] for each of the last `depth` moves, most
+    recent first, read off the circular body buffer. The vectorised `env.observations.move_history_obs`.
+
+    Cell k behind the head is `body[hp - k]`; the move j steps ago turned the heading of cell j+1 ->
+    cell j into that of cell j -> cell j-1, so it needs cells 0..j+1 and reads forward, (0, 0),
+    wherever the body is shorter than that -- the straight opening body reads all forward too.
+    """
+    n = body.shape[0]
+    out = np.zeros((n, 2 * depth), dtype=np.float32)
+    if depth <= 0:
+        return out
+    rows = np.arange(n)
+    k = np.arange(depth + 2)
+    cells = body[rows[:, None], (hp[:, None] - k[None, :]) % CAP]          # (n, depth + 2)
+    have = k[None, :] < length[:, None]                                    # cell k exists
+    step = cells[:, :-1] - cells[:, 1:]                                     # cell k+1 -> cell k
+    dirs = DIRCODE[np.clip(step + GRID, 0, 2 * GRID)]                      # heading into cell k
+    for j in range(1, depth + 1):
+        valid = have[:, j + 1] & (dirs[:, j] >= 0) & (dirs[:, j - 1] >= 0)
+        rel = REL[np.where(valid, dirs[:, j], 0), np.where(valid, dirs[:, j - 1], 0)]
+        rel = np.where(valid, rel, 2)
+        out[:, 2 * (j - 1)] = rel == 0
+        out[:, 2 * (j - 1) + 1] = rel == 1
+    return out
+
 _yy, _xx = np.divmod(np.arange(NCELL), GRID)
 PLAYABLE = np.zeros(PAD, dtype=bool)
 PLAYABLE[:NCELL] = (_xx >= 1) & (_xx <= C.PLAY) & (_yy >= 1) & (_yy <= C.PLAY)
@@ -682,6 +720,11 @@ class VecSnake:
         # --- 23-25: the move does NOT land on the cell the tail is vacating. 1 is good, and a fatal
         #     move also reads 1 — the flag only asks "is this the tail's cell". Combine with 6-8.
         obs[:, 23:26] = ~is_tail
+
+        # --- 26-: two bits per past move, only with SNEK_OBS_HISTORY. Read off the body, so it needs
+        #     no state of its own -- see move_history_bits.
+        if C.OBS_HISTORY:
+            obs[:, 26:] = move_history_bits(self.body, self.hp, self.length, C.OBS_HISTORY)
 
         # Ablation applied last, so the indices it names are the ones in the layout above.
         for index in C.ZERO_OBS_INDICES:

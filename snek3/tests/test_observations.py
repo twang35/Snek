@@ -896,9 +896,11 @@ def test_observation_spec_matches_what_the_game_emits():
 
     env = scalar_env.SnakeEnv()
     observation = env.reset()
-    assert scalar_env.observation_length() == 26
-    assert env.observation_spec()['shape'] == (26,)
-    assert observation.shape == (26,)
+    from env import constants
+    expected = 26 + 2 * constants.OBS_HISTORY       # 26 unless SNEK_OBS_HISTORY is set
+    assert scalar_env.observation_length() == expected
+    assert env.observation_spec()['shape'] == (expected,)
+    assert observation.shape == (expected,)
 
 
 def test_done_is_true_exactly_on_the_terminal_step():

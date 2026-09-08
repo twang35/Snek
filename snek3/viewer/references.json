@@ -209,5 +209,16 @@
     "label": "reference: b24's hzanneal50 cell -- the same config with no step penalty, but the 30-value observation era and a 200M cap, so a loose reference only; b26's own pen0 cell is the control for the 26-value observation",
     "after": "pen0",
     "value": "0"
+  },
+  "b27": {
+    "arms": [
+      "b26a-pen01-seed1",
+      "b26b-pen01-seed2",
+      "b26c-pen01-seed3",
+      "b26d-pen01-seed4"
+    ],
+    "label": "reference: b26's pen01 cell (step penalty 0.01, no history) at 50M and 4 seeds -- the same base b27 runs at 100M with 8 seeds; b27's own hist0 cell is the like-for-like control",
+    "after": "hist0",
+    "value": "0"
   }
 }

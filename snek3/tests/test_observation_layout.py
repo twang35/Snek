@@ -117,8 +117,11 @@ def test_the_vector_is_twenty_six_values():
     # A deliberate tripwire, not redundancy with the equalities above: adding or removing a block is
     # supposed to fail here so `OBS_LEN`, `OBS_BLOCKS`, `OBS_ERA` and the layout table in
     # docs/environment.md all get updated in the same pass. 30 until 2026-09-07, when the
-    # perfect-game triple (18-20) and the food-room value (29) were removed.
-    assert spec_length() == 26
+    # perfect-game triple (18-20) and the food-room value (29) were removed. `SNEK_OBS_HISTORY=N`
+    # appends 2N (the whole suite runs again under it -- tests/test_move_history.py).
+    from env import constants
+    assert spec_length() == 26 + 2 * constants.OBS_HISTORY
+    assert constants.BASE_OBS_LEN == 26
 
 
 def test_following_tail_block_sits_at_23_to_25():

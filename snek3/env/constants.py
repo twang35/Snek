@@ -72,7 +72,19 @@ CURRENT_DIRECTION_MAPS = {
 }
 
 # ----------------------------------------------------------------- observation
-OBS_LEN = 26
+BASE_OBS_LEN = 26
+
+# **Move history, off by default.** `SNEK_OBS_HISTORY=N` appends N moves of history to the vector as
+# two bits per move, most recent first: `[turned left, turned right]`, forward being `(0, 0)`. Read
+# off the body rather than kept in a buffer -- the last N moves *are* the shape of the first N+2 body
+# cells behind the head, so the block is a pure function of the board like every other one, with
+# nothing to reset, snapshot or keep in parity. A body shorter than the depth reads forward for the
+# moves it cannot show, which is also what the straight opening body reads. Design and the
+# investigation that preceded it: plans/obs-history.md; batch b27 is the first to run it.
+OBS_HISTORY = _num('OBS_HISTORY', 0, int)
+if OBS_HISTORY < 0:
+    raise ValueError('SNEK_OBS_HISTORY must be >= 0, got {0}'.format(OBS_HISTORY))
+OBS_LEN = BASE_OBS_LEN + 2 * OBS_HISTORY
 
 # **Bump this whenever the vector's *meaning* changes, even at constant length.** A checkpoint
 # restores whenever the length matches and nothing checks the values still mean what they meant:
@@ -84,7 +96,13 @@ OBS_LEN = 26
 # (18-20, nonzero in <0.03% of states) and `food_space` (29, at 1 in ~99.95%) -- after
 # `docs/findings.md`'s death analysis found neither doing anything; every checkpoint from before,
 # the snek2 champion included, stops loading. See docs/environment.md for the index layout.
-OBS_ERA = 'obs26-20260907'
+BASE_OBS_ERA = 'obs26-20260907'
+# The depth is part of the era, so a history checkpoint's sidecar names what it needs: the entry
+# points that measure or watch a checkpoint (`tools/sidecar_env.py`) read the suffix and set
+# `SNEK_OBS_HISTORY` before importing this module, and `tools/arch.py`'s mismatch message names it.
+OBS_ERA = BASE_OBS_ERA + ('-hist{0}'.format(OBS_HISTORY) if OBS_HISTORY else '')
+
+
 
 # The observation's blocks, in order, as `(name, width)`. The sum is the vector length and each
 # entry's offset is its index range — so this table *is* the layout in docs/environment.md.
@@ -109,7 +127,7 @@ OBS_BLOCKS = (
     ('board_fill', 1),           # 19     rank 1 by saliency in every snek2 arm measured
     ('hugging_wall', 3),         # 20-22
     ('not_following_tail', 3),   # 23-25  a *fatal* move also reads 1 here
-)
+) + ((('move_history', 2 * OBS_HISTORY),) if OBS_HISTORY else ())   # 26-  [left, right] per past move
 # Removed 2026-09-07 (era `obs26-20260907`): `perfect_game_move` (was 18-20) and `food_space` (was
 # 29). Both sat at a constant in >99.9% of states, and the death analysis in docs/findings.md found
 # the best checkpoints' failures ran through neither.

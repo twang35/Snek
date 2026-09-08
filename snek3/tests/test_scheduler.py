@@ -90,8 +90,9 @@ def box(tmp_path):
     _RUNS.pop('dir', None)
 
 
-def no_workers(count, runs_dir=None):
-    """Stands in for `eval_queue.ensure_workers`: a unit test must never start a real worker."""
+def no_workers(count, runs_dir=None, env=None):
+    """Stands in for `eval_queue.ensure_workers`: a unit test must never start a real worker. `env` is
+    the wave's environment (its `SNEK_OBS_HISTORY`), which the real one hands to each worker."""
     return []
 
 
@@ -605,7 +606,7 @@ def test_the_workers_are_started_before_the_wave_with_the_count_its_specs_name(b
     specs = [spec('b13aa-mb32-seed1', SNEK_EVAL_WORKERS='8'), spec('b13ab-mb32-seed2', SNEK_EVAL_WORKERS='8')]
     calls = Calls()
     d = driver(specs, box, calls, wave=2, stage_b=False,
-               ensure_workers=lambda n, runs_dir=None: asked.append((n, runs_dir)) or [])
+               ensure_workers=lambda n, runs_dir=None, env=None: asked.append((n, runs_dir)) or [])
     d.run()
     assert asked == [(8, box['runs'])], 'once, before the arms, with the specs\' number'
     assert calls.events[0][0] == 'train'

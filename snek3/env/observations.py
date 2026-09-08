@@ -28,8 +28,9 @@ def get_observations(old_grid,
                      current_food,
                      current_step,
                      last_food_step,
-                     snake_len):
-    """Builds the 26-value observation vector. Layout, in order:
+                     snake_len,
+                     body_positions=None):
+    """Builds the 26-value observation vector (plus 2 per move of history). Layout, in order:
 
     idx      values  what
     0-5      6       food: [is closer, 1/(distance+1)] per action
@@ -40,6 +41,9 @@ def get_observations(old_grid,
     19       1       fraction of the board the snake fills
     20-22    3       is the post-move head hugging a wall or body on its left or right
     23-25    3       is the move NOT a tail-chase (0 = it lands on the cell the tail is vacating)
+    26-      2/move  only with SNEK_OBS_HISTORY=N: [turned left, turned right] for each of the
+                     last N moves, most recent first, read off the body (`body_positions`,
+                     head first). Forward is (0, 0), and so is a move the body is too short to show
 
     Anything "per action" is ordered by ACTIONS — left, right, forward — as relative turns
     from the current heading, not compass directions. Keep this in step with
@@ -117,6 +121,12 @@ def get_observations(old_grid,
     # free space the snake still needs - see following_tail_obs. Unvalidated.
     observations.extend(following_tail_obs(head_pos, tail_pos, head_move_dir))
 
+    # 2 values per move of history, when the knob is on. Descriptive rather than evaluative: neither
+    # bit is "good". The one block that needs the ordered body rather than the grid, which is why
+    # `body_positions` is a separate argument; None reads as a straight body.
+    if OBS_HISTORY:
+        observations.extend(move_history_obs(body_positions, OBS_HISTORY))
+
     # Ablation, applied last so the indices it names are the ones in the layout above rather than
     # whatever position a block happened to occupy while being built. Empty unless SNEK_ZERO_OBS is
     # set, and then it costs one pass over a 26-element list - see ZERO_OBS_INDICES for why an
@@ -177,6 +187,44 @@ def body_and_wall_collisions(grid, head_pos, tail_pos, head_move_dir):
             observations.extend([0])
 
     return observations
+def turn_between(prev_dir, new_dir):
+    """The relative action that takes a snake heading `prev_dir` to heading `new_dir`: 'left',
+    'right' or 'forward'. A reversal cannot occur in a legal body and reads 'forward'."""
+    for action, result in CURRENT_DIRECTION_MAPS[prev_dir].items():
+        if result == new_dir:
+            return action
+    return 'forward'
+
+
+def _direction_of_step(from_pos, to_pos):
+    dx, dy = to_pos[0] - from_pos[0], to_pos[1] - from_pos[1]
+    for name, vector in MOVE_VECTORS.items():
+        if (dx, dy) == vector:
+            return name
+    return None
+
+
+def move_history_obs(body_positions, depth):
+    """2 values per past move, most recent first: [turned left, turned right]; forward is (0, 0).
+
+    `body_positions` is the body head first, as `SnakeHead.get_positions()` gives it. The move made
+    j steps ago turned the snake from the direction of body[j+1] -> body[j] to that of body[j] ->
+    body[j-1], so the last `depth` moves need `depth + 2` cells; any move the body cannot show reads
+    forward, which is also what the straight opening body reads. Descriptive, not "1 is good".
+    """
+    out = []
+    cells = list(body_positions) if body_positions is not None else []
+    for j in range(1, depth + 1):
+        if j + 1 < len(cells):
+            new_dir = _direction_of_step(cells[j], cells[j - 1])
+            prev_dir = _direction_of_step(cells[j + 1], cells[j])
+            action = turn_between(prev_dir, new_dir) if prev_dir and new_dir else 'forward'
+        else:
+            action = 'forward'
+        out.extend([1 if action == 'left' else 0, 1 if action == 'right' else 0])
+    return out
+
+
 def following_tail_obs(head_pos, tail_pos, head_move_dir):
     """0 per action when the move puts the head on the cell the tail is vacating; 1 otherwise.
 

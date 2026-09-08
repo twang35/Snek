@@ -41,7 +41,8 @@ everything read through `tuned()`, in `train.py` and in the algorithm's module a
 one function, which is why the split cost the grep nothing. The reward and shaping knobs are read by
 `env/constants.py` **at import**, before the trainer's config exists, so they print no override line
 — `SNEK_CHASE_SAFE_SHAPING`, `SNEK_CHASE_SAFE_GATE`, `SNEK_FREE_SPACE_*`,
-`SNEK_FOOD_DISTANCE_REWARD`, `SNEK_STEP_PENALTY`, `SNEK_PERFECT_GAME_REWARD`, `SNEK_ZERO_OBS`. For those, grep
+`SNEK_FOOD_DISTANCE_REWARD`, `SNEK_STEP_PENALTY`, `SNEK_PERFECT_GAME_REWARD`, `SNEK_ZERO_OBS`,
+`SNEK_OBS_HISTORY`. For those, grep
 **`reward config:`**, one line printed at startup from `vectorized/config.describe()`. Before it
 existed, b2's shaping dose had to be confirmed by reading `/proc/<pid>/environ` on the desktop.
 
@@ -149,7 +150,7 @@ step no checkpoint exists at is the one thing the protocol cannot tolerate.
 
 ### Rewards and shaping
 
-`SNEK_PERFECT_GAME_REWARD` (100), `SNEK_FOOD_DISTANCE_REWARD` (0.001), `SNEK_STEP_PENALTY` (0, subtracted on every step -- b26's knob),
+`SNEK_PERFECT_GAME_REWARD` (100), `SNEK_FOOD_DISTANCE_REWARD` (0.001), `SNEK_STEP_PENALTY` (0, subtracted on every step -- b26's knob), `SNEK_OBS_HISTORY` (0; N appends 2N values of move history to the observation and `-histN` to the era -- b27's knob; **one depth per wave**, since a shared eval worker serves one width),
 `SNEK_CHASE_SAFE_SHAPING` + `SNEK_CHASE_SAFE_GATE` (0, 85),
 `SNEK_FREE_SPACE_SHAPING` + `SNEK_FREE_SPACE_GATE` (0, 85).
 

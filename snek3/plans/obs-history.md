@@ -1,7 +1,8 @@
 # Short-term memory: showing the policy its last four moves
 
-**Written 2026-09-07, revised the same day after review. Phase 1 ran the same day and closed the
-plan: see "Phase 1 result" below.** The question asked was: give
+**Written 2026-09-07, revised the same day after review. Phase 1 ran the same day and found the
+feature addresses a failure the best checkpoints do not have (see "Phase 1 result"). Built anyway the
+same evening, at the user's request, to measure it: section 4 is as built, and batch b27 runs it.** The question asked was: give
 snek a view of its last four moves, cheaper than four one-hot triples (12 inputs), and is there a
 better approach altogether. The answer is in section 2; the rest is what it costs and how to test it.
 
@@ -15,7 +16,7 @@ better approach altogether. The answer is in section 2; the rest is what it cost
 | `ended_by` | goes into the stage-B row permanently, alongside this work |
 | **phase 1 result** | **the best checkpoints starve; they do not collide.** 257 of 280 failures across b17cl and b10ck at 30,000 games each are starves, nearly all an exact closed loop of the snake following itself while the food sits reachable. History cannot break a loop of period 8-98, and the policy is confident on every lap. **Sections 4-5 are not built.** The measurement and its numbers: `docs/findings.md`, "The best checkpoints fail by starving in a closed loop"; pictures `charts/deaths/` |
 | order | **investigation first, as a gate.** Phase 1 is sections 3 and 3b; nothing in section 4 is built until phase 1 has said how the best checkpoints die |
-| now | **closed.** What phase 1 points at is a reward change (starve −0.5 against death −5, no per-step cost) and the starve-budget input's compression — a new plan, not this one |
+| now | **built and queued as b27** (2026-09-07 evening): depths 0 / 4 / 8 × 8 seeds on b26's base with step penalty 0.01, 100M. Prediction on record: no effect on the perfect rate, since the dominant failure is a loop of period length + 1. The reward-side follow-up (b26's step penalty) runs alongside |
 
 **Two predictions, registered before the data.** The user expects the best checkpoints to die mostly by
 **starving**; this plan's first draft assumed **collisions**. Phase 1 is designed to say which, and
@@ -212,6 +213,18 @@ cost, so an uncertain approach is worse in expectation than an orbit — the loo
 asks for. Candidates, in order: a starve penalty of the same order as a death; a per-step cost; a
 linear rather than lg-compressed starve-budget input (or steps-since-food). All three are judged on
 the same trace tooling: the starve count falls and the sealed-food count does not rise.
+
+## 4a. As built (2026-09-07)
+
+| piece | where | what differs from the design |
+|---|---|---|
+| knob | `env/constants.py` `OBS_HISTORY`, `OBS_LEN = 26 + 2N`, `OBS_BLOCKS` gains `('move_history', 2N)` | as designed |
+| era | `OBS_ERA = 'obs26-20260907' + '-histN'` | **the depth rides in the era, not in a new `arch.json` field** — every field of the sidecar is required, so a new one would have invalidated b26's sidecars. `tools/sidecar_env.py` parses it |
+| reference | `env/observations.py` `move_history_obs(body_positions, depth)`; `get_observations` gains `body_positions=None` | the grid has no body order, so the game passes `snake.get_positions()` |
+| vectorised | `vectorized/vec_env.py` `move_history_bits`, `REL` (the inverse of `TURN`), `DIRCODE` | as designed; elementwise parity over the 18,053 states at depth 4 |
+| entry points | `tools/shard.py`, `evaluate.py`, `watch.py`, `record_gif.py`, `tools/death_trace.py` call `sidecar_env.adopt_from_argv` before importing the env | **new.** The design said "restore sets the env key"; restore runs after the env is imported, so the setting has to happen at the top of the process |
+| shared eval workers | `tools/scheduler.py` `wave_obs_history`: workers get the wave's depth; a wave that mixes depths gets none and its arms run stage A in-process | **new, and the one real constraint**: one worker process serves every arm on the box and one width. A depth sweep puts one depth per wave of eight |
+| tests | `tests/test_move_history.py`: values on hand-built bodies, the vectorised form against the reference on driven lanes, the era and sidecar, the scheduler rule, and the layout + parity suites re-run at depth 4 from a subprocess | |
 
 ## 4. The build, if section 3 says go
 

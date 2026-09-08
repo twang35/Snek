@@ -29,6 +29,9 @@ import os
 import sys
 import time
 
+from tools import sidecar_env  # noqa: E402  -- must precede anything that imports env.constants
+sidecar_env.adopt_from_argv(sys.argv)  # a history checkpoint's depth, from its sidecar
+
 # No SDL_VIDEODRIVER here — this is the one script that wants a real window. Audio is still silenced
 # for the usual reason, and before any pygame import.
 os.environ['SDL_AUDIODRIVER'] = 'dummy'
