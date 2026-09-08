@@ -17,6 +17,25 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### A per-step reward penalty of 0.01 nearly doubles stage-B density at 50M (46.3% against 25.5, every seed separated) without touching onset, entropy or KL; 0.001 and 0.0001 do nothing
+
+**Measured 2026-09-07, batch b26, four values x 4 seeds at 50M on the horizon-anneal config, the first batch of
+the 26-value observation era**, against the batch's own zero-penalty control. `SNEK_STEP_PENALTY=0.01` reads 46.3% of
+stage-B rows at ≥98/500 (42.3-52.6) against 25.5 (16.3-33.5), best30 98.88 against 98.47, stage-A ≥98 share 45.0%
+against 34.7, and every one of its seeds sits above every one of the twelve other arms (p = 0.029 against each cell);
+0.0001 (32.7%) and 0.001 (26.1%) are inside the control's spread. **The scale says why only the top value moves**: a
+perfect game is ~1,800 steps, so 0.01 a step is ~18 of return against ~195 from food and the perfect bonus, a tenth;
+0.001 is 1% and 0.0001 is noise. What the penalty leaves alone is as telling as what it moves: onset to 50% (1.1-1.2M)
+and to 80% (2.7-3.0M), late entropy (0.035) and approx KL are the same on all four cells, so it changes the converged
+policy rather than the learning curve; late explained variance rises with it (0.82 against 0.77-0.81, p = 0.029), a
+critic that can now predict time-to-food. **This is the reward term that charges for the failure mode the death
+traces found** — the best checkpoints orbit reachable food in a closed loop until they starve, and a per-step cost is
+the only term that makes an idle lap cost anything; at 0.01 a 100-step orbit costs a meal. Not yet shown: that
+`pen01`'s failures are fewer starvations (a death trace of `b26b` @38.9M against a control checkpoint would), that the
+curve has a peak (0.01 is the largest value run), and that the lever holds on the ladder top rather than the anneal.
+n=4 at 50M; the era is new, so no comparison to b9-b25 is clean. Details in `results.md` (b26), pictures in
+`sweep.md` §5.
+
 ### The ladder top holds at 200M and 8 seeds — 77.5% density, best30 99.34, and a 99.6 /30,000 checkpoint outside the γ 1.00 cell; the horizon anneal reaches the same peak lower on density
 
 **Measured 2026-09-07, batches b25 and b24, 200M steps x 8 seeds each**, against b23's ladder-top cell at 50M

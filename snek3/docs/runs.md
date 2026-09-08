@@ -6,6 +6,32 @@ goes directly under `## Established` in [`findings.md`](findings.md).
 
 ## Now
 
+**b26, the step-penalty sweep and the first batch of the 26-value observation era, closed on both boxes with every
+pass; the shared queue is empty and both boxes are idle.** As of 2026-09-07 18:30:
+
+| box | batch | state | ETA |
+|---|---|---|---|
+| desktop | — | b26 wave 2 (`pen0001`, `pen0`) closed with hof5000/hof30k; nothing unclaimed | **free** |
+| laptop | — | b26 wave 1 (`pen01`, `pen001`) closed with its passes ~17:00; scheduler exited on the empty pool | **free** |
+
+**What closed.** **A step penalty of 0.01 reads 46.3% density (42.3-52.6) against the `pen0` control's 25.5 (16.3-33.5),
+every seed separated from all twelve other arms, best30 98.88 against 98.47** — the two smaller values sit inside the
+control's spread, and the one diagnostic that moves with it is late explained variance (0.82 against 0.77-0.81). Onset,
+entropy and KL are identical across cells: the penalty changes what the converged policy does, not how fast it learns.
+Verdict in [`results.md`](results.md), reading in [`charts.md`](charts.md), finding under `## Established` in
+[`findings.md`](findings.md), curve and traces in [`sweep.md`](sweep.md) §5 and `viewer/sweep.html` (b26 is in the sweep
+reducer now, via `plans/sweep-extra.json`).
+
+**Open from the morning.** b24/b25's `hof30k` passes cover only their first arms (the observation change broke them
+off); `b25a` @106168320 at 99.6 /30k awaits a fresh 30,000 for the HOF, under the old era. Both are the obs26 work's.
+
+**Next.** The step-penalty curve has not turned: 0.02 and 0.05 at 4 seeds on the same config, and 0.01 on the ladder top
+(γ 0.999, T 512, `mse`) to see whether the lever holds there. A death trace (`tools/death_trace.py`) of `b26b` @38.9M
+against a `pen0` checkpoint would say whether the penalty is buying fewer starvation loops, which is the mechanism the
+result fits.
+
+## b24/b25 closed, b26 in flight, as it read at 2026-09-07 16:30 (superseded)
+
 **b24 and b25 — the two 200M champion attempts — closed on stage B and hof5000; both 30k passes broke off part-way
 when the observation changed to 26 values, and the other agent's obs26 work owns finishing them. b26, the step-penalty
 sweep and the first batch of the new era, is in flight on both boxes.** As of 2026-09-07 16:30:

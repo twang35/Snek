@@ -22,6 +22,46 @@ whose published artifacts are history, and the daemon's ledger, whose keys are t
 waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
 
 
+<!-- progress_update: batch b26 -->
+## Batch b26 — the `step_penalty` sweep, 4 values x 4 seeds, 50M, closed 2026-09-07
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b24a-hzanneal50-seed1, b24b-hzanneal50-seed2, b24c-hzanneal50-seed3, b24d-hzanneal50-seed4`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| step_penalty | rows | ≥98%/500 | per-seed share | ≥99 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| **0** (reference) | 17,338 | 62.6% | 54.8 69.9 62.1 63.1 | 3761 | 100.0 | 99.40 (99.3-99.5) | 97.9 | 0.0% | 0.9% | 56.9% |
+| 0 | 3,095 | 25.5% | 29.5 33.5 16.3 20.2 | 77 | 99.8 | 98.47 (98.0-98.7) | 92.4 | 0.0% | 2.08% | 34.7% |
+| 0.0001 | 3,183 | 32.7% | 35.7 40.8 28.7 23.3 | 117 | 99.8 | 98.42 (98.1-98.7) | 92.8 | 0.0% | 1.33% | 35.8% |
+| 0.001 | 3,012 | 26.1% | 24.9 32.0 23.2 23.3 | 69 | 99.8 | 98.33 (98.1-98.5) | 91.8 | 0.0% | 2.16% | 33.1% |
+| 0.01 | 3,693 | 46.3% | 46.4 52.6 43.0 42.3 | 325 | 100.0 | 98.88 (98.7-99.1) | 93.0 | 0.0% | 1.77% | 45.0% |
+
+<!-- reading -->
+Read against `pen0`, the batch's own control (the b24 horizon-anneal config at 50M under the 26-value observation), not the bold reference — that is b24 itself at 200M in the 30-value era and is there for orientation only. **A step penalty of 0.01 is a real lever at n=4 and the other two values are not**: `pen01` reads 46.3% density (42.3-52.6 per seed) against the control's 25.5 (16.3-33.5), every one of its four seeds above every one of the other twelve arms (Mann-Whitney p = 0.029 against each cell), best30 98.88 (98.7-99.1) against 98.47, stage-A ≥98 share 45.0% against 34.7, and the deep passes follow: 165 `hof5000` rows (at the 99.2 cut) against 42, the batch's only ≥99.2 /5,000 rows (`b26b` @38.9M, 99.2, twice) and its only 30k rows (99.1). `pen0001` (32.7%, 23.3-40.8) and `pen001` (26.1%) sit inside the control's spread. The scale explains the shape: a perfect game is ~1,800 steps, so 0.01 a step is ~18 of return against ~95 from food and 100 for the perfect game — about a tenth of the return — while 0.001 is 1% and 0.0001 is noise; only the top value is large enough to be felt, and **the curve has not turned**, so 0.02 and 0.05 are the next cells. What it did not change: onset (50% at 1.1-1.2M and 80% at 2.7-3.0M on every cell), late entropy (0.035 everywhere) and approx KL — the penalty changes what the converged policy does, not how fast it gets there. The one diagnostic that moved with it is late explained variance, 0.82 against 0.77-0.81 (p = 0.029): a per-step cost makes the return depend on time-to-food, which is a thing the critic can predict, and the policy gradient inherits the signal. The mechanism this fits is today's finding that the best checkpoints fail by orbiting reachable food in a closed loop: a per-step cost is the only reward term that charges for a lap that does not eat, and 0.01 makes a 100-step idle orbit cost a meal. Not settled: whether `pen01`'s failures are in fact fewer starvations (`tools/death_trace.py` on `b26b` @38.9M against a `pen0` checkpoint answers it directly); whether the lever holds on the ladder top (γ 0.999, T 512, `mse`) rather than the anneal; and how much of the control's 25.5% against b24's 60.5 is the 50M cap and how much the new observation — b24's config was never run at 50M in the old era, so this batch cannot separate them.
+<!-- /reading -->
+
+### Every arm
+
+| arm | step_penalty | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b26m-pen0-seed13` | 0 | 851 | 29.5% | 23 | 99.8 | 98.5 @42.4M | 92.5 | 0.14% |
+| `b26n-pen0-seed14` | 0 | 838 | 33.5% | 38 | 99.8 | 98.7 @49.0M | 93.3 | 0.0% |
+| `b26o-pen0-seed15` | 0 | 698 | 16.3% | 5 | 99.2 | 98.0 @41.5M | 92.9 | 0.0% |
+| `b26p-pen0-seed16` | 0 | 708 | 20.2% | 11 | 99.8 | 98.7 @49.7M | 91.0 | 0.0% |
+| `b26i-pen0001-seed9` | 0.0001 | 838 | 35.7% | 41 | 99.8 | 98.6 @48.0M | 92.3 | 0.0% |
+| `b26j-pen0001-seed10` | 0.0001 | 860 | 40.8% | 62 | 99.8 | 98.7 @39.2M | 94.1 | 0.0% |
+| `b26k-pen0001-seed11` | 0.0001 | 811 | 28.7% | 10 | 99.8 | 98.3 @35.8M | 92.3 | 0.0% |
+| `b26l-pen0001-seed12` | 0.0001 | 674 | 23.3% | 4 | 99.0 | 98.1 @27.9M | 92.7 | 0.07% |
+| `b26e-pen001-seed5` | 0.001 | 732 | 24.9% | 13 | 99.4 | 98.1 @42.8M | 91.2 | 0.0% |
+| `b26f-pen001-seed6` | 0.001 | 828 | 32.0% | 28 | 99.8 | 98.4 @49.3M | 90.9 | 0.0% |
+| `b26g-pen001-seed7` | 0.001 | 659 | 23.2% | 12 | 99.6 | 98.3 @40.4M | 91.3 | 0.0% |
+| `b26h-pen001-seed8` | 0.001 | 793 | 23.3% | 16 | 99.2 | 98.5 @47.8M | 93.8 | 0.0% |
+| `b26a-pen01-seed1` | 0.01 | 924 | 46.4% | 79 | 99.8 | 98.9 @45.8M | 91.2 | 0.0% |
+| `b26b-pen01-seed2` | 0.01 | 997 | 52.6% | 128 | 100.0 | 99.1 @37.1M | 93.8 | 0.0% |
+| `b26c-pen01-seed3` | 0.01 | 861 | 43.0% | 53 | 99.8 | 98.7 @48.5M | 91.9 | 0.0% |
+| `b26d-pen01-seed4` | 0.01 | 911 | 42.3% | 65 | 99.6 | 98.8 @31.5M | 95.2 | 0.0% |
+
+<!-- /progress_update: batch b26 -->
+
 <!-- progress_update: batch b25 -->
 ## Batch b25 — the `knob` sweep, 1 values x 8 seeds, 200M, closed 2026-09-07
 

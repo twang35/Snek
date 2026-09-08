@@ -262,6 +262,26 @@ tail is flat against collapses (ρ −0.02). The critic fits *best* in the cells
 records is the rollout (b14), where both are downstream of a longer window. **So the diagnostics are for checking a
 config took, not for ranking one** — the ranking still needs stage B.
 
+## 5. Added after the sweep
+
+Batches that were not in the plan but are read with the sweep's tools, listed in `plans/sweep-extra.json` (the
+reducer reads the plan's manifest and then that file; `viewer/sweep.html` shows them in the batch picker). Their
+references are whatever `viewer/references.json` says, and where the reference is another era or cap it is
+orientation only — read the batch against its own control cell.
+
+### b26 — step penalty, 0 / 0.0001 / 0.001 / 0.01 at 50M (2026-09-07)
+
+The first batch of the 26-value observation era, on the b24 horizon-anneal config; the hollow orange reference is
+b24 itself at 200M in the old era, so read the four cells against `pen0`. **0.01 is a lever**: 46.3% density against
+25.5, every seed of the cell above every other arm in the batch, best30 98.88 against 98.47; the two small values sit
+inside the control's band. The traces show why the table is the whole story — onset, late level and entropy are
+identical across cells, and the separation is in the stage-B panel alone. Verdict in `results.md`, finding in
+`findings.md`.
+
+![b26 curve](../charts/sweep/b26-curve.png)
+
+![b26 traces](../charts/sweep/b26-traces.png)
+
 ## 4. How this was made
 
 ```
