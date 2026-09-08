@@ -22,7 +22,7 @@ def _sweep(tmp_path):
                     ('b9d-lam100-seed2', [99, 98]), ('b19a-mse-seed1', [98]), ('b19b-mse-seed2', [99]),
                     ('b7aa-fc320-seed1', [97, 98]), ('b7ab-fc320-seed2', [97, 97])):
         _arm(runs, p, plateau, rows=rows, hof=[98.9], h30=[99.1] if p.endswith('seed1') else None)
-    return sa.build(runs, str(tmp_path / 'm.json'), str(tmp_path / 'r.json'))
+    return sa.build(runs, str(tmp_path / 'm.json'), str(tmp_path / 'r.json'), extra_path='')   # the real extra manifest stays out
 
 
 def test_every_figure_renders(tmp_path):

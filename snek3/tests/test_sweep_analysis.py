@@ -147,6 +147,26 @@ def test_build_groups_arms_into_cells_and_compares_to_the_reference(tmp_path):
     assert '`0.0` 66.7' in table
 
 
+def test_build_appends_the_extra_manifests_batches_after_the_plans_and_shrugs_at_a_missing_file(tmp_path):
+    """`plans/sweep-extra.json` carries batches added to the view after the sweep (b26 first, 2026-09-07);
+    the plan's file stays the plan. No extra file, or an explicit None-path of '' -- the plan alone."""
+    runs = str(tmp_path / 'runs'); os.makedirs(runs)
+    plan = {'batches': [{'batch': 'b9', 'knob': 'GAE lambda', 'control_value': {'SNEK_PPO_GAE_LAMBDA': '0.98'},
+                         'cells': [{'slug': 'lam0', 'env': {'SNEK_PPO_GAE_LAMBDA': '0.0'}}]}]}
+    extra = {'batches': [{'batch': 'b26', 'knob': 'step penalty', 'control_value': {'SNEK_STEP_PENALTY': '0'},
+                          'cells': [{'slug': 'pen0', 'env': {'SNEK_STEP_PENALTY': '0'}},
+                                    {'slug': 'pen01', 'env': {'SNEK_STEP_PENALTY': '0.01'}}]}]}
+    _write(str(tmp_path / 'm.json'), plan); _write(str(tmp_path / 'x.json'), extra); _write(str(tmp_path / 'r.json'), {})
+    _arm(runs, 'b26a-pen01-seed1', [85] * 40, rows=[99, 98])
+    sweep = sa.build(runs, str(tmp_path / 'm.json'), str(tmp_path / 'r.json'), extra_path=str(tmp_path / 'x.json'))
+    assert [b['batch'] for b in sweep['batches']] == ['b9', 'b26']
+    b26 = sweep['batches'][1]
+    assert [c['slug'] for c in b26['cells']] == ['pen0', 'pen01'] and b26['cells'][1]['arms'] == ['b26a-pen01-seed1']
+    alone = sa.build(runs, str(tmp_path / 'm.json'), str(tmp_path / 'r.json'), extra_path=str(tmp_path / 'absent.json'))
+    assert [b['batch'] for b in alone['batches']] == ['b9']
+    assert [b['batch'] for b in sa.manifest_batches(str(tmp_path / 'm.json'), extra_path='')] == ['b9']
+
+
 def test_write_and_load_round_trip(tmp_path):
     sweep = {'generated': 'now', 'metrics': [], 'batches': [], 'arms': {}}
     json_path, js_path = sa.write(sweep, str(tmp_path / 's.json'), str(tmp_path / 's.js'))

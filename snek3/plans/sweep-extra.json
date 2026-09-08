@@ -1,0 +1,45 @@
+{
+ "_about": "Batches added to the sweep view (tools/sweep_analysis.py, viewer/sweep.html) after the one-knob sweep b9-b21 closed. Same shape as plans/hyperparam-sweep.json's `batches`; the reducer reads that file first, then this one. Each batch's reference is viewer/references.json's entry for it.",
+ "batches": [
+  {
+   "batch": "b26",
+   "knob": "step penalty",
+   "priority": 260,
+   "control_value": {
+    "SNEK_STEP_PENALTY": "0"
+   },
+   "expected_optimum": "unknown; the user's question was whether a per-step cost changes what the policy learns to do about long games",
+   "notes": "The first batch of the 26-value observation era (obs26-20260907), on the horizon-anneal config of b24 (gamma 0.99 -> 0.999 and lambda 0.95 -> 0.999 over the first half, huber, T 256, minibatch 512) at 50M, 4 seeds a cell. The reference in references.json is b24's own cell -- 200M and the 30-value era, so a loose one -- and pen0 is the batch's own control.",
+   "cells": [
+    {
+     "slug": "pen0",
+     "env": {
+      "SNEK_STEP_PENALTY": "0"
+     },
+     "prediction": "the control: the b24 config at 50M under the 26-value observation"
+    },
+    {
+     "slug": "pen0001",
+     "env": {
+      "SNEK_STEP_PENALTY": "0.0001"
+     },
+     "prediction": "within noise of the control"
+    },
+    {
+     "slug": "pen001",
+     "env": {
+      "SNEK_STEP_PENALTY": "0.001"
+     },
+     "prediction": "within noise of the control"
+    },
+    {
+     "slug": "pen01",
+     "env": {
+      "SNEK_STEP_PENALTY": "0.01"
+     },
+     "prediction": "large enough to be felt against the b2 reward preset's per-step terms; the cell to read"
+    }
+   ]
+  }
+ ]
+}

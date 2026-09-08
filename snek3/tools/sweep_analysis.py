@@ -40,6 +40,11 @@ from env import constants
 from tools import viewer_manifest as vm
 
 MANIFEST = os.path.join(constants.ROOT, 'plans', 'hyperparam-sweep.json')
+# Batches added to the sweep view after the plan closed, in the manifest's `batches` shape (`batch`, `knob`,
+# `control_value`, `cells` of `slug`/`env`/`prediction`), one entry per batch. b26 was the first (user,
+# 2026-09-07: "I know it wasn't part of the sweep, but I'd like to see the metrics"). Kept apart from the
+# plan so `plans/hyperparam-sweep.json` stays what it is -- the sweep as it was designed.
+EXTRA_MANIFEST = os.path.join(constants.ROOT, 'plans', 'sweep-extra.json')
 OUT_JSON = os.path.join(constants.ROOT, 'viewer', 'sweep.json')
 OUT_JS = os.path.join(constants.ROOT, 'viewer', 'sweep.js')
 FIGURES_DIR = os.path.join(constants.ROOT, 'charts', 'sweep')
@@ -382,14 +387,23 @@ def cell_stats(arm_scalars, ref_scalars):
     return out
 
 
-def build(runs_dir=None, manifest_path=None, references_path=None):
-    runs_dir = runs_dir or constants.RUNS_DIR
+def manifest_batches(manifest_path=None, extra_path=None):
+    """The plan's batches followed by the extra manifest's, in file order; the extra file is optional."""
     with open(manifest_path or MANIFEST) as handle:
-        manifest = json.load(handle)
+        batches = list(json.load(handle)['batches'])
+    extra = EXTRA_MANIFEST if extra_path is None else extra_path
+    if extra and os.path.exists(extra):
+        with open(extra) as handle:
+            batches += list(json.load(handle)['batches'])
+    return batches
+
+
+def build(runs_dir=None, manifest_path=None, references_path=None, extra_path=None):
+    runs_dir = runs_dir or constants.RUNS_DIR
     refs = vm.references(references_path)
     arms = {}
     batches = []
-    for batch in manifest['batches']:
+    for batch in manifest_batches(manifest_path, extra_path):
         name = batch['batch']
         reference = refs.get(name) or {}
         cells = layout_cells(batch, reference)
