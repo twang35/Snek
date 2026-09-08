@@ -34,9 +34,9 @@
   "SNEK_STEP_PENALTY": "0.01"
  },
  "id": "b28j-hist8a25-seed10",
- "label": "b28: hist8 anneal-to-25% (move history 8), seed 10 of 16, 200M",
+ "label": "b28: hist8 anneal-to-25% (move history 8), seed 10 of 8, 200M",
  "max_steps": 200015872,
- "notes": "Batch b28: b27's config (b24 base + step penalty 0.01, move history) at 200M with every anneal reaching its final value at 25% of the cap instead of 50% (SNEK_PPO_ANNEAL_FRACTION 0.25: lambda 0.95->0.999, gamma 0.99->0.999, entropy 0.01->0.001 all final by 50M, then 150M held there). Two depths, 8 seeds each so every wave of 8 is one observation width: hist4 (a-h) and hist8 (i-p); no hist0 cell -- b27 is the reference for that. Queued 2026-09-07 on b27 going well. Fixed: lr 2.5e-4, epochs 4, mb 512, T 256, clip 0.2, huber, adv norm, grad 0.5, adam eps 1e-7, vf 0.5, target_kl 0, chase-safe 0.1 gate 75, fc 320, 128 lanes, seeds pinned to the arm letter. Pinned to the desktop (2026-09-08) to free the laptop.",
+ "notes": "Batch b28: b27's config (b24 base + step penalty 0.01, move history) at 200M with every anneal reaching its final value at 25% of the cap instead of 50% (SNEK_PPO_ANNEAL_FRACTION 0.25: lambda 0.95->0.999, gamma 0.99->0.999, entropy 0.01->0.001 all final by 50M, then 150M held there). One depth, hist8, 8 seeds (i-p; the hist4 group a-h was dropped on 2026-09-08 before anything was claimed, so the batch is one wave); b27's hist4 and hist0 cells are the reference. Queued 2026-09-07 on b27 going well. Fixed: lr 2.5e-4, epochs 4, mb 512, T 256, clip 0.2, huber, adv norm, grad 0.5, adam eps 1e-7, vf 0.5, target_kl 0, chase-safe 0.1 gate 75, fc 320, 128 lanes, seeds pinned to the arm letter. Pinned to the desktop (2026-09-08) to free the laptop.",
  "policy": "b28j-hist8a25-seed10",
  "priority": 300,
  "project": "snek3",
