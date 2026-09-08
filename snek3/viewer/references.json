@@ -220,5 +220,20 @@
     "label": "reference: b26's pen01 cell (step penalty 0.01, no history) at 50M and 4 seeds -- the same base b27 runs at 100M with 8 seeds; b27's own hist0 cell is the like-for-like control",
     "after": "hist0",
     "value": "0"
+  },
+  "b28": {
+    "arms": [
+      "b27i-hist4-seed9",
+      "b27j-hist4-seed10",
+      "b27k-hist4-seed11",
+      "b27l-hist4-seed12",
+      "b27m-hist4-seed13",
+      "b27n-hist4-seed14",
+      "b27o-hist4-seed15",
+      "b27p-hist4-seed16"
+    ],
+    "label": "reference: b27's hist4 cell at 100M with the anneal reaching its final values at 50% -- b28 runs the same config at 200M with the anneal final at 25%",
+    "after": "hist4a25",
+    "value": "0.5"
   }
 }
