@@ -232,8 +232,8 @@
       "b27o-hist4-seed15",
       "b27p-hist4-seed16"
     ],
-    "label": "reference: b27's hist4 cell at 100M with the anneal reaching its final values at 50% -- b28 runs the same config at 200M with the anneal final at 25%",
-    "after": "hist4a25",
+    "label": "reference: b27's hist4 cell at 100M with the anneal reaching its final values at 50% -- b28 runs hist8 at 200M with the anneal final at 25%",
+    "after": "hist8a25",
     "value": "0.5"
   }
 }
