@@ -1,0 +1,12 @@
+{
+  "project": "snek3",
+  "id": "b27-hof30k-hist4-desktop",
+  "type": "eval",
+  "policies": ["b27i-hist4-seed9", "b27j-hist4-seed10", "b27k-hist4-seed11", "b27l-hist4-seed12",
+               "b27m-hist4-seed13", "b27n-hist4-seed14", "b27o-hist4-seed15", "b27p-hist4-seed16"],
+  "eval_args": ["--pass", "hof30k"],
+  "box": "desktop",
+  "priority": 290,
+  "label": "b27 hist4 hof30k (laptop wave 2, moved to the desktop)",
+  "notes": "The hof30k pass of b27 wave 2 (hist4, trained on the laptop), moved to the desktop 2026-09-08: 1355 candidates at the default above:99.6:hof5000 cut read as ~223 h on the laptop. The candidates' checkpoints, arch.json and the arms' _evals / _checkpoint_evals / _checkpoint_evals_hof5000 JSONs were rsynced to this box first. The laptop's own b27-hof30k-w2 is marked skipped in its queue mirror. Selector and episodes omitted: --pass hof30k carries the protocol's defaults."
+}
