@@ -17,6 +17,34 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### Two bits per past move in the observation — `SNEK_OBS_HISTORY` 4 or 8 — roughly doubles stage-B density (93.6 / 95.4% against 49.2) and lifts the confirmed 30,000-episode top from 99.65 to 99.8; the plan predicted no effect and was wrong
+
+b27 (`plans/obs-history.md`, section 4): b26's `pen01` base at 100M, 8 seeds a cell, `SNEK_OBS_HISTORY` 0 / 4 / 8 — the
+policy's last N turns read off its own body as a left/right bit pair each (`env/observations.py` `move_history_obs`,
+`vectorized/vec_env.py` `move_history_bits`), 26 + 2N values.
+
+| cell | stage-B density (seed range) | stage-A ≥98 share | best30 | `hof30k` rows ≥99.6 / ≥99.7 / =99.8 (seed 7) | top /30,000 |
+|---|---|---|---|---|---|
+| `hist0` (control) | 49.2% (33.0-64.7) | 47.2% | 99.08 | 0 / 0 / 0 of 124 (old 99.2 gate) | 99.4 |
+| `hist4` | 93.6% (91.0-95.7) | 84.3% | 99.76 | 605 / 215 / 19 of 1,355 | **99.8** (`b27k` @77594624, 29,943) |
+| `hist8` | 95.4% (94.3-95.7) | 85.4% | 99.79 | 937 / 278 / 9 of 1,836 | **99.8** (`b27t` @85065728, 29,944) |
+
+Every history seed sits above every control seed on density, and onset is unchanged (trailing-30 ≥ 90 at ~5-10M in all
+three cells), so the gain is in how often a checkpoint is near-perfect once trained, not in how fast it learns. At 30,000
+episodes on seed 7 — the HOF admission measurement — 28 rows across five arms read 99.8, against the table's first place at
+99.65 (`b10ck` @30523392, 29,894 of 30,000): the top row leads it by 0.17 pp, z ≈ 3.9. `hist8` is a small, consistent step
+above `hist4` (worst seed 94.3 above six of `hist4`'s eight; more rows through every gate); the peaks are level.
+
+**Why the prediction was wrong.** Phase 1 of the plan showed the champions fail by starving in a tail-following orbit
+with the policy confident on every lap, and predicted history would not help because the orbit is not a zigzag. The
+mechanism finding stands; the inference did not. The two bits per move are not being used as a zigzag detector — they
+make the recent turn sequence visible, and a policy that can see it has lifted its density everywhere, in-orbit deaths
+included. What the history is actually doing to the orbit is unmeasured: a death trace of `b27t` against `b26b` (same
+config, no history) is the experiment.
+
+b28 re-ran the `hist8` config at 200M with the anneal final at 25% — the same 50M anneal, 100M more of hold — and reads
+97.5% density over the run, 94.9 over its first 100M (b27: 95.4); its passes are pending.
+
 ### A per-step reward penalty of 0.01 nearly doubles stage-B density at 50M (46.3% against 25.5, every seed separated) without touching onset, entropy or KL; 0.001 and 0.0001 do nothing
 
 **Measured 2026-09-07, batch b26, four values x 4 seeds at 50M on the horizon-anneal config, the first batch of

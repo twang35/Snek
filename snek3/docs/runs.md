@@ -6,6 +6,35 @@ goes directly under `## Established` in [`findings.md`](findings.md).
 
 ## Now
 
+**b27, the move-history batch, has every pass in: at 30,000 episodes on seed 7 both history cells beat the Hall of Fame's
+first place (28 rows at 99.8 against 99.65), and b28 — the same `hist8` config held for 100M more — is through training and
+stage B at 97.5% density with its `hof5000` pass running on the desktop.** As of 2026-09-09 12:50:
+
+| box | batch | state | ETA |
+|---|---|---|---|
+| desktop | b28 w1 (`hist8a25`, seeds 9-16, 200M) | 8 arms at cap, stage B in (46,471 rows, 97.5%); `hof5000` running over 36,550 candidates, ~18 h left; `hof30k` queued behind it (~12% of candidates pass the 99.6 gate on b27's rate, so ~4,000+ rows, about a day) | hof5000 ~06:30 2026-09-10; hof30k ~2026-09-11 |
+| laptop | b27 w2 (`hist4`, seeds 9-16) | **nothing running: the scheduler (pid 75048) and its `hof30k` pass died at 15:42 on 2026-09-08** (the pass exited -9 at launch, the log's relaunch never happened, no process remains). Its status line on the site is frozen at 15:39 and reads "~223 h left". The `hist4` 30k measurement was done by the desktop instead (`b27-hof30k-hist4-desktop`, all 8 arms, imported and committed here) | nothing owed |
+
+**What is in.** b27 closed in substance: stage B `hist0` 49.2% / `hist4` 93.6 / `hist8` 95.4; `hof30k` on seed 7: `hist4`
+605 rows ≥99.6 and 19 at 99.8 (`b27i`, `b27k`), `hist8` 937 rows ≥99.6 and 9 at 99.8 (`b27t`, `b27u`, `b27v`); `hist0`
+tops at 99.4. Top rows `b27t` @85065728 (29,944 /30,000) and `b27k` @77594624 (29,943), z ≈ 3.9 over the HOF's `b10ck`
+@30523392 (29,894). Both checkpoints are on disk (`savedPolicies/` on the desktop and laptop respectively, no rotation
+loss). The finding is written (`findings.md`). b28 window for window equals b27's `hist8` (0-100M 94.9% against 95.4) —
+25% of 200M is the same 50M anneal — so its 97.5 is the extra 100M of hold reading 99.8% density; best30 99.88 against
+99.79. Readings in [`charts.md`](charts.md).
+
+**To do, in order.** (1) Release the laptop's `b27-w2` claim (`tools.claims`): with it held, `tools.batch_state` reads
+b27 as in flight, `results.md` gets no skeleton, and a laptop scheduler started now would relaunch the redundant 223 h
+pass from `runs/.live/.pass-b27-hof30k-w2`. Delete that marker with the claim. (2) Promote `b27t` @85065728 (`hof-promote`;
+the confirmed row is in its `hof30k` file — nothing to re-run) and consider `b27k` @77594624 beside it. (3) Write b27's
+`results.md` reading when the skeleton lands. (4) Decide whether `SNEK_OBS_HISTORY=8` becomes the default; a `hist16` cell
+and a step-penalty cell above 0.01 on the `hist8` base are the obvious next sweeps once b28's passes are in.
+
+**Watch.** The desktop's queued-line counts for `hof30k` still come from the running scheduler's old cut until it next
+restarts. `tools/eta.py`'s pooled-rate fix is committed. The laptop's `.failed-b25-hof30k` marker stands.
+
+## b27 passes closing, b28 waiting, as it read at 2026-09-08 11:00 (superseded)
+
 **b27, the move-history batch, has every arm through stage B, `hist4`'s 5,000-episode pass closed, `hist8`'s an hour out —
 and both history depths read ~94-95% stage-B density against the control's 49.2, `hist8` a small step above `hist4` on
 every density and stability column and level with it on the peaks.** As of 2026-09-08 11:00:
