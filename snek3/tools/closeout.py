@@ -59,31 +59,64 @@ REDRAW_SECONDS = 20
 # `tools.closeout <arms> --pass hof5000` and carries none of these numbers (see
 # `desktop/daemon/launch.py` for why it must not), and `tools/scheduler.py` runs the same command.
 # `stageb` is the close-out's own defaults, so a command that names no pass is unchanged.
+#
+# `stop` is the early stop (`vectorized/engine.py`, `plans/early-stop.md`): a checkpoint is retired once
+# that perfect rate is arithmetically out of reach. hof5000 stops at the hof30k cut, so no row it could
+# have promoted is lost; hof30k stops at the record it exists to find; stage B has none, because
+# density98 counts the rows a stop would retire. `check_stops` holds each stop at or above the next
+# pass's cut -- the invariant snek2 kept in one assert across two files and let drift.
 PASSES = {
-    'stageb': {'selector': 'screen', 'episodes': 500, 'label': None, 'seed': 0},
-    'hof5000': {'selector': 'above:{0:g}'.format(eta.HOF_THRESHOLD), 'episodes': 5000, 'label': 'hof5000', 'seed': 0},
-    'hof30k': {'selector': 'above:{0:g}:hof5000'.format(eta.HOF30K_THRESHOLD), 'episodes': 30000, 'label': 'hof30k', 'seed': 7},
+    'stageb': {'selector': 'screen', 'episodes': 500, 'label': None, 'seed': 0, 'stop': None},
+    'hof5000': {'selector': 'above:{0:g}'.format(eta.HOF_THRESHOLD), 'episodes': 5000, 'label': 'hof5000', 'seed': 0,
+                'stop': eta.HOF5000_STOP},
+    'hof30k': {'selector': 'above:{0:g}:hof5000'.format(eta.HOF30K_THRESHOLD), 'episodes': 30000, 'label': 'hof30k', 'seed': 7,
+               'stop': eta.HOF30K_STOP},
 }
 # The chain, in the order the passes run. `FOLLOW_ON[pass]` is what a finished pass earns.
 CHAIN = ('stageb', 'hof5000', 'hof30k')
 FOLLOW_ON = {CHAIN[i]: CHAIN[i + 1] for i in range(len(CHAIN) - 1)}
+# What the pass after each one selects at, from `eta.PASS_INPUTS` (the one place the cuts live).
+NEXT_CUT = {name: eta.PASS_INPUTS[FOLLOW_ON[name]][1] for name in FOLLOW_ON}
 
 
-def pass_settings(name, selector=None, episodes=None, label=None, seed=None):
-    """`{'selector', 'episodes', 'label', 'seed'}` for a named pass, with any explicit value winning.
+def check_stops(passes=None):
+    """Raises unless every pass's `stop` is None or at least the next pass's selector cut.
+
+    A stopped row is below its own stop target by arithmetic, so with the stop at or above the next cut
+    no stopped row can ever be selected -- the whole safety argument for stopping early. Below it, a
+    checkpoint retired at 99.5 of 5,000 could sit above a 99.4 hof30k cut and be promoted on a short,
+    biased sample. Run at import, so a bad edit fails every pass rather than the one that reads it.
+    """
+    passes = PASSES if passes is None else passes
+    for name, settings in passes.items():
+        stop, cut = settings.get('stop'), NEXT_CUT.get(name)
+        if stop is not None and cut is not None and stop < cut:
+            raise ValueError('pass {0!r} stops at {1:g} but the next pass selects at {2:g}: a stopped '
+                             'row could be promoted'.format(name, stop, cut))
+    return True
+
+
+check_stops()
+
+
+def pass_settings(name, selector=None, episodes=None, label=None, seed=None, stop=None, no_stop=False):
+    """`{'selector', 'episodes', 'label', 'seed', 'stop'}` for a named pass, with any explicit value winning.
 
     Explicit means "the caller typed it": `None` is the not-given value for every field, including
     `label`, whose preset for stage B *is* None — so a caller cannot un-label a hof pass by accident,
     and the hand-typed `--selector above:99.2 --episodes 5000 --label hof5000` still spells the same
-    pass `--pass hof5000` does.
+    pass `--pass hof5000` does. `no_stop` is the one way to switch a pass's stop *off*, since None
+    means not-given here too.
     """
     if name not in PASSES:
         raise ValueError('unknown pass {0!r}; known: {1}'.format(name, ', '.join(CHAIN)))
     settings = dict(PASSES[name])
     for key, value in (('selector', selector), ('episodes', episodes), ('label', label),
-                       ('seed', seed)):
+                       ('seed', seed), ('stop', stop)):
         if value is not None:
             settings[key] = value
+    if no_stop:
+        settings['stop'] = None
     return settings
 
 
@@ -151,15 +184,16 @@ def measure_one(policy, episodes=500, width=None, seed=0):
 
 
 def run(policies, selector='screen', episodes=500, shards=4, label=None, width=None, seed=0,
-        resume=True, merge=True, redraw_interval=REDRAW_SECONDS):
+        resume=True, merge=True, redraw_interval=REDRAW_SECONDS, stop_target=None):
     """Measures every arm, shards pooled across them. Returns the last failing arm's status, or 0.
 
     The keyword defaults are `evaluate.py`'s, which are the protocol — `screen:97` at 500 episodes.
     Nothing here has an opinion about them; a caller that wants the protocol passes nothing.
     """
     started = time.time()
-    print('=== close-out: {0} arm(s), selector {1}, {2} episodes, {3} shard(s) pooled'.format(
-        len(policies), selector, episodes, shards), flush=True)
+    print('=== close-out: {0} arm(s), selector {1}, {2} episodes, {3} shard(s) pooled{4}'.format(
+        len(policies), selector, episodes, shards,
+        '' if stop_target is None else ', stop once {0:g}% is out of reach'.format(stop_target)), flush=True)
     if selector == 'one':
         status = 0
         for index, policy in enumerate(policies, 1):
@@ -172,14 +206,14 @@ def run(policies, selector='screen', episodes=500, shards=4, label=None, width=N
                 print('--- {0} raised {1}: {2}'.format(policy, type(error).__name__, error), flush=True)
     else:
         status = run_pool(policies, selector, episodes, shards, label, width, seed, resume, merge,
-                          redraw_interval)
+                          redraw_interval, stop_target=stop_target)
     print('\n=== close-out done in {0:.1f}m, status {1}'.format(
         (time.time() - started) / 60.0, status), flush=True)
     return status
 
 
 def run_pool(policies, selector, episodes, pool, label, width, seed, resume, merge,
-             redraw_interval=REDRAW_SECONDS, poll=None):
+             redraw_interval=REDRAW_SECONDS, poll=None, stop_target=None):
     """Keeps up to `pool` shards running across the arms, in arm order, merging each arm as it ends.
 
     Every arm is resolved first, so a bad arm is reported at the top rather than an hour in, and the
@@ -194,7 +228,7 @@ def run_pool(policies, selector, episodes, pool, label, width, seed, resume, mer
     for index, policy in enumerate(policies, 1):
         try:
             wave = eval_wave.ArmWave(policy, selector, episodes, pool, label, width, seed, resume,
-                                     merge)
+                                     merge, stop_target=stop_target)
         except Exception as error:                    # noqa: BLE001 - one bad arm, not a bad batch
             status = 1
             print('--- [{0}/{1}] {2} raised {3}: {4}; the arms behind it still run'.format(
@@ -300,14 +334,20 @@ def build_parser():
     parser.add_argument('--seed', type=int, default=None)
     parser.add_argument('--no-resume', action='store_true')
     parser.add_argument('--no-merge', action='store_true')
+    parser.add_argument('--stop', type=float, default=None,
+                        help='retire a checkpoint once this perfect rate (percent) is out of reach; '
+                             'the default is the pass\'s (hof5000 99.6, hof30k 99.8, stage B none)')
+    parser.add_argument('--no-stop', action='store_true', help='measure every checkpoint to full length')
     return parser
 
 
 def main(argv=None):
     args = build_parser().parse_args(argv)
-    pass_ = pass_settings(args.pass_name, args.selector, args.episodes, args.label, args.seed)
+    pass_ = pass_settings(args.pass_name, args.selector, args.episodes, args.label, args.seed,
+                          args.stop, args.no_stop)
     return run(args.policies, pass_['selector'], pass_['episodes'], args.shards, pass_['label'],
-               args.width, pass_['seed'], not args.no_resume, not args.no_merge)
+               args.width, pass_['seed'], not args.no_resume, not args.no_merge,
+               stop_target=pass_['stop'])
 
 
 if __name__ == '__main__':

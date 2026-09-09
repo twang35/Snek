@@ -47,7 +47,8 @@ POLL_S = 10.0
 ETA_MIN_ROWS = 8
 
 
-def shard_command(policy, selector, episodes, label, shard, shards, width, seed, resume):
+def shard_command(policy, selector, episodes, label, shard, shards, width, seed, resume,
+                  stop_target=None):
     command = [sys.executable, '-u', '-m', 'tools.shard', policy,
                '--selector', selector, '--episodes', str(episodes),
                '--shard', str(shard), '--shards', str(shards), '--seed', str(seed)]
@@ -55,6 +56,8 @@ def shard_command(policy, selector, episodes, label, shard, shards, width, seed,
         command += ['--label', label]
     if width:
         command += ['--width', str(width)]
+    if stop_target is not None:
+        command += ['--stop', '{0:g}'.format(stop_target)]
     if not resume:
         command.append('--no-resume')
     return command
@@ -97,9 +100,10 @@ class ArmWave(object):
     """
 
     def __init__(self, policy, selector='screen', episodes=500, shards=4, label=None, width=None,
-                 seed=0, resume=True, merge=True):
+                 seed=0, resume=True, merge=True, stop_target=None):
         self.policy, self.selector, self.episodes = policy, selector, episodes
         self.label, self.width, self.seed, self.resume, self.merge = label, width, seed, resume, merge
+        self.stop_target = stop_target
         directory = restore.policy_dir(policy)
         self.steps, self.description = selectors.resolve(directory, selector, policy=policy)
         # An arm already merged is done: a rerun of the pass (a killed close-out relaunched, a
@@ -128,8 +132,10 @@ class ArmWave(object):
             print('note: {0} shards for {1} step(s); {2} will run'.format(
                 requested, len(self.steps), self.shards))
         print('{0}: {1} step(s) — {2}'.format(self.name, len(self.steps), self.description))
-        print('{0} episodes each, {1} shard(s) = {2} episodes total'.format(
-            self.episodes, self.shards, len(self.steps) * self.episodes))
+        print('{0} episodes each, {1} shard(s) = {2} episodes total{3}'.format(
+            self.episodes, self.shards, len(self.steps) * self.episodes,
+            '' if self.stop_target is None
+            else '; a checkpoint stops once {0:g}% is out of reach'.format(self.stop_target)))
 
     def start_shard(self):
         """Launches the next shard. Returns False when every shard has been launched."""
@@ -146,7 +152,7 @@ class ArmWave(object):
         self.logs.append((log_path, handle))
         self.processes.append(subprocess.Popen(
             shard_command(self.policy, self.selector, self.episodes, self.label, shard,
-                          self.shards, self.width, self.seed, self.resume),
+                          self.shards, self.width, self.seed, self.resume, self.stop_target),
             stdout=handle, stderr=subprocess.STDOUT, cwd=constants.ROOT))
         return True
 

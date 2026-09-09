@@ -1,8 +1,10 @@
 # Early stop in the deep passes: retire a checkpoint once the target is out of reach
 
-**Status: planned 2026-09-09, not started.** Written with the user after b27 and b28's hof30k passes. The
-thresholds and the estimates below are the user's asked-for configuration; §5 records where this plan
-disagrees with it and why.
+**Status: built 2026-09-09**, the same day it was planned, in the configuration the user chose after §5:
+**no stop in stage B, hof5000 stops at 99.6, hof30k stops at 99.8** (`eta.HOF5000_STOP`, `eta.HOF30K_STOP`;
+`--stop` / `--no-stop` on `tools.closeout`). §3 is as built, with one change: the sweep page shows the
+counts at the gates (`hof_996`, `hof30k_998`) in place of the hof means (user). The estimates in §4 were
+the basis; the 99.7 column there is the asked-for one, the 99.8 hof30k figures are in its text.
 
 ## 1. What is asked
 

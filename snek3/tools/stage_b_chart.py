@@ -104,22 +104,31 @@ def widest_region(rows, level=REGION_LEVEL):
     return best
 
 
+def full_rows(rows):
+    """The rows measured to full length. A row stopped early (`abandoned`, `plans/early-stop.md`) is a
+    short, downward-biased sample that is only ever "below the target": it is drawn, counted as
+    stopped, and left out of every pooled or threshold statistic here."""
+    return [row for row in rows if not row.get('abandoned')]
+
+
 def summarise(rows, level=REGION_LEVEL):
-    """The numbers the text block prints, as a dict. Empty rows give an empty dict."""
+    """The numbers the text block prints, as a dict. Empty rows give an empty dict. The pooled rate,
+    the thresholds and the region are over full rows only; `stopped` says how many were not."""
     if not rows:
         return {}
-    percents = [row['perfect_percent'] for row in rows]
-    episodes = sum(row['episodes'] for row in rows)
-    perfect = sum(row['perfect_games'] for row in rows)
-    count, region_lo, region_hi = widest_region(rows, level)
-    best = max(percents)
-    return {'rows': len(rows),
+    full = full_rows(rows)
+    percents = [row['perfect_percent'] for row in full]
+    episodes = sum(row['episodes'] for row in full)
+    perfect = sum(row['perfect_games'] for row in full)
+    count, region_lo, region_hi = widest_region(full, level) if full else (0, None, None)
+    best = max(percents) if percents else None
+    return {'rows': len(rows), 'stopped': len(rows) - len(full),
             'step_lo': int(rows[0]['step']), 'step_hi': int(rows[-1]['step']),
-            'episodes_per_row': sorted({row['episodes'] for row in rows}),
+            'episodes_per_row': sorted({row.get('episodes_planned', row['episodes']) for row in rows}),
             'episodes': episodes, 'perfect_games': perfect,
-            'pooled_percent': 100.0 * perfect / episodes,
+            'pooled_percent': 100.0 * perfect / episodes if episodes else None,
             'best_percent': best,
-            'best_steps': [int(row['step']) for row in rows if row['perfect_percent'] == best],
+            'best_steps': [int(row['step']) for row in full if row['perfect_percent'] == best],
             'at_or_above': {threshold: sum(1 for p in percents if p >= threshold)
                             for threshold in (95.0, 98.0, 99.0, 100.0)},
             'widest_region': count, 'region_lo': region_lo, 'region_hi': region_hi}
@@ -131,15 +140,20 @@ def text_summary(rows, name, level=REGION_LEVEL):
         return '{0}: no stage-B rows'.format(name)
     per_row = '/'.join(str(count) for count in facts['episodes_per_row'])
     lines = ['{0}  stage B'.format(name),
-             '  rows              {0:>10,}   steps {1:,} - {2:,}'.format(
-                 facts['rows'], facts['step_lo'], facts['step_hi']),
-             '  episodes per row  {0:>10}'.format(per_row),
-             '  pooled perfect    {0:>9.2f}%   ({1:,} / {2:,})'.format(
-                 facts['pooled_percent'], facts['perfect_games'], facts['episodes']),
-             '  best row          {0:>9.1f}%   @ step {1:,}{2}'.format(
-                 facts['best_percent'], facts['best_steps'][0],
-                 '' if len(facts['best_steps']) == 1
-                 else '  ({0} rows tie)'.format(len(facts['best_steps'])))]
+             '  rows              {0:>10,}   steps {1:,} - {2:,}{3}'.format(
+                 facts['rows'], facts['step_lo'], facts['step_hi'],
+                 '   ({0:,} stopped early; the numbers below are over the full rows)'.format(facts['stopped'])
+                 if facts['stopped'] else ''),
+             '  episodes per row  {0:>10}'.format(per_row)]
+    if facts['pooled_percent'] is not None:
+        lines += ['  pooled perfect    {0:>9.2f}%   ({1:,} / {2:,})'.format(
+                      facts['pooled_percent'], facts['perfect_games'], facts['episodes']),
+                  '  best row          {0:>9.1f}%   @ step {1:,}{2}'.format(
+                      facts['best_percent'], facts['best_steps'][0],
+                      '' if len(facts['best_steps']) == 1
+                      else '  ({0} rows tie)'.format(len(facts['best_steps'])))]
+    else:
+        lines.append('  every row stopped early; nothing to pool')
     for threshold in (95.0, 98.0, 99.0, 100.0):
         lines.append('  at or above {0:>4.0f}%  {1:>10,}'.format(
             threshold, facts['at_or_above'][threshold]))
@@ -149,7 +163,7 @@ def text_summary(rows, name, level=REGION_LEVEL):
     else:
         lines.append('  widest >={0:.0f}% run  {1:>10}'.format(level, 'none'))
 
-    ranked = sorted(rows, key=lambda row: (-row['perfect_percent'], int(row['step'])))[:TOP_N]
+    ranked = sorted(full_rows(rows), key=lambda row: (-row['perfect_percent'], int(row['step'])))[:TOP_N]
     lines.append('  top {0}:'.format(len(ranked)))
     for row in ranked:
         # `perfect_ci95` is stored in percent, like `perfect_percent` beside it.
@@ -174,6 +188,19 @@ def build_figure(rows, name=None, level=REGION_LEVEL):
         figure.tight_layout(pad=0.4)
         return figure, axis
 
+    # A stopped row (`abandoned`) is drawn hollow and grey at the rate it had when it stopped -- it is
+    # a real reading of "below the target", not a measurement to pool -- and every statistic on the
+    # chart is over the full rows. `percents` is the full rows' from here on.
+    stopped = [row for row in rows if row.get('abandoned')]
+    rows = full_rows(rows)
+    if stopped:
+        axis.plot([int(row['step']) for row in stopped], [row['perfect_percent'] for row in stopped],
+                  marker='o', markersize=1.8, markerfacecolor='none', markeredgewidth=0.4,
+                  linestyle='none', color='gray', alpha=0.5)
+    if not rows:
+        axis.set_title('{0} — every row stopped early'.format(name or ''), fontsize=LABEL_SIZE + 1)
+        figure.tight_layout(pad=0.4)
+        return figure, axis
     steps = np.array([int(row['step']) for row in rows], dtype=np.int64)
     percents = np.array([row['perfect_percent'] for row in rows], dtype=np.float64)
 

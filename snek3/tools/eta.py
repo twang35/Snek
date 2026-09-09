@@ -78,6 +78,14 @@ MIN_LEDGER_CHECKPOINTS = 50
 # and the move-history arms (b27) put ~7,500 rows a cell through the old cut (195 h on the laptop).
 HOF_THRESHOLD = 99.2
 HOF30K_THRESHOLD = 99.6
+# The early stops (user, 2026-09-09; `plans/early-stop.md`): a hof5000 checkpoint is retired once it can
+# no longer read 99.6 -- the hof30k cut, so nothing it could have been promoted for is lost -- and a
+# hof30k checkpoint once it can no longer read 99.8, the record the pass exists to find. Stage B has no
+# stop: density98 counts the rows a stop would retire. Modelled on b27 + b28's rows: 88 -> 60 h with
+# the 99.7 stop, ~50 h with 99.8. A stop must never sit below the next pass's cut (asserted in
+# `closeout.PASSES`), or a stopped row could be selected.
+HOF5000_STOP = 99.6
+HOF30K_STOP = 99.8
 # Which file each pass's selector reads and the threshold it applies: `(label of the input pass,
 # threshold)`, with None the arm's stage-A `_evals.json`. Spelled here rather than read from
 # `closeout.PASSES` so this module imports no torch (the daemon reads it too); `closeout` imports

@@ -82,8 +82,19 @@ def test_scalars_stage_b_and_hof():
                    {'rows': [{'perfect_percent': p} for p in [98.8, 99.1]]},
                    {'rows': [{'step': 5, 'perfect_percent': 99.3}]})
     assert (s['rows'], s['density98'], s['density99'], s['cands99'], s['best_row']) == (4, 75.0, 25.0, 1, 99.2)
-    assert (s['hof_rows'], s['hof_best'], s['hof_9873']) == (2, 99.1, 2)
-    assert (s['hof30k_best'], s['hof30k_best_step']) == (99.3, 5)
+    assert (s['hof_rows'], s['hof_best'], s['hof_9873'], s['hof_996']) == (2, 99.1, 2, 0)
+    assert (s['hof30k_best'], s['hof30k_best_step'], s['hof30k_998']) == (99.3, 5, 0)
+
+
+def test_scalars_count_stopped_rows_as_rows_and_in_no_mean():
+    """A hof row stopped early (`abandoned`) is below every gate by arithmetic; the page ranks on the
+    counts at the gates (`hof_996`, `hof30k_998`) and the means are over the full rows only."""
+    hof = {'rows': [{'perfect_percent': 99.7}, {'perfect_percent': 99.6}, {'perfect_percent': 97.0, 'abandoned': True}]}
+    h30 = {'rows': [{'step': 1, 'perfect_percent': 99.8}, {'step': 2, 'perfect_percent': 98.5, 'abandoned': True}]}
+    s = sa.scalars({'summary': {}, 'evals': []}, {'rows': []}, hof, h30)
+    assert (s['hof_rows'], s['hof_stopped'], s['hof_996'], s['hof_mean']) == (3, 1, 2, 99.65)
+    assert (s['hof30k_rows'], s['hof30k_stopped'], s['hof30k_998'], s['hof30k_mean']) == (2, 1, 1, 99.8)
+    assert 'hof_mean' not in sa.METRIC_KEYS and 'hof_996' in sa.METRIC_KEYS and 'hof30k_998' in sa.METRIC_KEYS
 
 
 def test_mann_whitney_exact_floor_and_tie():

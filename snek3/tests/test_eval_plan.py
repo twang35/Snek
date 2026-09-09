@@ -87,17 +87,31 @@ def test_the_stage_a_screen_is_carried_through():
     assert eval_plan.build_row(1, held([95]), stage_a_percent=96.0)['stage_a_percent'] == 96.0
 
 
-def test_a_row_carries_no_comparability_caveats():
-    """Every row is full length, so there is nothing to check before comparing two of them.
-
-    snek2's rows carried `selected_by`, `abandoned` and a nullable `min_achievable`, and half of
-    reading two of them was working out whether they were comparable at all. Their absence here is
-    the protocol, so it is pinned: a field reappearing means the single-stage design has quietly
-    grown a second stage.
+def test_a_full_row_says_so_and_carries_no_other_comparability_caveats():
+    """snek2's rows carried `selected_by`, `abandoned` and a nullable `min_achievable`, and half of
+    reading two of them was working out whether they were comparable at all. Since 2026-09-09 the one
+    caveat that exists -- the early stop -- is on **every** row, `abandoned: false` with
+    `episodes_planned == episodes` on a full one, so a reader checks one field and never guesses.
+    The other two stay absent: a tier or a nullable gate reappearing means the single-stage design has
+    quietly grown a second stage.
     """
     row = eval_plan.build_row(1, held([95] * 10))
-    for field in ('selected_by', 'abandoned', 'min_achievable', 'graph_surrounding'):
+    assert row['abandoned'] is False and row['episodes'] == row['episodes_planned'] == 10
+    for field in ('selected_by', 'min_achievable', 'graph_surrounding'):
         assert field not in row, field
+
+
+def test_a_stopped_row_is_the_banked_episodes_and_says_what_was_planned():
+    """The engine hands out exactly the episodes it banked (`plans/early-stop.md`); the row's rate and
+    interval are over those, and `episodes_planned` keeps the depth that was asked for."""
+    sample = held([95, 95, 0, 0, 0], seconds=2.0)
+    sample.update({'abandoned': True, 'episodes_planned': 500, 'stop_target': 99.6})
+    row = eval_plan.build_row(7, sample)
+    assert row['abandoned'] is True
+    assert (row['episodes'], row['episodes_planned'], row['perfect_games']) == (5, 500, 2)
+    assert row['perfect_percent'] == 40.0 and len(row['episode_scores']) == 5
+    assert 'stopped at 5/500' in eval_plan.one_line(row)
+    assert 'stopped' not in eval_plan.one_line(eval_plan.build_row(1, held([95] * 10)))
 
 
 # --------------------------------------------------- what the row carries per episode

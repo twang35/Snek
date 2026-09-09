@@ -156,3 +156,26 @@ def test_a_merge_carries_the_shards_header_fields(runs):
     merged = results.read(path)
     assert merged['seed'] == 7 and merged['config'] == 'grid 10x10'
     assert merged['policy'] == 'a' and merged['label'] is None
+
+
+# ------------------------------------------------------------------- the early stop
+
+def test_a_merge_keeps_the_stop_target_and_refuses_two_targets_once_a_row_was_stopped(runs):
+    """A stopped row means something only against the target it was stopped under, and a merged file
+    has one header -- so shards stopped under different targets do not merge. Full rows are full under
+    any target, so files with none stopped merge whatever their headers say (`plans/early-stop.md`)."""
+    stopped = dict(a_row(2000), episodes=120, abandoned=True, episodes_planned=500)
+    results.write(results.stage_b_path('a', shard=0, shards=2),
+                  {'episodes': 500, 'stop_target': 99.6, 'rows': [a_row(1000)]})
+    results.write(results.stage_b_path('a', shard=1, shards=2),
+                  {'episodes': 500, 'stop_target': 99.6, 'rows': [stopped]})
+    path, rows = results.merge('a')
+    assert results.read(path)['stop_target'] == 99.6 and [r['step'] for r in rows] == [1000, 2000]
+    results.write(results.stage_b_path('a', shard=0, shards=2),
+                  {'episodes': 500, 'stop_target': None, 'rows': [a_row(1000)]})
+    with pytest.raises(ValueError, match='different stop targets'):
+        results.merge('a')
+    results.write(results.stage_b_path('a', shard=1, shards=2),
+                  {'episodes': 500, 'stop_target': 99.6, 'rows': [a_row(2000)]})      # nothing stopped
+    _, rows = results.merge('a')
+    assert [r['step'] for r in rows] == [1000, 2000]

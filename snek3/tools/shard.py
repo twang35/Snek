@@ -54,11 +54,12 @@ class _NetPool:
 
 
 def measure_slice(policy_dir, steps, episodes, out_path, policy=None, width=None, seed=0,
-                  stage_a=None, on_row=None, resume=True, device='cpu'):
+                  stage_a=None, on_row=None, resume=True, device='cpu', stop_target=None):
     """Measure `steps` and write rows to `out_path`. Returns every row in the file, by step.
 
     `stage_a` maps step -> the stage-A percent that selected it, carried into each row so the screen
-    and the measurement can be compared on the same weights.
+    and the measurement can be compared on the same weights. `stop_target` (a percent, or None) is the
+    engine's early stop; it is written into the file header so the rows it stopped can be read against it.
     """
     # One thread. A wave runs 4-16 of these at once, and torch defaults to one thread per core each,
     # so the processes oversubscribe the box and every one of them slows down. The matmul here is
@@ -72,7 +73,7 @@ def measure_slice(policy_dir, steps, episodes, out_path, policy=None, width=None
     existing = {row['step']: row for row in results.rows_of(results.read(out_path))} if resume else {}
     todo = [step for step in steps if step not in existing]
     header = {'policy': results.run_name(policy), 'arch': arch, 'episodes': episodes,
-              'seed': seed, 'config': config.describe()}
+              'seed': seed, 'stop_target': stop_target, 'config': config.describe()}
 
     def flush():
         payload = dict(header)
@@ -84,8 +85,9 @@ def measure_slice(policy_dir, steps, episodes, out_path, policy=None, width=None
         flush()
         return [existing[step] for step in sorted(existing)]
 
-    print('{0}: {1} step(s) to measure, {2} already done, {3} episodes each'.format(
-        out_path, len(todo), len(existing), episodes))
+    print('{0}: {1} step(s) to measure, {2} already done, {3} episodes each{4}'.format(
+        out_path, len(todo), len(existing), episodes,
+        '' if stop_target is None else ', stopped once {0:g}% is out of reach'.format(stop_target)))
 
     pool = _NetPool(arch, device=device)
     nets = {}
@@ -125,12 +127,16 @@ def measure_slice(policy_dir, steps, episodes, out_path, policy=None, width=None
         if on_row:
             on_row(row)
 
-    engine.measure_stream(next_job, on_complete, episodes, width=width, seed=seed)
+    engine.measure_stream(next_job, on_complete, episodes, width=width, seed=seed,
+                          stop_target=stop_target)
     flush()
 
     ordered = [existing[step] for step in sorted(existing)]
-    print('{0}: {1} row(s), {2} episodes, {3:.1f}m'.format(
-        out_path, len(ordered), len(todo) * episodes, (time.time() - started) / 60.0))
+    played = sum(existing[step]['episodes'] for step in todo if step in existing)
+    stopped = sum(1 for step in todo if step in existing and existing[step].get('abandoned'))
+    print('{0}: {1} row(s), {2} of {3} episodes played{4}, {5:.1f}m'.format(
+        out_path, len(ordered), played, len(todo) * episodes,
+        ' ({0} stopped early)'.format(stopped) if stopped else '', (time.time() - started) / 60.0))
     return ordered
 
 
@@ -144,6 +150,9 @@ def main(argv=None):
     parser.add_argument('--shards', type=int, default=1)
     parser.add_argument('--width', type=int, default=None, help='games in lockstep')
     parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--stop', type=float, default=None,
+                        help='retire a checkpoint once this perfect rate is out of reach (percent); '
+                             'absent: measure every checkpoint to full length')
     parser.add_argument('--no-resume', action='store_true')
     args = parser.parse_args(argv)
 
@@ -160,7 +169,8 @@ def main(argv=None):
         return 0
 
     measure_slice(directory, mine, args.episodes, out_path, policy=args.policy,
-                  width=args.width, seed=args.seed, resume=not args.no_resume)
+                  width=args.width, seed=args.seed, resume=not args.no_resume,
+                  stop_target=args.stop)
     return 0
 
 

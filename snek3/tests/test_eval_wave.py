@@ -57,3 +57,11 @@ def test_an_arm_with_no_candidates_is_unchanged_by_the_rule(monkeypatch):
     _arm(monkeypatch, [])
     wave = eval_wave.ArmWave('b1a-x', shards=4)
     assert not wave.already_merged and wave.shards == 0
+
+
+def test_the_shard_command_carries_the_stop_target_only_when_there_is_one():
+    from tools import eval_wave
+    plain = eval_wave.shard_command('b1a', 'screen', 500, None, 0, 4, None, 0, True)
+    assert '--stop' not in plain
+    stopped = eval_wave.shard_command('b1a', 'above:99.2', 5000, 'hof5000', 0, 4, None, 0, True, 99.6)
+    assert stopped[stopped.index('--stop') + 1] == '99.6'

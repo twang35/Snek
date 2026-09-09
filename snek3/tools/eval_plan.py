@@ -1,10 +1,14 @@
 """A measured checkpoint, as a result row.
 
-**Every row here is full length and directly comparable.** snek3's protocol is one stage — stage A
-is the trainer's own 100-episode self-eval, stage B measures every checkpoint that reached ≥97/100
-at 500 episodes — so there is no screen/confirm split, no tiered selector and no min-achievable
-gate. snek2's files carried `selected_by`, `abandoned` and a nullable `min_achievable` for exactly
-those, and half of comparing two of its rows was working out whether they were comparable at all.
+**Every row here is full length, or stopped below its pass's target and says so.** snek3's protocol
+is one stage — stage A is the trainer's own 100-episode self-eval, stage B measures every checkpoint
+that reached ≥97/100 at 500 episodes — so there is no screen/confirm split and no tiered selector.
+snek2's files carried `selected_by`, `abandoned` and a nullable `min_achievable` for exactly those,
+and half of comparing two of its rows was working out whether they were comparable at all. Since
+2026-09-09 the deep passes stop a checkpoint once its target is arithmetically out of reach
+(`plans/early-stop.md`): such a row carries `abandoned: true`, `episodes` as banked and
+`episodes_planned` as asked, and every pooling reader takes full rows only. `abandoned` is on every
+row, false on a full one, so a reader never has to guess.
 
 **`episode_scores` is stored, not just the summaries, and that is not redundancy:** the summaries
 pool but **the median does not**, so a row rebuilt from two summaries carries a quietly wrong median.
@@ -68,6 +72,10 @@ def build_row(step, held, stage_a_percent=None):
         'step': int(step),
         'stage_a_percent': stage_a_percent,
         'episodes': episodes,
+        # The early stop (`vectorized/engine.py`): banked episodes above, what was asked for here, and
+        # whether the checkpoint was retired before reaching it. False and equal on a full row.
+        'episodes_planned': int(held.get('episodes_planned', episodes)),
+        'abandoned': bool(held.get('abandoned', False)),
         'perfect_games': perfect,
         'perfect_percent': round(100.0 * perfect / episodes, 1),
         'perfect_ci95': [round(100.0 * low, 1), round(100.0 * high, 1)],
@@ -104,8 +112,10 @@ def perfect_flags(row):
 def one_line(row, label=''):
     """A row as one line, for a log or a terminal."""
     low, high = row['perfect_ci95']
+    stopped = ('  stopped at {0}/{1}'.format(row['episodes'], row['episodes_planned'])
+               if row.get('abandoned') else '')
     return ('{0}step {1:>9}  {2:>5.1f}% perfect  [{3:.1f}, {4:.1f}]  {5}/{6} episodes  '
-            'score avg {7:.2f} median {8:.1f} max {9:.0f}  reward {10:.2f}  {11:.0f}s'.format(
+            'score avg {7:.2f} median {8:.1f} max {9:.0f}  reward {10:.2f}  {11:.0f}s{12}'.format(
                 '{0}  '.format(label) if label else '', row['step'], row['perfect_percent'],
                 low, high, row['perfect_games'], row['episodes'], row['avg_score'],
-                row['median_score'], row['max_score'], row['avg_reward'], row['seconds']))
+                row['median_score'], row['max_score'], row['avg_reward'], row['seconds'], stopped))

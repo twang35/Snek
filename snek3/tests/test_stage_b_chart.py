@@ -215,3 +215,21 @@ def test_the_trend_constants_are_gone_not_just_unused():
     # Left behind, they read as a feature that is temporarily off and invite it back.
     assert not hasattr(stage_b_chart, 'TREND_WINDOW')
     assert not hasattr(stage_b_chart, 'TREND_COLOR')
+
+
+def test_summarise_pools_full_rows_only_and_counts_the_stopped_ones():
+    """A stopped row (`abandoned`) is a short sample below its target: it is a row, and it is in no
+    pooled rate, threshold count or top list (`plans/early-stop.md`)."""
+    stopped = dict(row(3000, 40, episodes=50), abandoned=True, episodes_planned=100)
+    rows = [row(1000, 98), row(2000, 99), stopped]
+    facts = stage_b_chart.summarise(rows)
+    assert (facts['rows'], facts['stopped']) == (3, 1)
+    assert facts['pooled_percent'] == pytest.approx(197 / 200 * 100, abs=0.01)
+    assert facts['at_or_above'][95.0] == 2 and facts['episodes_per_row'] == [100]
+    text = stage_b_chart.text_summary(rows, 'arm')
+    assert '1 stopped early' in text and '3,000' not in text.split('top')[1]
+    only_stopped = stage_b_chart.summarise([stopped])
+    assert only_stopped['pooled_percent'] is None and only_stopped['best_percent'] is None
+    assert 'nothing to pool' in stage_b_chart.text_summary([stopped], 'arm')
+    figure, _ = stage_b_chart.build_figure(rows, "arm")    # draws, with the stopped row hollow
+    assert figure is not None

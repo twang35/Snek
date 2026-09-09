@@ -82,8 +82,9 @@ METRICS = [
     ('density98', '≥98%/500 density', True, '%'),
     ('density99', '≥99%/500 density', True, '%'),
     ('hof_best', 'hof5000 best', True, ''),
-    ('hof_mean', 'hof5000 mean', True, ''),
+    ('hof_996', 'hof5000 rows ≥99.6 (hof30k candidates)', True, ''),
     ('hof30k_best', 'hof30k best', True, ''),
+    ('hof30k_998', 'hof30k rows ≥99.8', True, ''),
     ('best30', 'best30', True, ''),
     ('stage_a_98', 'stage-A ≥98, post-onset', True, '%'),
     ('drawdown80', 'evals < 80, post-onset', False, '%'),
@@ -296,20 +297,29 @@ def scalars(stage_a, stage_b, hof, h30):
         'cands99': sum(s >= 99 for s in scores) if scores else None,
         'best_row': max(scores) if scores else None,
     })
-    hof_scores = [r.get('perfect_percent', 0) for r in ((hof or {}).get('rows') or [])]
+    # A row stopped early (`abandoned`, `plans/early-stop.md`) counts as a row and toward no mean; it is
+    # below every `>=` cut by arithmetic. The page ranks on the counts at the gates, not the means (user, 2026-09-09).
+    hof_rows = (hof or {}).get('rows') or []
+    hof_scores = [r.get('perfect_percent', 0) for r in hof_rows]
+    hof_full = [r.get('perfect_percent', 0) for r in hof_rows if not r.get('abandoned')]
     out.update({
         'hof_rows': len(hof_scores) if hof is not None else None,
-        'hof_mean': round(sum(hof_scores) / len(hof_scores), 2) if hof_scores else None,
+        'hof_stopped': len(hof_scores) - len(hof_full) if hof is not None else None,
+        'hof_mean': round(sum(hof_full) / len(hof_full), 2) if hof_full else None,
         'hof_best': max(hof_scores) if hof_scores else None,
         'hof_9873': sum(s >= 98.73 for s in hof_scores) if hof_scores else None,
+        'hof_996': sum(s >= 99.6 for s in hof_scores) if hof is not None else None,
     })
     h30_rows = (h30 or {}).get('rows') or []
+    h30_full = [r.get('perfect_percent', 0) for r in h30_rows if not r.get('abandoned')]
     best = max(h30_rows, key=lambda r: r.get('perfect_percent', 0)) if h30_rows else None
     out.update({
         'hof30k_rows': len(h30_rows) if h30 is not None else None,
-        'hof30k_mean': round(sum(r.get('perfect_percent', 0) for r in h30_rows) / len(h30_rows), 2) if h30_rows else None,
+        'hof30k_stopped': len(h30_rows) - len(h30_full) if h30 is not None else None,
+        'hof30k_mean': round(sum(h30_full) / len(h30_full), 2) if h30_full else None,
         'hof30k_best': best.get('perfect_percent') if best else None,
         'hof30k_best_step': best.get('step') if best else None,
+        'hof30k_998': sum(r.get('perfect_percent', 0) >= 99.8 for r in h30_rows) if h30 is not None else None,
     })
     return out
 

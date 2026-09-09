@@ -1072,7 +1072,8 @@ def test_a_running_pass_says_what_is_left_of_it_and_a_queued_arm_is_estimated_at
     from tools import eta as eta_module
     policies = os.path.join(box['runs'], 'policies')
     monkeypatch.setattr(eta_module.constants, 'POLICY_DIR', policies)
-    # a finished arm that took 1,000 s for its 100 steps (0.1 steps/s), and a ledger of 400-s passes
+    # a finished arm that took 1,000 s for its 100 steps (0.1 steps/s), and a ledger at 400 s a checkpoint
+    # over enough checkpoints (`eta.MIN_LEDGER_CHECKPOINTS`) for the pooled rate to stand in for the default
     done, todo = spec('b13aa-mb32-seed1'), spec('b13ab-mb32-seed2')
     for s in (done, todo):
         s['max_steps'] = 100
@@ -1084,7 +1085,8 @@ def test_a_running_pass_says_what_is_left_of_it_and_a_queued_arm_is_estimated_at
     with open(evals, 'w') as handle:
         json.dump({'summary': {'step': 100}, 'evals': [{'step': 100, 'steps_per_second': 1.0, 'perfect_percent': 99}]}, handle)
     os.utime(evals, (2000.0, 2000.0))
-    live_runs.record_duration('stageb', 400.0, box['runs'], arms=1, checkpoints=1)
+    live_runs.record_duration('stageb', 400.0 * eta_module.MIN_LEDGER_CHECKPOINTS, box['runs'],
+                              arms=eta_module.MIN_LEDGER_CHECKPOINTS, checkpoints=eta_module.MIN_LEDGER_CHECKPOINTS)
     d = driver([done, todo], box, Calls(), wave=1, clock=lambda: 5000.0)
     d.active_pass = ('stageb', 1, [done])
     d._pass_started = 4900.0                          # 100 s into a 400-s pass

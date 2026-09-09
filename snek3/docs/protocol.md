@@ -32,6 +32,19 @@ screen/confirm split, no min-achievable gate, so no `abandoned` rows that are sh
 neighbours and no `min_achievable` to read out of the payload before pooling anything. That was not
 true of snek2's files, which have four gate eras.
 
+**The two deep passes stop a checkpoint early, on arithmetic only (2026-09-09,
+[`plans/early-stop.md`](../plans/early-stop.md)).** `hof5000` retires a checkpoint once it can no longer
+read 99.6 (the `hof30k` cut, so nothing it could have promoted is lost) and `hof30k` once it can no
+longer read 99.8; stage B never stops, because density98 counts the rows a stop would retire. The rule
+is "even a perfect remainder cannot reach the target", so a checkpoint that would have reached it is
+never stopped, and a stopped row's rate is below the target by construction. Such a row carries
+`abandoned: true`, `episodes` as banked and `episodes_planned` as asked; every row carries `abandoned`,
+false on a full one. **Readers pool full rows only** -- the stage-B chart's pooled rate and thresholds,
+the viewer's and the sweep page's means -- and the site shows the counts at the gates (`>=99.6 /5000`,
+`>=99.8 /30k`) where it showed means. The file header carries `stop_target`, and a merge refuses shards
+stopped under different targets. Modelled on b27 and b28: 88 h of passes become about 50 h.
+`--no-stop` on `tools.closeout` measures every checkpoint to full length.
+
 ### What each stage costs
 
 Measured on the laptop over `b45a`'s 3,222 checkpoints, which is a champion-class arm's full history.

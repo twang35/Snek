@@ -69,6 +69,7 @@ def test_build_reduces_each_arm_to_the_docs_numbers(tmp_path):
     assert (a['best30'], a['drawdown50'], a['stage_b_png']) == (99, 33.33, True)
     assert (a['hof_png'], a['hof_rows'], a['hof_mean'], a['hof_best'], a['hof_9873']) == (True, 3, 98.8, 99.4, 2)
     assert (a['hof30k_png'], a['hof30k_rows'], a['hof30k_mean'], a['hof30k_best'], a['hof30k_best_step']) == (True, 2, 99.1, 99.3, 10)
+    assert (a['hof_stopped'], a['hof_996'], a['hof30k_stopped'], a['hof30k_998']) == (0, 0, 0, 0)
     b = by['b9cf-lam999-seed2']
     assert b['rows'] is None and b['density98'] is None and b['best30'] == 90
     assert b['hof_png'] is False and b['hof_rows'] is None and b['hof30k_png'] is False and b['hof30k_rows'] is None

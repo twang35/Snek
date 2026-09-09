@@ -109,15 +109,29 @@ def merge(policy, label=None, delete_shards=False):
     Rows are sorted by step and de-duplicated, keeping the longer sample when two shards measured
     the same checkpoint — which should not happen, and did in snek2 when a re-dispatched shard
     overlapped the slice it was replacing.
+
+    **Shards measured under different `stop_target`s are refused when any row was stopped.** A stopped
+    row means something only against the target it was stopped under (`plans/early-stop.md`), and a
+    merged file has one header, so one file cannot hold two targets' stopped rows. snek2's result files
+    had four gate eras that every reader had to know about; here the merge refuses instead. Full rows
+    are full under any target, so files with none stopped merge whatever their headers say.
     """
     by_step = {}
+    targets, any_stopped = set(), False
     for path in shard_paths(policy, label):
         payload = read(path)
+        targets.add((payload or {}).get('stop_target'))
         for row in rows_of(payload):
+            any_stopped = any_stopped or bool(row.get('abandoned'))
             existing = by_step.get(row['step'])
             if existing is None or row['episodes'] > existing['episodes']:
                 by_step[row['step']] = row
     rows = [by_step[step] for step in sorted(by_step)]
+    if any_stopped and len(targets) > 1:
+        raise ValueError(
+            '{0}: shards were measured under different stop targets {1} and some rows were stopped; '
+            'a merged file has one target. Re-measure the odd shards (`--no-resume`) under one.'.format(
+                _stage_b_stem(policy, label), sorted(targets, key=lambda t: (t is None, t))))
 
     header = {}
     paths = shard_paths(policy, label)

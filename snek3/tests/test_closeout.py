@@ -27,10 +27,10 @@ class Waves(object):
         self.alive_now, self.peak = 0, 0
 
     def __call__(self, policy, selector='screen', episodes=500, shards=4, label=None, width=None,
-                 seed=0, resume=True, merge=True):
+                 seed=0, resume=True, merge=True, stop_target=None):
         self.calls.append(policy)
         self.settings[policy] = {'selector': selector, 'episodes': episodes, 'shards': shards,
-                                 'label': label, 'seed': seed}
+                                 'label': label, 'seed': seed, 'stop_target': stop_target}
         code = self.codes.get(policy, 0)
         if isinstance(code, Exception):
             raise code
@@ -142,7 +142,7 @@ def test_the_protocol_defaults_are_the_close_outs_own(waves):
     stub = waves()
     closeout.run(['b1a'])
     assert stub.settings['b1a'] == {'selector': 'screen', 'episodes': 500, 'shards': 4,
-                                    'label': None, 'seed': 0}
+                                    'label': None, 'seed': 0, 'stop_target': None}
 
 
 # --- the pool --------------------------------------------------------------------------------------
@@ -270,7 +270,7 @@ def test_the_hof_cut_is_one_number_and_the_estimator_reads_the_same_one():
 def test_stage_b_is_the_default_pass_and_the_close_outs_own_defaults():
     """A command that names no pass is unchanged: `screen:97` at 500, unlabelled, seed 0."""
     assert closeout.pass_settings('stageb') == {'selector': 'screen', 'episodes': 500,
-                                                'label': None, 'seed': 0}
+                                                'label': None, 'seed': 0, 'stop': None}
     args = closeout.build_parser().parse_args(['b1a'])
     assert args.pass_name == 'stageb'
 
@@ -280,9 +280,42 @@ def test_a_hof_pass_is_labelled_so_it_never_overwrites_what_it_selected_from():
     rows would replace the 500-episode file `above:99.2` reads. The hof-remeasure skill calls omitting
     the label 'destroying the input'; the preset makes it impossible to omit."""
     assert closeout.pass_settings('hof5000') == {'selector': 'above:99.2', 'episodes': 5000,
-                                                 'label': 'hof5000', 'seed': 0}
+                                                 'label': 'hof5000', 'seed': 0, 'stop': 99.6}
     assert closeout.pass_settings('hof30k') == {'selector': 'above:99.6:hof5000', 'episodes': 30000,
-                                                'label': 'hof30k', 'seed': 7}
+                                                'label': 'hof30k', 'seed': 7, 'stop': 99.8}
+
+
+def test_the_early_stops_are_the_users_and_stage_b_has_none():
+    """2026-09-09: hof5000 stops at the hof30k cut, hof30k at the 99.8 record, stage B never --
+    density98 counts the rows a stop would retire (`plans/early-stop.md`)."""
+    from tools import eta
+    assert (eta.HOF5000_STOP, eta.HOF30K_STOP) == (99.6, 99.8)
+    assert closeout.PASSES['stageb']['stop'] is None
+    assert closeout.PASSES['hof5000']['stop'] == eta.HOF5000_STOP
+    assert closeout.PASSES['hof30k']['stop'] == eta.HOF30K_STOP
+
+
+def test_a_stop_below_the_next_passs_cut_is_refused_at_import():
+    """The safety argument: a stopped row is below its stop target, so with the stop at or above the
+    next cut it can never be selected. snek2 held this in one assert across two files and let it drift."""
+    assert closeout.check_stops()
+    bad = {name: dict(settings) for name, settings in closeout.PASSES.items()}
+    bad['hof5000']['stop'] = 99.5                    # below the 99.6 hof30k cut
+    with pytest.raises(ValueError, match='could be promoted'):
+        closeout.check_stops(bad)
+    bad['hof5000']['stop'] = 99.6                    # exactly the cut is fine
+    assert closeout.check_stops(bad)
+    bad['hof30k']['stop'] = 50.0                     # the last pass has no next cut
+    assert closeout.check_stops(bad)
+
+
+def test_the_stop_flag_wins_and_no_stop_is_the_only_way_off():
+    assert closeout.pass_settings('hof5000', stop=99.7)['stop'] == 99.7
+    assert closeout.pass_settings('hof5000', no_stop=True)['stop'] is None
+    args = closeout.build_parser().parse_args(['b1a', '--pass', 'hof30k', '--no-stop'])
+    assert args.no_stop and args.stop is None
+    args = closeout.build_parser().parse_args(['b1a', '--pass', 'hof30k', '--stop', '99.7'])
+    assert args.stop == 99.7
 
 
 def test_an_explicit_flag_wins_over_the_preset_but_none_never_unsets_it():
@@ -296,13 +329,14 @@ def test_an_explicit_flag_wins_over_the_preset_but_none_never_unsets_it():
 def test_main_hands_the_pass_to_run(monkeypatch):
     seen = {}
 
-    def run(policies, selector, episodes, shards, label, width, seed, resume, merge):
+    def run(policies, selector, episodes, shards, label, width, seed, resume, merge, stop_target=None):
         seen.update(policies=policies, selector=selector, episodes=episodes, shards=shards,
-                    label=label, seed=seed)
+                    label=label, seed=seed, stop_target=stop_target)
         return 0
     monkeypatch.setattr(closeout, 'run', run)
     assert closeout.main(['b1a', 'b1b', '--pass', 'hof30k', '--shards', '12']) == 0
     assert seen == {'policies': ['b1a', 'b1b'], 'selector': 'above:99.6:hof5000', 'episodes': 30000,
-                    'shards': 12, 'label': 'hof30k', 'seed': 7}
+                    'shards': 12, 'label': 'hof30k', 'seed': 7, 'stop_target': 99.8}
+    assert closeout.main(['b1a', '--pass', 'hof30k', '--no-stop']) == 0 and seen['stop_target'] is None
     closeout.main(['b1a'])
     assert (seen['selector'], seen['episodes'], seen['label'], seen['seed']) == ('screen', 500, None, 0)

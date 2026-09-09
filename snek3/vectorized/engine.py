@@ -33,10 +33,18 @@ episode is ever selected on its length. Which physical lane runs one is irreleva
 independent given the policy. Concretely: episode length correlates with outcome, and banking on
 completion order put a 20-of-100 prefix at 0.25% failures against a true 2.23%.
 
-**No abandon gate, by design.** Stopping a measurement early once it cannot reach a threshold makes
-its row shorter than a full one, so a file holding both cannot be pooled directly and every reader
-has to know which gate it was measured under. At this throughput flat equal-effort rows are cheaper
-to produce than they are to reason about.
+**An early stop, on arithmetic only (`stop_target`, since 2026-09-09; none before).** A checkpoint is
+retired once `perfect_banked + (episodes - banked) < ceil(target * episodes)` -- even a perfect
+remainder could not reach the target -- so a checkpoint that would have reached it is never stopped,
+and a stopped row's rate is below the target by construction. Two rules keep the sample honest: the
+job stops *starting* episodes and is retired only when its last in-flight lane completes, because the
+lanes still playing are disproportionately the long, perfect games and dropping them would bias the
+rate down on top of the arithmetic; and the sample handed out is exactly the banked episodes, marked
+`abandoned` with `episodes_planned` beside it, so no reader mistakes it for a full row. The reason the
+gate was left out of the port -- a stopped row is shorter than its neighbours and not poolable with
+them -- is answered by the readers: `stage_b_chart` and the viewer pool full rows only, and nothing
+selects a stopped row because every selector's cut is at or above the stop target (`closeout.PASSES`
+asserts that ordering). Without a target nothing here changes. `plans/early-stop.md`.
 """
 
 import time
@@ -78,13 +86,18 @@ class _Job:
     """One checkpoint being measured: its policy, its quota, and its accumulating sample."""
 
     __slots__ = ('key', 'policy_fn', 'episodes', 'started', 'scores', 'perfect', 'rewards',
-                 'started_at', 'live', 'banked')
+                 'started_at', 'live', 'banked', 'failures', 'stop_target', 'needed')
 
-    def __init__(self, key, policy_fn, episodes):
+    def __init__(self, key, policy_fn, episodes, stop_target=None):
         self.key = key
         self.policy_fn = policy_fn
         self.episodes = episodes
         self.started = 0
+        self.failures = 0
+        # The early stop: `needed` perfect games, or the target is out of reach. None: never stops.
+        self.stop_target = stop_target
+        self.needed = (None if stop_target is None
+                       else int(-(-int(round(stop_target * 100)) * episodes // 10000)))   # ceil(target% * episodes)
         # Preallocated, because an episode is banked at the index it was **started** at rather than
         # the position it finished in. See `record` for why that distinction is statistical rather
         # than cosmetic.
@@ -125,12 +138,26 @@ class _Job:
         self.perfect[slot] = int(score == C.MAX_POSSIBLE_SCORE)
         self.rewards[slot] = float(reward)
         self.banked += 1
+        self.failures += 1 - self.perfect[slot]
+
+    def out_of_reach(self):
+        """Whether even a perfect remainder -- every in-flight and every unstarted episode -- would leave
+        the row below `stop_target`. Arithmetic, never a prediction."""
+        if self.needed is None:
+            return False
+        return (self.banked - self.failures) + (self.episodes - self.banked) < self.needed
+
+    @property
+    def stopped(self):
+        return self.out_of_reach() and self.banked < self.episodes
 
     def wants_more(self):
-        return self.started < self.episodes
+        return self.started < self.episodes and not self.out_of_reach()
 
     def finished(self):
-        return self.done >= self.episodes
+        """Full, or stopped with its last in-flight lane banked. A stopped job keeps its slot until
+        `live` is zero so the episodes still playing are counted rather than dropped (module docstring)."""
+        return self.done >= self.episodes or (self.out_of_reach() and self.live == 0)
 
     def held(self):
         """The sample in the shape `eval_plan.build_row` consumes.
@@ -138,17 +165,35 @@ class _Job:
         Raw per-episode lists rather than running totals, because that is what makes a row resumable
         and its median exact — a row rebuilt from summaries carries a quietly wrong median.
         """
+        if self.stopped:
+            if self.live:
+                raise RuntimeError(
+                    'checkpoint {0} handed out a stopped sample with {1} lane(s) still playing'.format(
+                        self.key, self.live))
+            kept = [i for i, s in enumerate(self.scores) if s is not None]
+            if len(kept) != self.banked:
+                raise RuntimeError(
+                    'checkpoint {0} stopped with {1} banked but {2} slots filled'.format(
+                        self.key, self.banked, len(kept)))
+            return {'scores': [self.scores[i] for i in kept], 'perfect': [self.perfect[i] for i in kept],
+                    'rewards': [self.rewards[i] for i in kept],
+                    'seconds': time.time() - self.started_at, 'abandoned': True,
+                    'episodes_planned': self.episodes, 'stop_target': self.stop_target}
         if self.banked != self.episodes:
             raise RuntimeError(
                 'checkpoint {0} handed out a sample with {1} of {2} episodes banked -- a gap would '
                 'reach the result file as a null'.format(self.key, self.banked, self.episodes))
         return {'scores': self.scores, 'perfect': self.perfect, 'rewards': self.rewards,
-                'seconds': time.time() - self.started_at, 'abandoned': False}
+                'seconds': time.time() - self.started_at, 'abandoned': False,
+                'episodes_planned': self.episodes, 'stop_target': self.stop_target}
 
 
 def measure_stream(next_job, on_complete, episodes, width=None, max_live=None, seed=0,
-                   shaping_discount=1.0, on_step=None):
+                   shaping_discount=1.0, on_step=None, stop_target=None):
     """Measure a stream of checkpoints in one wide env, calling `on_complete(key, held)` for each.
+
+    `stop_target`, a percent or None: retire a checkpoint once it can no longer reach that perfect
+    rate (`_Job.out_of_reach`), handing out the episodes it banked as an `abandoned` sample.
 
     `next_job` is called whenever a lane needs work and returns `(key, policy_fn)` or None when the
     stream is exhausted. `policy_fn` takes an `(m, OBS_LEN)` float32 array and returns `(m,)` int
@@ -193,7 +238,7 @@ def measure_stream(next_job, on_complete, episodes, width=None, max_live=None, s
             if fresh is None:
                 exhausted = True
                 return None
-            job = _Job(fresh[0], fresh[1], episodes)
+            job = _Job(fresh[0], fresh[1], episodes, stop_target)
             live.append(job)
             if job.wants_more():
                 return job

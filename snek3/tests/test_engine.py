@@ -52,7 +52,8 @@ def test_every_checkpoint_gets_exactly_the_requested_episodes():
     for key, held in out.items():
         assert len(held['scores']) == 25, '{0} got {1}'.format(key, len(held['scores']))
         assert len(held['perfect']) == 25 and len(held['rewards']) == 25
-        assert not held['abandoned'], 'the vec engine has no abandon gate'
+        assert not held['abandoned'], 'without a stop target nothing is ever stopped'
+        assert held['episodes_planned'] == 25 and held['stop_target'] is None
     assert stats['checkpoints'] == 5
     assert stats['episodes'] == 125
 
@@ -228,6 +229,74 @@ def test_banking_one_slot_twice_is_refused():
         assert 'twice' in str(error)
     else:
         raise AssertionError('a double-banked slot must raise')
+
+
+# ------------------------------------------------------------------- the early stop
+
+def test_a_job_is_out_of_reach_by_arithmetic_and_not_one_failure_sooner():
+    """Target 80% of 10 needs 8 perfect games, so the 3rd failure -- not the 2nd -- puts it out of
+    reach: with 2 failures banked the other 8 could still all be perfect. `plans/early-stop.md`."""
+    job = engine._Job('ckpt', lambda obs: obs, 10, stop_target=80.0)
+    assert job.needed == 8
+    job.record(0, 0, 0.0); job.record(1, 0, 0.0)
+    assert not job.out_of_reach() and job.wants_more() and not job.stopped
+    job.record(2, 0, 0.0)
+    assert job.out_of_reach() and not job.wants_more() and job.stopped
+    assert not job.finished() or job.live == 0             # finished only once nothing is in flight
+
+
+def test_a_stopped_job_waits_for_its_in_flight_lanes_and_hands_out_exactly_the_banked_episodes():
+    """Dropping the lanes still playing would bias the rate down -- they are the long, perfect games --
+    so a stopped job is retired only when `live` is zero, and its sample is the banked episodes,
+    compacted, marked `abandoned` with the planned depth beside it."""
+    job = engine._Job('ckpt', lambda obs: obs, 10, stop_target=80.0)
+    job.started, job.live = 5, 2                             # 5 started: 3 banked below, 2 in flight
+    job.record(0, 0, 0.0); job.record(1, 0, 0.0); job.record(2, 0, 0.0)
+    assert job.stopped and not job.finished()
+    try:
+        job.held()
+    except RuntimeError as error:
+        assert 'still playing' in str(error)
+    else:
+        raise AssertionError('a stopped job with lanes in flight must not hand out its sample')
+    job.record(3, C.MAX_POSSIBLE_SCORE, 1.0); job.live -= 1
+    job.record(4, 0, 0.0); job.live -= 1
+    assert job.finished()
+    held = job.held()
+    assert held['abandoned'] is True and held['episodes_planned'] == 10 and held['stop_target'] == 80.0
+    assert held['scores'] == [0, 0, 0, C.MAX_POSSIBLE_SCORE, 0] and held['perfect'] == [0, 0, 0, 1, 0]
+    assert len(held['rewards']) == 5 and None not in held['scores']
+
+
+def test_a_job_that_reaches_its_target_is_never_stopped():
+    job = engine._Job('ckpt', lambda obs: obs, 10, stop_target=80.0)
+    for slot in range(10):
+        job.record(slot, C.MAX_POSSIBLE_SCORE if slot >= 2 else 0, 1.0)
+        assert not job.out_of_reach()
+    assert job.finished() and job.held()['abandoned'] is False and len(job.held()['scores']) == 10
+
+
+def test_the_stream_stops_a_hopeless_checkpoint_early_and_keeps_the_batch_full():
+    """Through `measure_stream`: a checkpoint that fails every episode is retired once its target is
+    out of reach, its sample is whole (no None), the survivors beside it still get every episode, and
+    the run banks fewer episodes than were planned -- the whole point."""
+    jobs = [('dead%d' % i, suicidal_policy) for i in range(3)] + [('ok', survival_policy)]
+    queue = list(jobs); out = {}
+    stats = engine.measure_stream(lambda: queue.pop(0) if queue else None,
+                                  lambda key, held: out.__setitem__(key, held),
+                                  40, width=32, seed=3, stop_target=50.0)
+    assert sorted(out) == ['dead0', 'dead1', 'dead2', 'ok']
+    for key in ('dead0', 'dead1', 'dead2'):
+        held = out[key]
+        assert held['abandoned'] is True and held['episodes_planned'] == 40
+        # 50% of 40 needs 20 perfect games; the 21st failure puts it out of reach, and the lanes in
+        # flight at that moment finish, so the sample is at least 21 and well short of 40.
+        assert 21 <= len(held['scores']) < 40, (key, len(held['scores']))
+        assert None not in held['scores'] and len(held['perfect']) == len(held['rewards']) == len(held['scores'])
+        assert sum(held['perfect']) + (40 - len(held['scores'])) < 20, 'stopped only once out of reach'
+    assert out['ok']['abandoned'] is False and len(out['ok']['scores']) == 40
+    assert stats['checkpoints'] == 4
+    assert stats['episodes'] == sum(len(h['scores']) for h in out.values()) < 160
 
 
 def test_a_partial_job_refuses_to_hand_out_a_sample():

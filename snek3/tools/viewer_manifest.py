@@ -14,9 +14,12 @@ the page and the tables cannot disagree:
 | `sef` | `summary.strong_eval_fraction`, share of stage-A evals at >=80% perfect |
 | `rows`, `density98`, `cands99`, `best_row` | stage-B row count, share at >=98/500, `hof5000` candidates at >=99, max |
 | `drawdown50`, `drawdown80` | share of post-competence stage-A evals (onset = first >=80%) below 50 / 80 |
-| `hof_rows`, `hof_mean`, `hof_best`, `hof_9873` | the `hof5000` pass: rows, mean, max, count at >=98.73 (the snek2 champion) |
-| `hof30k_rows`, `hof30k_mean`, `hof30k_best`, `hof30k_best_step` | the `hof30k` pass (30,000 episodes, seed 7): rows, mean, max and where it is |
-| `hof_99` | `hof5000` rows at >=99 /5,000 — the `hof30k` candidate cut |
+| `hof_rows`, `hof_stopped`, `hof_mean`, `hof_best`, `hof_9873`, `hof_996` | the `hof5000` pass: rows, rows stopped early, mean over the full rows, max, count at >=98.73 (the snek2 champion), count at >=99.6 (the `hof30k` cut) |
+| `hof30k_rows`, `hof30k_stopped`, `hof30k_mean`, `hof30k_best`, `hof30k_best_step`, `hof30k_998` | the `hof30k` pass (30,000 episodes, seed 7): rows, rows stopped early, mean over the full rows, max and where it is, count at >=99.8 |
+| `hof_99` | `hof5000` rows at >=99 /5,000 — the `hof30k` candidate cut until 2026-09-08 |
+
+A row stopped early (`abandoned`, `plans/early-stop.md`) is a short sample that is only ever below its
+pass's target: it counts as a row and never in a mean, and it sits below every `>=` count by arithmetic.
 | `status` | `{a, b, h, k}`: one word per view, see `pass_state` — so the page can say whether a missing panel is a pass still to come or one that found nothing |
 | `status_box` | `{a, b, h, k}`: the box a running or queued view is on (`desktop`, `laptop`, or None when unknown or unclaimed), so the caption names the right box |
 
@@ -268,21 +271,28 @@ def arm_record(policy, runs_dir, desktop=None, laptop_live=frozenset(), arm_boxe
         'best_row': max(scores) if scores else None,
     })
     hof = _read(os.path.join(runs_dir, policy + '_checkpoint_evals_hof5000.json'))
-    hof_scores = [r.get('perfect_percent', 0) for r in ((hof or {}).get('rows') or [])]
+    hof_rows = (hof or {}).get('rows') or []
+    hof_scores = [r.get('perfect_percent', 0) for r in hof_rows]
+    hof_full = [r.get('perfect_percent', 0) for r in hof_rows if not r.get('abandoned')]
     record.update({
         'hof_rows': len(hof_scores) if hof is not None else None,
-        'hof_mean': round(sum(hof_scores) / len(hof_scores), 2) if hof_scores else None,
+        'hof_stopped': len(hof_scores) - len(hof_full) if hof is not None else None,
+        'hof_mean': round(sum(hof_full) / len(hof_full), 2) if hof_full else None,
         'hof_best': max(hof_scores) if hof_scores else None,
         'hof_9873': sum(s >= 98.73 for s in hof_scores) if hof_scores else None,
+        'hof_996': sum(s >= 99.6 for s in hof_scores) if hof is not None else None,
     })
     h30 = _read(os.path.join(runs_dir, policy + '_checkpoint_evals_hof30k.json'))
     h30_rows = (h30 or {}).get('rows') or []
+    h30_full = [r.get('perfect_percent', 0) for r in h30_rows if not r.get('abandoned')]
     best = max(h30_rows, key=lambda r: r.get('perfect_percent', 0)) if h30_rows else None
     record.update({
         'hof30k_rows': len(h30_rows) if h30 is not None else None,
-        'hof30k_mean': round(sum(r.get('perfect_percent', 0) for r in h30_rows) / len(h30_rows), 2) if h30_rows else None,
+        'hof30k_stopped': len(h30_rows) - len(h30_full) if h30 is not None else None,
+        'hof30k_mean': round(sum(h30_full) / len(h30_full), 2) if h30_full else None,
         'hof30k_best': best.get('perfect_percent') if best else None,
         'hof30k_best_step': best.get('step') if best else None,
+        'hof30k_998': sum(r.get('perfect_percent', 0) >= 99.8 for r in h30_rows) if h30 is not None else None,
         'hof_99': sum(s >= 99 for s in hof_scores) if hof is not None else None,
     })
     # Where each view stands. Stage A is live if this box or the desktop is training it, or if its
