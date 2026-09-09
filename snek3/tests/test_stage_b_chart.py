@@ -205,8 +205,12 @@ def test_the_two_horizontal_guides_survive():
 
 
 def test_the_points_and_the_rug_are_still_drawn():
-    rows = [row(1000 * i, 495, episodes=500) for i in range(1, 60)]
-    figure, axis = stage_b_chart.build_figure(rows, 'arm')
+    # Stated against the pass's own level rather than a count out of 500, so moving the gate (99 -> 99.2
+    # on 2026-09-09) cannot empty the rug while the property it is about still holds.
+    level = stage_b_chart.region_level(None)
+    rows = [row(1000 * i, 500, episodes=500) for i in range(1, 60)]
+    assert rows[0]['perfect_percent'] >= level
+    figure, axis = stage_b_chart.build_figure(rows, 'arm', level=level)
     markers = [line for line in axis.get_lines() if line.get_marker() not in ('', 'None', None)]
     assert len(markers) == 2, 'expected the point cloud and the >=level rug'
 
