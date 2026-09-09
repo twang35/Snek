@@ -25,8 +25,8 @@ loss). The finding is written (`findings.md`). b28 window for window equals b27'
 
 **To do, in order.** (1) Done 2026-09-09 14:50: b27 reads closed on the pool and its `results.md` reading is written (a
 `release` would have been wrong — it returns the wave's arms to the pool for retraining; publishing the pass under the
-wave's id is what closes it). (2) Promote `b27t` @85065728 (`hof-promote`;
-the confirmed row is in its `hof30k` file — nothing to re-run) and consider `b27k` @77594624 beside it. (3) Decide whether `SNEK_OBS_HISTORY=8` becomes the default; a `hist16` cell
+wave's id is what closes it). (2) Done 2026-09-09 15:05: `b27t` @85065728 and `b27k` @77889536 are in `hallOfFame/` as a pair, the new record
+(99.81 /30,000 each, z = 0.19 between them, 3.8-3.9 over `b10ck`). (3) Decide whether `SNEK_OBS_HISTORY=8` becomes the default; a `hist16` cell
 and a step-penalty cell above 0.01 on the `hist8` base are the obvious next sweeps once b28's passes are in.
 
 **Watch.** The desktop's queued-line counts for `hof30k` still come from the running scheduler's old cut until it next

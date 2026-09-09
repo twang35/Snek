@@ -11,19 +11,24 @@ nothing.
 ## The entries
 
 All admitted on 30,000 fresh episodes at **seed 7** — a seed the selecting pass never used; `b5h` and
-`b6b` on 2026-09-01, `b9ch` and the two `b10ck` checkpoints on 2026-09-03, `b17cl` on 2026-09-06. Add one with the
+`b6b` on 2026-09-01, `b9ch` and the two `b10ck` checkpoints on 2026-09-03, `b17cl` on 2026-09-06, `b27t` and `b27k` (the first move-history
+entries) on 2026-09-09. Add one with the
 [`hof-promote`](../skills/hof-promote/SKILL.md) skill.
 
 | entry | algo / net | confirmed **/30,000** | 95% CI | selected at | drop |
 |---|---|---|---|---|---|
-| **`b10ck-g100-seed3-ckpt30523392`** | PPO, `fc 320`, 4 epochs, λ 0.98, **γ 1.00** | **99.65%** (29894) | [99.6, 99.7] | 99.5 /5000 | +0.15 pp |
+| **`b27t-hist8-seed20-ckpt85065728`** | PPO, `fc 320`, 4 epochs, b24's λ/γ anneal, step penalty 0.01, **move history 8** (26+16 values) | **99.81%** (29944) | [99.8, 99.9] | 99.8 /5000 | +0.01 pp |
+| `b27k-hist4-seed11-ckpt77889536` | PPO, `fc 320`, 4 epochs, b24's λ/γ anneal, step penalty 0.01, **move history 4** (26+8 values) | **99.81%** (29942) | [99.8, 99.9] | 99.9 /5000 | −0.09 pp |
+| `b10ck-g100-seed3-ckpt30523392` | PPO, `fc 320`, 4 epochs, λ 0.98, **γ 1.00** | **99.65%** (29894) | [99.6, 99.7] | 99.5 /5000 | +0.15 pp |
 | `b10ck-g100-seed3-ckpt30539776` | PPO, `fc 320`, 4 epochs, λ 0.98, **γ 1.00** | **99.55%** (29866) | [99.5, 99.6] | 99.3 /5000 | +0.25 pp |
 | `b17cl-clipanneal001hold80-seed4-ckpt11386880` | PPO, `fc 320`, 4 epochs, λ 0.98, **clip 0.2→0.001 annealed over 40M, held for the last 10M** | **99.50%** (29851) | [99.4, 99.6] | 99.6 /5000 | −0.10 pp |
 | **`b9ch-lam999-seed4-ckpt47251456`** | PPO, `fc 320`, 4 epochs, **λ 0.999** | **99.30%** (29790) | [99.2, 99.4] | 99.40 /5000 | −0.10 pp |
 | `b5h-ep8-seed8-ckpt9027584` | PPO, `fc 320`, 8 epochs | **98.96%** (29687) | [98.84, 99.07] | 99.20 /5000 | −0.24 pp |
 | `b6b-fc200x100-seed2-ckpt133120000` | PPO, `fc 200,100`, 4 epochs | **98.73%** (29619) | [98.60, 98.85] | 99.10 /5000 | −0.37 pp |
 
-`b10ck` @30523392 leads `b9ch` by 0.35 pp (z = 5.9, p < 1e-8); the two `b10ck` entries are 16,384
+`b27t` @85065728 and `b27k` @77889536 are **not distinguishable from each other** (z = 0.19, p = 0.85): two arms, two
+history depths, one rate, admitted as a pair. Each leads `b10ck` @30523392 by 0.16 pp (`b27t` z = 3.9, p < 1e-4; `b27k`
+z = 3.8, p = 0.0002), so the record moved. Below them: `b10ck` @30523392 leads `b9ch` by 0.35 pp (z = 5.9, p < 1e-8); the two `b10ck` entries are 16,384
 transitions apart and **not distinguishable from each other** (z = 1.8, p = 0.07) — they are one
 region admitted as a pair, not a first and a second place. `b17cl` @11386880 sits between them and `b9ch`:
 it is **not distinguishable from the lower `b10ck` entry** (z = 0.9, p = 0.37), 0.15 pp behind the upper one
@@ -48,9 +53,33 @@ batch's densest with `clipannealhold80` (24.3 and 23.5% of stage-B rows ≥98%, 
 
 The copy was verified from `hallOfFame/` at 500 episodes on seed 11: 496/500.
 
-## ‡ The record: `b10ck` @30523392 and @30539776, 99.6% over 30,000 episodes — 2026-09-03
+## ‡ The record: `b27t` @85065728 and `b27k` @77889536, 99.8% over 30,000 episodes — 2026-09-09
 
-**The undiscounted arm holds the record.** b10 swept the discount γ off b7's `fc 320` / 4-epoch /
+**The first entries with move history, and the first pair from two different arms.** b27 (`plans/obs-history.md`) put
+the policy's last N turns into the observation as a left/right bit pair each, on b26's `pen01` base (b24's λ/γ anneal
+plus a 0.01 step penalty) at 100M, 8 seeds a cell, N = 0 / 4 / 8. The depth-8 arm seed 20 and the depth-4 arm seed 11
+are the entries; the plan had predicted no effect on the perfect rate (`docs/findings.md`). The protocol found both end
+to end — `b27t`: 2,840 checkpoints screened at 500 episodes, 1,564 re-measured at 5,000 (`hof5000`, desktop), 384 at
+≥99.6 /5,000 re-measured at 30,000 on seed 7 (`hof30k`, desktop); `b27k`: 2,783 screened, 1,451 at 5,000 (laptop),
+365 at 30,000 (desktop, `b27-hof30k-hist4-desktop`). **Both regions are wide**: `b27t`'s 33 `hof30k` neighbours within
+±1M read 99.4-99.7 with a mean of 99.62 and its 56 `hof5000` neighbours average 99.57 (45 of them ≥99.5); `b27k`'s 54
+`hof30k` neighbours read 99.5-99.8 with a mean of 99.69 — above the old record's own number — and its 60 `hof5000`
+neighbours average 99.69 (59 ≥99.5), against 99.17 for `b10ck`'s basin. `b27k` holds 15 rows at 99.8 /30,000 and 142
+at ≥99.7; `b27t` 7 and 84. Across the batch's 3,191 confirmed rows the 5,000 → 30,000 drop was **−0.09 pp** (`hist4`
+−0.10, `hist8` −0.09), and 493 of them, from 14 of the 16 history arms, beat `b10ck`'s 29,894 — the old record is
+ordinary inside these two cells. **Why two, and why these**: the 28 rows at 99.8 across five arms are all within 19
+games of each other, so no ranking among them is supported; one entry per depth is what the table can say, `b27k`
+@77889536 is the centre of a seven-checkpoint plateau (77.59M-77.89M, every one 99.8 /30k) and `b27t` @85065728 is the
+best count in the batch. `b27i` @96174080 (99.8, 29,942) adds nothing over `b27k` and is not promoted.
+
+Each copy was verified from `hallOfFame/` at 500 episodes on seed 11: `b27k` 500/500, `b27t` 498/500. These are the
+first entries whose observation is not the 30-value one: their `arch.json` eras carry the depth (`-hist4`, `-hist8`) and
+`tools/sidecar_env.py` sets `SNEK_OBS_HISTORY` from it, so `watch.py`, `evaluate.py` and `record_gif.py` take the
+`hallOfFame/` path with no environment set by hand.
+
+## ‡ The previous record: `b10ck` @30523392 and @30539776, 99.6% over 30,000 episodes — 2026-09-03
+
+**The undiscounted arm held the record from 2026-09-03 to 2026-09-09.** b10 swept the discount γ off b7's `fc 320` / 4-epoch /
 λ 0.98 cell, and γ 1.00 seed 3 is the arm — the cell the batch's own read calls a cliff, because the
 deployed policy collapses and recovers for its entire run (44% of its post-competence evals below 50%
 perfect). Its *surviving* checkpoints are another matter: γ 1.00's 178 `hof5000` rows average 98.8
@@ -121,6 +150,7 @@ reaches this folder as the maximum of a selection, so it is biased upward.
 | `b5h` and `b6b` as admitted | 99.20, 99.10 /5000 | 98.96, 98.73 /30000 | −0.24, −0.37 |
 | `b9ch` as admitted (2026-09-03) | 99.40 /5000 | 99.30 /30000 | **−0.10** |
 | `b10ck` pair as admitted (2026-09-03) | 99.5, 99.3 /5000 | 99.65, 99.55 /30000 | **+0.15, +0.25** |
+| `b27t`, `b27k` as admitted (2026-09-09) | 99.8, 99.9 /5000 | 99.81, 99.81 /30000 | +0.01, −0.09 |
 
 Every entry held up far better than snek2's did, and the `b10ck` pair *rose*, which is what a wide basin
 looks like when the selecting number was an under-draw rather than an over-draw. That is the *result*, not the process working as
@@ -158,8 +188,8 @@ simply the top rows.
 Captured with [`record_gif.py`](../record_gif.py) straight off the offscreen surface, one frame per
 game step at 50 fps, snek2's settings (`--tile 20 --colors 32`, game seeds 1, 2, 3), so the two eras'
 folders read alike. **The number under each is its confirmed rate from the table above, not anything
-the recording shows** — three games settle nothing about a rate. 200x247, 73-202 s, 1.8-5.3 MB
-(**18 MB for the section**), reproducible: the policy is greedy and food placement is the only
+the recording shows** — three games settle nothing about a rate. 200x247, 67-202 s, 1.7-5.3 MB
+(**21 MB for the section**), reproducible: the policy is greedy and food placement is the only
 randomness, so the same command gives the same bytes.
 
 ```
@@ -168,7 +198,9 @@ PYTHONPATH=. python -u record_gif.py hallOfFame/<entry> --tile 20 --colors 32 --
 
 | recording | what to watch for |
 |:--|:--|
-| ![b10ck @30523392](gifs/b10ck-g100-seed3-ckpt30523392.gif)<br>**`b10ck-g100-seed3`** @30523392<br>**99.65% /30,000** — the record | **The undiscounted policy is slow.** Its three perfect games run 2,774-3,727 steps against 1,081-1,329 for the three discounted entries: with γ 1.00 a reward later is worth exactly a reward now, so the critic has no reason to prefer the short way to the food, and the policy settles into long safe circuits. It also holds the record — the safety that costs it speed is the same thing that wins it games. `avg_steps` is not in the eval tables; it should be. |
+| ![b27t](gifs/b27t-hist8-seed20-ckpt85065728.gif)<br>**`b27t-hist8-seed20`** @85065728<br>**99.81% /30,000** — the record | **The first policy here that can see its own last eight turns.** Three perfect games of 1,014-1,027 steps — as direct as `b9ch`'s routes and a third of `b10ck`'s length, at a higher rate than either. Watch the late game against `b10ck`: it fills the board in tight sweeps rather than long circuits. |
+| ![b27k](gifs/b27k-hist4-seed11-ckpt77889536.gif)<br>**`b27k-hist4-seed11`** @77889536<br>**99.81% /30,000** | Four turns of history instead of eight, a different arm and seed, and indistinguishable at depth (z = 0.19). Games of 969-1,040 steps; set beside `b27t` the two read as one style, which is the claim the table makes. |
+| ![b10ck @30523392](gifs/b10ck-g100-seed3-ckpt30523392.gif)<br>**`b10ck-g100-seed3`** @30523392<br>**99.65% /30,000** — the previous record | **The undiscounted policy is slow.** Its three perfect games run 2,774-3,727 steps against 1,081-1,329 for the three discounted entries: with γ 1.00 a reward later is worth exactly a reward now, so the critic has no reason to prefer the short way to the food, and the policy settles into long safe circuits. It also holds the record — the safety that costs it speed is the same thing that wins it games. `avg_steps` is not in the eval tables; it should be. |
 | ![b10ck @30539776](gifs/b10ck-g100-seed3-ckpt30539776.gif)<br>**`b10ck-g100-seed3`** @30539776<br>**99.55% /30,000** | The same arm 16,384 transitions later, indistinguishable at depth (z = 1.8). Same long circuits (3,155-3,318 steps). Watch both and the two look like one policy, which is the claim the table makes. |
 | ![b17cl](gifs/b17cl-clipanneal001hold80-seed4-ckpt11386880.gif)<br>**`b17cl-clipanneal001hold80-seed4`** @11386880<br>**99.50% /30,000** | The first anneal in the folder, and its earliest checkpoint: 11.4M transitions, a fifth of the arm's budget, saved while the clip was still near 0.15 on its way from 0.2 to 0.001. Direct routes like `b9ch`'s, 1,123-1,283 steps a game, at 0.20 pp above it — the discounted family's best, indistinguishable from the lower `b10ck` entry at a third of its game length. |
 | ![b9ch](gifs/b9ch-lam999-seed4-ckpt47251456.gif)<br>**`b9ch-lam999-seed4`** @47251456<br>**99.30% /30,000** | The λ 0.999 record it displaced, from the same `fc 320` / 4-epoch / λ-and-γ family. Direct routes to the food, 1,081-1,177 steps a game — a third of `b10ck`'s length at 0.35 pp lower rate. |
@@ -188,4 +220,6 @@ beside the checkpoint, so nothing has to be staged under `savedPolicies/` to be 
 
 `arch.json` sits beside every checkpoint and is **required** — width and observation era cannot be
 recovered from weights, so a copy without it does not load at all rather than loading wrongly
-(`tools/arch.py`). Every entry here is observation era `b09c616`, 30 values, 3 actions.
+(`tools/arch.py`). Every entry through `b17cl` is observation era `b09c616`, 30 values, 3 actions, and loads only under
+a checkout of that era (`418cf047c` is its last commit); the two b27 entries are `obs26-20260907-hist4` (34 values) and
+`obs26-20260907-hist8` (42 values) and load under the current code, the depth read from `arch.json`.
