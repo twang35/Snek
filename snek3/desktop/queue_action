@@ -48,6 +48,13 @@ def ops_worktree():
             break
     else:
         path = '/tmp/snek-ops-wt'
+        if os.path.exists(path):
+            # A directory git no longer lists as a worktree: macOS's /tmp cleaner strips the `.git`
+            # file out of an idle checkout (2026-09-09), leaving a husk `worktree add` refuses. Moved
+            # aside rather than deleted -- nothing in it can be committed, but nothing here deletes.
+            aside = '{0}.stale-{1}'.format(path, time.strftime('%Y%m%dT%H%M%S'))
+            os.rename(path, aside)
+            sys.stderr.write('moved a stale {0} (not a registered worktree) to {1}\n'.format(path, aside))
         git('worktree', 'add', path, 'ops')
     git('merge', '--ff-only', 'origin/ops', cwd=path)
     return path
