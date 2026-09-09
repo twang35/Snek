@@ -1,0 +1,18 @@
+{
+ "arms": [
+  "b27i-hist4-seed9",
+  "b27j-hist4-seed10",
+  "b27k-hist4-seed11",
+  "b27l-hist4-seed12",
+  "b27m-hist4-seed13",
+  "b27n-hist4-seed14",
+  "b27o-hist4-seed15",
+  "b27p-hist4-seed16"
+ ],
+ "batch": "b27",
+ "box": "desktop",
+ "claimed_iso": "2026-09-08T20:18:55",
+ "claimed_ts": 1788923935.0497556,
+ "id": "b27-hof30k-hist4-desktop",
+ "kind": "eval"
+}
