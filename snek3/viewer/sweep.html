@@ -64,7 +64,7 @@
     <button data-view="curve" title="1">curve</button><button data-view="traces" title="2">traces</button><button data-view="cell" title="3">cell</button><button data-view="levers" title="4">levers</button><button data-view="scatter" title="5">scatter</button>
   </label>
   <label id="cellpick-l">cell <select id="cellpick"></select></label>
-  <label id="smooth-l">smooth <select id="smooth"><option value="1">250k bin</option><option value="2">500k</option><option value="4">1M</option></select></label>
+  <label id="smooth-l">smooth <select id="smooth"><option value="1">1 bin</option><option value="2">2 bins</option><option value="4">4 bins</option></select></label>
   <label><input type="checkbox" id="ref" checked> reference</label>
   <span id="summary"></span>
 </header>
@@ -107,6 +107,10 @@
   function batch() { return S.batches.filter(function (b) { return b.batch === state.batch; })[0] || S.batches[0]; }
   function cellsOf(b) { return b.cells.filter(function (c) { return !c.reference; }); }
   function refOf(b) { return b.cells.filter(function (c) { return c.reference; })[0] || null; }
+  // A series' x grid is its first arm's bins: every arm of a batch is binned on the batch's own horizon, and a
+  // reference from another batch keeps its own grid, drawn clipped to this batch's horizon.
+  function stepsOf(arms, key) { return S.arms[arms[0]][key === 'stage_b' ? 'stage_b' : 'trace'].steps.map(function (s) { return s / 1e6; }); }
+  function binLabel(t) { return t >= 1e6 ? (t / 1e6) + 'M' : (t / 1e3) + 'k'; }
   function selectedMetrics(defaults) { return state.m ? state.m.split(',').filter(function (k) { return k; }) : defaults; }
 
   S.batches.forEach(function (b) {
@@ -322,25 +326,22 @@
   function viewTraces(main) {
     var b = batch(), ref = refOf(b), col = colours(b), w = parseInt(state.smooth, 10) || 1;
     var keys = renderMetrics(TRACE_ROWS, TRACE_DEFAULT);
-    main.innerHTML = '<h2>' + b.batch + ' — ' + b.knob + '</h2><p class="sub">Each cell as its seed-median per 250k transitions' + (w > 1 ? ', smoothed over ' + w + ' bins' : '') + '; ordered cells run light → dark. Click a trace for that cell\'s seeds.</p>';
+    main.innerHTML = '<h2>' + b.batch + ' — ' + b.knob + '</h2><p class="sub">Each cell as its seed-median per ' + binLabel(b.bin) + ' transitions' + (w > 1 ? ', smoothed over ' + w + ' bins' : '') + '; ordered cells run light → dark. Click a trace for that cell\'s seeds.</p>';
     configNote(main, b, col);
     legend(main, b, col, ref);
     var W = Math.min(1100, main.clientWidth - 4), L = 170, R = 16, PH = 110, gap = 12, top = 8, H = top + keys.length * (PH + gap) + 26;
     var svg = el('svg', { width: W, height: H, viewBox: '0 0 ' + W + ' ' + H }, main);
-    var steps = S.arms[Object.keys(S.arms)[0]].trace.steps.map(function (s) { return s / 1e6; });
-    var sbsteps = S.arms[Object.keys(S.arms)[0]].stage_b.steps.map(function (s) { return s / 1e6; });
-    var xdom = [0, S.horizon / 1e6];
+    var xdom = [0, b.horizon / 1e6];
     keys.forEach(function (key, ki) {
-      var label = TRACE_ROWS.filter(function (r) { return r[0] === key; })[0][1];
-      var xs = key === 'stage_b' ? sbsteps : steps;
+      var label = TRACE_ROWS.filter(function (r) { return r[0] === key; })[0][1].replace('2.5M', binLabel(b.stage_b_bin));
       var series = [];
-      if (ref && state.ref === '1' && ref.arms.length) series.push({ cell: ref, ys: smoothed(medianOver(ref.arms, key), key === 'stage_b' ? 1 : w), colour: REF, width: 3 });
-      cellsOf(b).forEach(function (c) { if (!state.hidden[c.slug] && c.arms.length) series.push({ cell: c, ys: smoothed(medianOver(c.arms, key), key === 'stage_b' ? 1 : w), colour: col[c.slug], width: 1.4 }); });
+      if (ref && state.ref === '1' && ref.arms.length) series.push({ cell: ref, xs: stepsOf(ref.arms, key), ys: smoothed(medianOver(ref.arms, key), key === 'stage_b' ? 1 : w), colour: REF, width: 3 });
+      cellsOf(b).forEach(function (c) { if (!state.hidden[c.slug] && c.arms.length) series.push({ cell: c, xs: stepsOf(c.arms, key), ys: smoothed(medianOver(c.arms, key), key === 'stage_b' ? 1 : w), colour: col[c.slug], width: 1.4 }); });
       var all = []; series.forEach(function (s) { s.ys.forEach(function (v) { if (v !== null) all.push(v); }); });
       var dom = extent(all, 0.05, LOG[key]); if (key === 'perfect' || key === 'perfect_min' || key === 'stage_b') dom = [Math.max(0, dom[0]), Math.min(100, Math.max(dom[1], 1))];
       var P = panel(svg, { x: L, y: top + ki * (PH + gap), w: W - L - R, h: PH }, dom, { xdom: xdom, log: LOG[key], title: label });
       series.forEach(function (s) {
-        var path = polyline(P, xs, s.ys, { stroke: s.colour, 'stroke-width': s.width, 'class': 'hit', opacity: s.cell.reference ? 0.85 : 1 });
+        var path = polyline(P, s.xs, s.ys, { stroke: s.colour, 'stroke-width': s.width, 'class': 'hit', opacity: s.cell.reference ? 0.85 : 1 });
         hover(path, function () { return s.cell.label + (s.cell.reference ? ' (reference)' : '') + ' — ' + s.cell.arms.length + ' arms'; });
         path.addEventListener('mouseenter', function () { path.setAttribute('stroke-width', s.width + 1.5); });
         path.addEventListener('mouseleave', function () { path.setAttribute('stroke-width', s.width); });
@@ -368,22 +369,19 @@
     var W = Math.min(1300, main.clientWidth - 4), L = 150, R = 10, colgap = 10, PH = 96, gap = 12, top = 22;
     var cw = (W - L - R - colgap * (n - 1)) / n, H = top + keys.length * (PH + gap) + 22;
     var svg = el('svg', { width: W, height: H, viewBox: '0 0 ' + W + ' ' + H }, main);
-    var steps = S.arms[Object.keys(S.arms)[0]].trace.steps.map(function (s) { return s / 1e6; });
-    var sbsteps = S.arms[Object.keys(S.arms)[0]].stage_b.steps.map(function (s) { return s / 1e6; });
-    var xdom = [0, S.horizon / 1e6];
+    var xdom = [0, b.horizon / 1e6];
     arms.forEach(function (p, ci) { var t = text(svg, L + ci * (cw + colgap) + cw / 2, 14, p, { 'text-anchor': 'middle', 'class': 'k', 'style': 'cursor:pointer' }); t.addEventListener('click', function () { zoom(p); }); });
     keys.forEach(function (key, ki) {
-      var label = TRACE_ROWS.filter(function (r) { return r[0] === key; })[0][1];
-      var xs = key === 'stage_b' ? sbsteps : steps;
+      var label = TRACE_ROWS.filter(function (r) { return r[0] === key; })[0][1].replace('2.5M', binLabel(b.stage_b_bin));
       var all = [], refSeries = [];
-      if (ref && state.ref === '1' && !cell.reference) ref.arms.forEach(function (rp) { var ys = smoothed(medianOver([rp], key), key === 'stage_b' ? 1 : w); refSeries.push(ys); ys.forEach(function (v) { if (v !== null) all.push(v); }); });
+      if (ref && state.ref === '1' && !cell.reference) ref.arms.forEach(function (rp) { var ys = smoothed(medianOver([rp], key), key === 'stage_b' ? 1 : w); refSeries.push({ xs: stepsOf([rp], key), ys: ys }); ys.forEach(function (v) { if (v !== null) all.push(v); }); });
       var own = arms.map(function (p) { var ys = smoothed(medianOver([p], key), key === 'stage_b' ? 1 : w); ys.forEach(function (v) { if (v !== null) all.push(v); }); return ys; });
       var dom = extent(all, 0.05, LOG[key]); if (key === 'perfect' || key === 'perfect_min' || key === 'stage_b') dom = [Math.max(0, dom[0]), Math.min(100, Math.max(dom[1], 1))];
       arms.forEach(function (p, ci) {
         var P = panel(svg, { x: L + ci * (cw + colgap), y: top + ki * (PH + gap), w: cw, h: PH }, dom, { xdom: xdom, log: LOG[key], title: ci === 0 ? label : null });
         if (ci > 0) P.g.querySelectorAll('text').forEach(function (t) { t.remove(); });
-        refSeries.forEach(function (ys) { polyline(P, xs, ys, { stroke: REF, 'stroke-width': 1, opacity: 0.5 }); });
-        polyline(P, xs, own[ci], { stroke: BLUE, 'stroke-width': 1.4 });
+        refSeries.forEach(function (r) { polyline(P, r.xs, r.ys, { stroke: REF, 'stroke-width': 1, opacity: 0.5 }); });
+        polyline(P, stepsOf([p], key), own[ci], { stroke: BLUE, 'stroke-width': 1.4 });
         var hit = el('rect', { x: P.box.x, y: P.box.y, width: P.box.w, height: P.box.h, fill: 'transparent', 'class': 'hit' }, P.g);
         var sc = S.arms[p].scalars;
         hover(hit, function () { return p + '\nbest30 ' + fmt(sc.best30, 1) + ' @' + fmt((sc.best30_step || 0) / 1e6, 1) + 'M · density ' + fmt(sc.density98, 1) + '% of ' + sc.rows + ' rows · evals<80 ' + fmt(sc.drawdown80, 2) + '% · onset90 ' + fmt(sc.onset90_m, 1) + 'M\nlate: ev ' + fmt(sc.ev_late, 3) + ' · value loss ' + fmt(sc.value_loss_late, 2) + ' · KL p99 ' + fmt(sc.kl_p99) + ' · entropy ' + fmt(sc.entropy_end, 3) + '\nclick: the arm\'s chart'; });
@@ -543,7 +541,7 @@
     $('cellpick-l').style.display = state.view === 'cell' ? '' : 'none';
     $('smooth-l').style.display = state.view === 'traces' || state.view === 'cell' ? '' : 'none';
     $('smooth').value = state.smooth; $('ref').checked = state.ref === '1';
-    $('summary').textContent = 'reduced ' + (S.generated || '?').replace('T', ' ') + ' · ' + Object.keys(S.arms).length + ' arms · bins ' + (S.bin / 1e3) + 'k';
+    $('summary').textContent = 'reduced ' + (S.generated || '?').replace('T', ' ') + ' · ' + Object.keys(S.arms).length + ' arms · ' + b.batch + ' to ' + (b.horizon / 1e6).toFixed(0) + 'M, bins ' + binLabel(b.bin);
     var main = $('main'); tip.style.display = 'none';
     ({ curve: viewCurve, traces: viewTraces, cell: viewCell, levers: viewLevers, scatter: viewScatter }[state.view] || viewCurve)(main);
     writeHash();

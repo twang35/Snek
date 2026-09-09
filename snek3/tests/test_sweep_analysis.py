@@ -18,12 +18,12 @@ def _evals(perfects, per_eval=16384, kl=0.002):
             for i, p in enumerate(perfects)]
 
 
-def _arm(runs, policy, perfects, rows=None, hof=None, h30=None):
+def _arm(runs, policy, perfects, rows=None, hof=None, h30=None, step_size=16384):
     best = max(perfects)
     _write(os.path.join(runs, policy + '_evals.json'), {
-        'summary': {'step': len(perfects) * 16384, 'evals': len(perfects), 'trailing_now': perfects[-1],
+        'summary': {'step': len(perfects) * step_size, 'evals': len(perfects), 'trailing_now': perfects[-1],
                     'strong_eval_fraction': 50.0, 'best_perfect30': {'value': best, 'step': 7}},
-        'evals': _evals(perfects), 'resumes': []})
+        'evals': _evals(perfects, per_eval=step_size), 'resumes': []})
     if rows is not None:
         _write(os.path.join(runs, policy + '_checkpoint_evals.json'),
                {'policy': policy, 'rows': [{'step': 3_000_000 * (i + 1), 'perfect_percent': p} for i, p in enumerate(rows)]})
@@ -173,3 +173,42 @@ def test_write_and_load_round_trip(tmp_path):
     assert sa.load(json_path) == sweep
     with open(js_path) as handle:
         assert handle.read().startswith('window.SNEK_SWEEP = {')
+
+
+def test_bin_sizes_keep_about_two_hundred_trace_bins_at_every_horizon():
+    """The sweep's 50M grid is 250k/2.5M; a 100M batch (b27) gets 500k/5M, 200M (b24, b25) 1M/10M, and a 3M
+    batch 25k/250k -- never a grid that crushes half a run into its last bin."""
+    assert sa.bin_sizes(50_003_968) == (250_000, 2_500_000)
+    assert sa.bin_sizes(100_007_936) == (500_000, 5_000_000)
+    assert sa.bin_sizes(200_015_872) == (1_000_000, 10_000_000)
+    assert sa.bin_sizes(3_000_000) == (25_000, 250_000)
+
+
+def test_build_bins_each_batch_on_its_own_horizon_and_a_reference_on_its_own(tmp_path):
+    """b27 runs to 100M against b26's 50M reference: b27's arms get 500k bins to 100M, the reference arm
+    keeps its own 250k grid (it is drawn clipped), and the batch dict says which grid it is on."""
+    runs = str(tmp_path / 'runs'); os.makedirs(runs)
+    extra = {'batches': [
+        {'batch': 'b26', 'knob': 'step penalty', 'control_value': {'SNEK_STEP_PENALTY': '0'},
+         'cells': [{'slug': 'pen01', 'env': {'SNEK_STEP_PENALTY': '0.01'}}]},
+        {'batch': 'b27', 'knob': 'history', 'control_value': {'SNEK_OBS_HISTORY': '0'},
+         'cells': [{'slug': 'hist0', 'env': {'SNEK_OBS_HISTORY': '0'}}, {'slug': 'hist4', 'env': {'SNEK_OBS_HISTORY': '4'}}]}]}
+    refs = {'b27': {'arms': ['b26a-pen01-seed1'], 'label': 'b26 pen01', 'value': '0', 'after': 'hist0'}}
+    _write(str(tmp_path / 'm.json'), {'batches': []}); _write(str(tmp_path / 'x.json'), extra); _write(str(tmp_path / 'r.json'), refs)
+    _arm(runs, 'b26a-pen01-seed1', [85] * 40, rows=[99, 98], step_size=1_250_000)      # 40 evals to 50M
+    _arm(runs, 'b27a-hist0-seed1', [85] * 40, rows=[99, 98], step_size=2_500_000)      # 40 evals to 100M
+    _arm(runs, 'b27i-hist4-seed9', [85] * 32, rows=[99, 98], step_size=2_500_000)      # 32 evals to 80M
+    sweep = sa.build(runs, str(tmp_path / 'm.json'), str(tmp_path / 'r.json'), extra_path=str(tmp_path / 'x.json'))
+    b26, b27 = sweep['batches']
+    assert (b26['horizon'], b26['bin'], b26['stage_b_bin']) == (50_000_000, 250_000, 2_500_000)
+    assert (b27['horizon'], b27['bin'], b27['stage_b_bin']) == (100_000_000, 500_000, 5_000_000)
+    assert 'horizon' not in sweep and 'bin' not in sweep
+    ref = sweep['arms']['b26a-pen01-seed1']
+    assert ref['horizon'] == 50_000_000 and ref['trace']['steps'][-1] == 50_000_000 and len(ref['trace']['steps']) == 200
+    for p in ('b27a-hist0-seed1', 'b27i-hist4-seed9'):          # the shorter arm shares the batch grid
+        arm = sweep['arms'][p]
+        assert arm['horizon'] == 100_000_000 and arm['trace']['steps'][-1] == 100_000_000 and len(arm['trace']['steps']) == 200
+        assert len(arm['stage_b']['steps']) == 20
+    assert [c['slug'] for c in b27['cells']] == ['hist0', 'reference', 'hist4']
+    # the last eval of the 100M arm lands in the last bin, not clamped into an earlier one
+    assert sweep['arms']['b27a-hist0-seed1']['trace']['perfect'][-1] == 85

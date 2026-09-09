@@ -1,5 +1,5 @@
 {
- "_about": "Batches added to the sweep view (tools/sweep_analysis.py, viewer/sweep.html) after the one-knob sweep b9-b21 closed. Same shape as plans/hyperparam-sweep.json's `batches`; the reducer reads that file first, then this one. Each batch's reference is viewer/references.json's entry for it.",
+ "_about": "Batches added to the sweep view (tools/sweep_analysis.py, viewer/sweep.html) after the one-knob sweep b9-b21 closed. Same shape as plans/hyperparam-sweep.json's `batches`; the reducer reads that file first, then this one. Each batch's reference is viewer/references.json's entry for it. Every batch is binned on its own horizon (the max step over its arms), so a 100M or 200M batch sits here as it is.",
  "batches": [
   {
    "batch": "b26",
@@ -38,6 +38,39 @@
       "SNEK_STEP_PENALTY": "0.01"
      },
      "prediction": "large enough to be felt against the b2 reward preset's per-step terms; the cell to read"
+    }
+   ]
+  },
+  {
+   "batch": "b27",
+   "knob": "move history depth",
+   "priority": 270,
+   "control_value": {
+    "SNEK_OBS_HISTORY": "0"
+   },
+   "expected_optimum": "unknown; the question was whether the observation's missing piece is the recent path -- hist4 was the cell to read",
+   "notes": "The pen01 base of b26 (step penalty 0.01, the 26-value observation, the b24 horizon anneal) at 100M and 8 seeds a cell; SNEK_OBS_HISTORY=N appends two bits per past move (plans/obs-history.md). Every cell also carries SNEK_STEP_PENALTY=0.01, left off the cell env here so the depth is the one numeric key the axis sorts on. The reference in references.json is b26's pen01 cell -- 50M and 4 seeds, so a loose one; hist0 is the like-for-like control. hist0 and hist4 ran first (laptop + desktop), hist8 followed on the desktop.",
+   "cells": [
+    {
+     "slug": "hist0",
+     "env": {
+      "SNEK_OBS_HISTORY": "0"
+     },
+     "prediction": "the control: b26's pen01 at 100M"
+    },
+    {
+     "slug": "hist4",
+     "env": {
+      "SNEK_OBS_HISTORY": "4"
+     },
+     "prediction": "if the path matters, this shows it; the cell to read"
+    },
+    {
+     "slug": "hist8",
+     "env": {
+      "SNEK_OBS_HISTORY": "8"
+     },
+     "prediction": "more of the same or noise on top of hist4"
     }
    ]
   }

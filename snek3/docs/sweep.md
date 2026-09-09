@@ -295,8 +295,9 @@ open viewer/sweep.html
 
 `tools/sweep_analysis.py` reduces each arm to its scalars (the docs tables' definitions from `viewer_manifest`,
 plus onset by trailing-30 ≥ 90, the last-20% diagnostics, the KL p99, worst post-onset eval), its traces binned
-to 250k transitions (the mean, and for the perfect rate the min too — a bin mean hides a one-eval collapse),
-its stage-B rows ≥98 per 2.5M, and its hof rows. `tools/sweep_figures.py` draws the figures with matplotlib's
+to 250k transitions at the sweep's 50M -- since 2026-09-08 each batch is binned on its own horizon, ~200 bins
+of a clean step, so b27's 100M gets 500k (the mean, and for the perfect rate the min too — a bin mean hides a
+one-eval collapse), its stage-B rows ≥98 per ten of those bins, and its hof rows. `tools/sweep_figures.py` draws the figures with matplotlib's
 object API. Both are covered by `tests/test_sweep_analysis.py` and `tests/test_sweep_figures.py`. Cell x
 values come from `plans/hyperparam-sweep.json`, the reference cells from `viewer/references.json`. Value loss is
 not comparable across b10 (γ sets the value scale) or into b19's `mse` cell (a different function), so it is

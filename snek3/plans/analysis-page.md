@@ -1,6 +1,6 @@
 # Snek analysis: rename the sweep page, cover every batch, publish it on the site
 
-**Status: planned 2026-09-08, not started.** Written with the user after b26/b27; implement in the order of work below. Supersedes the TODO in `docs/runs.md` about adding the ladder to the sweep manifest.
+**Status: planned 2026-09-08; B1 (each batch on its own horizon) built the same day without the rename, when b27 was added to the page -- `bin_sizes`, `horizon_of`, per-batch `horizon`/`bin`/`stage_b_bin`, the page and figures reading each series' own step grid. The rest not started.** Written with the user after b26/b27; implement in the order of work below. Supersedes the TODO in `docs/runs.md` about adding the ladder to the sweep manifest.
 
 
 ## Context

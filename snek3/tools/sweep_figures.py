@@ -108,6 +108,21 @@ def _metric(sweep, key):
     return next(m for m in sweep['metrics'] if m['key'] == key)
 
 
+def _steps(arms, key, sweep):
+    """The x grid (M transitions) of a series: its first arm's bins -- every arm of a batch shares the batch's
+    grid, and a reference from another batch keeps its own, drawn clipped to this batch's horizon."""
+    block = 'stage_b' if key == 'stage_b' else 'trace'
+    return np.array(sweep['arms'][arms[0]][block]['steps']) / 1e6
+
+
+def _m(transitions):
+    """`250k`, `2.5M`, `1M`: a bin size as the axis prints it."""
+    if transitions >= 1_000_000:
+        v = transitions / 1e6
+        return ('%g' % v) + 'M'
+    return ('%g' % (transitions / 1e3)) + 'k'
+
+
 def _median_over(arms, key, sweep, block='trace'):
     """Per bin, the median over the cell's arms of `trace[key]` (None-aware). For `stage_b`, the share
     of rows ≥98 pooled over the arms per bin (None where no rows)."""
@@ -185,8 +200,6 @@ def traces_figure(sweep, batch, rows=TRACE_ROWS):
     ref = next((c for c in batch['cells'] if c['reference']), None)
     colours = cell_colours(batch)
     n = len(rows)
-    steps = np.array(next(iter(sweep['arms'].values()))['trace']['steps']) / 1e6
-    sb_steps = np.array(next(iter(sweep['arms'].values()))['stage_b']['steps']) / 1e6
     with _rc():
         fig = Figure(figsize=(7.2, 1.25 * n + 0.8))
         _canvas(fig)
@@ -195,28 +208,28 @@ def traces_figure(sweep, batch, rows=TRACE_ROWS):
         for ax, (key, label, scale) in zip(axes, rows):
             ax.set_facecolor(SURFACE)
             ax.grid(True, axis='y'); ax.grid(False, axis='x')
-            x = sb_steps if key == 'stage_b' else steps
+            label = label.replace('2.5M', _m(batch['stage_b_bin']))
             if ref is not None and ref['arms']:
                 y = _median_over(ref['arms'], key, sweep)
                 if y is not None:
-                    ax.plot(x, y, color=REF_GREY, lw=2.2, alpha=0.8, zorder=1, label='reference ' + ref['label'])
+                    ax.plot(_steps(ref['arms'], key, sweep), y, color=REF_GREY, lw=2.2, alpha=0.8, zorder=1, label='reference ' + ref['label'])
             for c in cells:
                 y = _median_over(c['arms'], key, sweep)
                 if y is None:
                     continue
-                ax.plot(x, y, color=colours[c['slug']], lw=1.0, zorder=2, label=c['label'])
+                ax.plot(_steps(c['arms'], key, sweep), y, color=colours[c['slug']], lw=1.0, zorder=2, label=c['label'])
             if scale:
                 ax.set_yscale(scale)
             ax.set_ylabel(label, fontsize=FONT - 0.5, rotation=0, ha='right', va='center', labelpad=6)
             ax.tick_params(length=2, pad=2, labelsize=FONT - 1)
         axes[-1].set_xlabel('transitions (M)', color=INK2)
-        axes[-1].set_xlim(0, sweep['horizon'] / 1e6)
+        axes[-1].set_xlim(0, batch['horizon'] / 1e6)
         handles, labels = axes[0].get_legend_handles_labels()
         fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.705, 0.5), fontsize=FONT - 1,
                    title=batch['knob'][:26], title_fontsize=FONT - 0.5, handlelength=1.6, labelspacing=0.35)
         ordered = any(c['value'] is not None for c in cells) or len(cells) > len(CATEGORICAL)
-        fig.suptitle('{0} — {1}\neach cell as its seed-median per 250k transitions, {2}; the reference grey'.format(
-            batch['batch'], batch['knob'], 'light → dark in value order' if ordered else 'one colour per switch'),
+        fig.suptitle('{0} — {1}\neach cell as its seed-median per {3} transitions, {2}; the reference grey'.format(
+            batch['batch'], batch['knob'], 'light → dark in value order' if ordered else 'one colour per switch', _m(batch['bin'])),
             fontsize=FONT + 0.5, x=0.20, ha='left', color=INK)
     return fig
 
@@ -232,8 +245,6 @@ def cell_figure(sweep, batch, slug, rows=CELL_ROWS):
     ref = next((c for c in batch['cells'] if c['reference']), None)
     arms = cell['arms']
     ncol = max(1, len(arms))
-    steps = np.array(next(iter(sweep['arms'].values()))['trace']['steps']) / 1e6
-    sb_steps = np.array(next(iter(sweep['arms'].values()))['stage_b']['steps']) / 1e6
     with _rc():
         fig = Figure(figsize=(2.1 * ncol + 1.5, 1.1 * len(rows) + 0.8))
         _canvas(fig)
@@ -241,7 +252,7 @@ def cell_figure(sweep, batch, slug, rows=CELL_ROWS):
         fig.subplots_adjust(left=1.35 / (2.1 * ncol + 1.5), right=0.99, top=1 - 0.5 / (1.1 * len(rows) + 0.8),
                             bottom=0.5 / (1.1 * len(rows) + 0.8), hspace=0.25, wspace=0.08)
         for r, (key, label, scale) in enumerate(rows):
-            x = sb_steps if key == 'stage_b' else steps
+            label = label.replace('2.5M', _m(batch['stage_b_bin']))
             for c, policy in enumerate(arms):
                 ax = axes[r][c]
                 ax.set_facecolor(SURFACE); ax.grid(True, axis='y'); ax.grid(False, axis='x')
@@ -249,10 +260,10 @@ def cell_figure(sweep, batch, slug, rows=CELL_ROWS):
                     for rp in ref['arms']:
                         y = _median_over([rp], key, sweep)
                         if y is not None:
-                            ax.plot(x, y, color=REF_GREY, lw=0.7, alpha=0.5, zorder=1)
+                            ax.plot(_steps([rp], key, sweep), y, color=REF_GREY, lw=0.7, alpha=0.5, zorder=1)
                 y = _median_over([policy], key, sweep)
                 if y is not None:
-                    ax.plot(x, y, color=BLUE, lw=1.0, zorder=2)
+                    ax.plot(_steps([policy], key, sweep), y, color=BLUE, lw=1.0, zorder=2)
                 if scale:
                     ax.set_yscale(scale)
                 ax.tick_params(length=2, pad=2, labelsize=FONT - 1.5)
@@ -262,7 +273,7 @@ def cell_figure(sweep, batch, slug, rows=CELL_ROWS):
                     ax.set_ylabel(label, fontsize=FONT - 0.5, rotation=0, ha='right', va='center', labelpad=6)
                 if r == len(rows) - 1:
                     ax.set_xlabel('transitions (M)', fontsize=FONT - 1, color=INK2)
-                    ax.set_xlim(0, sweep['horizon'] / 1e6)
+                    ax.set_xlim(0, batch['horizon'] / 1e6)
         fig.suptitle('{0} {1} = {2}: each seed (blue) over the reference\'s seeds (grey)'.format(
             batch['batch'], batch['knob'], cell['label']), fontsize=FONT + 1, x=0.02, ha='left', color=INK)
     return fig

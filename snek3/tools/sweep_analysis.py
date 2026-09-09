@@ -23,7 +23,9 @@ cells sorted, then the categorical ones in manifest order): the grids are dense 
 and a linear axis squashes lambda's 0.9-1.0 plateau into a tenth of the width. A batch's reference
 cell (`viewer/references.json`) is slotted in at its own value.
 
-**Late** means the last `LATE_FRACTION` of an arm's evals (~10M of 50M), so the diagnostics describe
+**Every batch is binned on its own horizon** (`horizon_of`, `bin_sizes`): the max step over its arms, with the
+bin the smallest clean step that keeps ~200 trace bins, so b27 at 100M gets 500k bins and a 50M reference
+keeps its 250k grid, drawn clipped. **Late** means the last `LATE_FRACTION` of an arm's evals (~10M of 50M), so the diagnostics describe
 the endgame the record region lives in rather than the climb.
 """
 
@@ -49,9 +51,14 @@ OUT_JSON = os.path.join(constants.ROOT, 'viewer', 'sweep.json')
 OUT_JS = os.path.join(constants.ROOT, 'viewer', 'sweep.js')
 FIGURES_DIR = os.path.join(constants.ROOT, 'charts', 'sweep')
 
-BIN = 250_000                 # transitions per trace bin: 200 bins over the sweep's 50M
-STAGE_B_BIN = 2_500_000       # transitions per stage-B density bin: 20 over 50M
-HORIZON = 50_003_968
+BIN = 250_000                 # transitions per trace bin at the sweep's 50M: 200 bins
+STAGE_B_BIN = 2_500_000       # transitions per stage-B density bin at 50M: 20
+HORIZON = 50_003_968          # the one-knob sweep's cap; a batch's own horizon is the max step over its arms
+# Every batch is binned on its own horizon (b27 runs to 100M, b24 to 200M, and a 50M grid crushed everything
+# past 50.25M into the last bin): the bin is the smallest clean step that keeps the trace at ~200 bins, and
+# the stage-B bin is ten of those -- 250k/2.5M at 50M, 500k/5M at 100M, 1M/10M at 200M, 25k/250k at 3M.
+BIN_LADDER = (12_500, 25_000, 50_000, 100_000, 125_000, 250_000, 500_000, 1_000_000, 2_000_000, 5_000_000)
+TRACE_BINS = 201              # ceil(50_003_968 / 250_000): the sweep's grid, the target for every horizon
 LATE_FRACTION = 0.2
 TRAILING = 30
 ONSET_TRAILING = 90.0         # the plan's onset: first step with trailing-30 >= 90
@@ -185,7 +192,16 @@ def mann_whitney_exact(a, b):
 
 
 # ------------------------------------------------------------------------------------ one arm
-def bin_trace(evals, bin_size=BIN, horizon=HORIZON):
+def bin_sizes(horizon):
+    """`(bin, stage_b_bin)` for a horizon: the smallest step on `BIN_LADDER` that keeps the trace within
+    `TRACE_BINS` bins, and ten of it for stage B."""
+    for b in BIN_LADDER:
+        if math.ceil(horizon / b) <= TRACE_BINS:
+            return b, 10 * b
+    return BIN_LADDER[-1], 10 * BIN_LADDER[-1]
+
+
+def bin_trace(evals, bin_size, horizon):
     """Each stage-A metric averaged per `bin_size` transitions, plus `perfect_min`; `steps` is the bin's
     right edge in transitions. Empty bins are None (a rollout-1024 arm has 382 evals for 200 bins)."""
     n_bins = max(1, math.ceil(horizon / bin_size))
@@ -213,7 +229,7 @@ def bin_trace(evals, bin_size=BIN, horizon=HORIZON):
     return out
 
 
-def stage_b_density(rows, bin_size=STAGE_B_BIN, horizon=HORIZON):
+def stage_b_density(rows, bin_size, horizon):
     """`{'steps', 'rows', 'rows98'}` per `bin_size` transitions of stage-B rows -- the record region over time."""
     n_bins = max(1, math.ceil(horizon / bin_size))
     total, hi = [0] * n_bins, [0] * n_bins
@@ -298,20 +314,42 @@ def scalars(stage_a, stage_b, hof, h30):
     return out
 
 
-def arm_record(policy, runs_dir):
-    """Everything the page and the figures need about one arm, or None without a stage-A file."""
+def load_arm(policy, runs_dir):
+    """The arm's four files as `{stage_a, stage_b, hof, h30}`, or None without a stage-A file."""
     stage_a = vm._read(os.path.join(runs_dir, policy + '_evals.json'))
     if not stage_a or 'summary' not in stage_a:
         return None
-    stage_b = vm._read(os.path.join(runs_dir, policy + '_checkpoint_evals.json'))
-    hof = vm._read(os.path.join(runs_dir, policy + '_checkpoint_evals_hof5000.json'))
-    h30 = vm._read(os.path.join(runs_dir, policy + '_checkpoint_evals_hof30k.json'))
+    return {
+        'stage_a': stage_a,
+        'stage_b': vm._read(os.path.join(runs_dir, policy + '_checkpoint_evals.json')),
+        'hof': vm._read(os.path.join(runs_dir, policy + '_checkpoint_evals_hof5000.json')),
+        'h30': vm._read(os.path.join(runs_dir, policy + '_checkpoint_evals_hof30k.json')),
+    }
+
+
+def horizon_of(loaded):
+    """The horizon a group of loaded arms is binned on: the max `summary.step` over them, else the sweep's."""
+    steps = [(l['stage_a'].get('summary') or {}).get('step') or 0 for l in loaded if l]
+    return max(steps) if steps and max(steps) > 0 else HORIZON
+
+
+def arm_record(policy, runs_dir, horizon=None, loaded=None):
+    """Everything the page and the figures need about one arm, or None without a stage-A file. Binned on
+    `horizon` (its batch's, from `build`), else on the arm's own final step."""
+    loaded = loaded if loaded is not None else load_arm(policy, runs_dir)
+    if loaded is None:
+        return None
+    stage_a, stage_b, hof, h30 = loaded['stage_a'], loaded['stage_b'], loaded['hof'], loaded['h30']
+    if horizon is None:
+        horizon = horizon_of([loaded])
+    bin_size, stage_b_bin = bin_sizes(horizon)
     evals = stage_a.get('evals') or []
     return {
         'policy': policy, 'batch': vm.batch_of(policy), 'cell': vm.knob_of(policy), 'seed': vm.seed_of(policy),
+        'horizon': horizon, 'bin': bin_size, 'stage_b_bin': stage_b_bin,
         'scalars': scalars(stage_a, stage_b, hof, h30),
-        'trace': bin_trace(evals),
-        'stage_b': stage_b_density((stage_b or {}).get('rows') or []),
+        'trace': bin_trace(evals, bin_size, horizon),
+        'stage_b': stage_b_density((stage_b or {}).get('rows') or [], stage_b_bin, horizon),
         'hof5000': [[r.get('step'), r.get('perfect_percent')] for r in ((hof or {}).get('rows') or [])],
         'hof30k': [[r.get('step'), r.get('perfect_percent')] for r in ((h30 or {}).get('rows') or [])],
     }
@@ -409,20 +447,25 @@ def build(runs_dir=None, manifest_path=None, references_path=None, extra_path=No
         cells = layout_cells(batch, reference)
         policies = sorted(os.path.basename(p)[:-len('_evals.json')]
                           for p in _glob(runs_dir, name + '*_evals.json') if '_checkpoint' not in p)
+        loaded = {p: load_arm(p, runs_dir) for p in policies if vm.batch_of(p) == name}
+        loaded = {p: l for p, l in loaded.items() if l is not None}
+        horizon = horizon_of(loaded.values())                 # the batch's own: its longest arm
+        bin_size, stage_b_bin = bin_sizes(horizon)
         by_cell = {}
-        for policy in policies:
-            if vm.batch_of(policy) != name:
-                continue
-            rec = arm_record(policy, runs_dir)
-            if rec is None:
-                continue
+        for policy, l in loaded.items():
+            rec = arm_record(policy, runs_dir, horizon, loaded=l)
             arms[policy] = rec
             by_cell.setdefault(rec['cell'], []).append(policy)
+        # Reference arms from another batch keep that batch's grid (b26 <- b24 at 200M, b27 <- b26 at 50M):
+        # already reduced if their batch came first, else binned together on their own longest step.
+        ref_loaded = {p: load_arm(p, runs_dir) for p in reference.get('arms', []) if p not in arms}
+        ref_loaded = {p: l for p, l in ref_loaded.items() if l is not None}
+        ref_horizon = horizon_of(ref_loaded.values()) if ref_loaded else None
         ref_arms = []
         for policy in reference.get('arms', []):
-            rec = arms.get(policy) or arm_record(policy, runs_dir)
-            if rec is not None:
-                arms[policy] = rec
+            if policy in ref_loaded:
+                arms[policy] = arm_record(policy, runs_dir, ref_horizon, loaded=ref_loaded[policy])
+            if policy in arms:
                 ref_arms.append(policy)
         ref_scalars = [arms[p]['scalars'] for p in ref_arms]
         for cell in cells:
@@ -434,11 +477,12 @@ def build(runs_dir=None, manifest_path=None, references_path=None, extra_path=No
             'expected_optimum': batch.get('expected_optimum', ''),
             'reference_label': reference.get('label', ''), 'reference_arms': ref_arms,
             'value_loss_comparable': name not in VALUE_LOSS_INCOMPARABLE,
+            'horizon': horizon, 'bin': bin_size, 'stage_b_bin': stage_b_bin, 'arm_count': len(loaded),
             'cells': cells,
         })
     return {
         'generated': datetime.datetime.now().isoformat(timespec='seconds'),
-        'bin': BIN, 'stage_b_bin': STAGE_B_BIN, 'horizon': HORIZON, 'late_fraction': LATE_FRACTION,
+        'late_fraction': LATE_FRACTION,
         'metrics': [{'key': k, 'label': l, 'higher': h, 'unit': u} for k, l, h, u in METRICS],
         'batches': batches, 'arms': arms,
     }

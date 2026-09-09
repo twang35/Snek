@@ -162,10 +162,14 @@ moment a commit also touches code, config, or anything that changes program beha
 change reverts to the code rule above and waits for approval. Chart images that accompany a docs
 edit ride along with the docs commit.
 
-**The chart viewer: commit and push without waiting** (standing authorization, 2026-09-04). A change
-to `snek3/viewer/index.html` is committed as soon as it is made; the desktop's next site build (a
-deploy, then `trigger`) puts it on the live page. The only-if rule below still applies: a viewer edit that rides along with a trainer or tool change waits
-with that change.
+**The viewer pages: commit and push without waiting** (standing authorization, 2026-09-04 for
+`index.html`, extended to the whole of `snek3/viewer/` on 2026-09-09). A change to anything under
+`snek3/viewer/` -- the chart viewer, the sweep page, `references.json` -- is committed as soon as it is
+made, together with the reducers that exist only to feed those pages (`tools/viewer_manifest.py`,
+`tools/sweep_analysis.py`, `tools/sweep_figures.py`, `plans/sweep-extra.json`, their tests and the
+`charts/sweep/` figures) when the change touches nothing else; the desktop's next site build (a deploy,
+then `trigger`) puts it on the live page. The only-if rule below still applies: a viewer edit that rides
+along with a trainer, scheduler or eval-tool change waits with that change.
 
 **Tests: commit and push without waiting** (standing authorization, 2026-08-14, for the stated
 reason that the user does not read these diffs). `snek3/tests/*.py` — assertions about behaviour,
