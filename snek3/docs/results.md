@@ -22,6 +22,53 @@ whose published artifacts are history, and the daemon's ledger, whose keys are t
 waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
 
 
+<!-- progress_update: batch b27 -->
+## Batch b27 — the `obs_history` sweep, 3 values x 8 seeds, 100M, closed 2026-09-09
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b26a-pen01-seed1, b26b-pen01-seed2, b26c-pen01-seed3, b26d-pen01-seed4`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| obs_history | rows | ≥98%/500 | per-seed share | ≥99 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| **0** (reference) | 3,693 | 46.3% | 46.4 52.6 43.0 42.3 | 325 | 100.0 | 98.88 (98.7-99.1) | 93.0 | 0.0% | 1.77% | 45.0% |
+| 0 | 15,271 | 49.2% | 61.4 52.9 46.5 47.6 64.7 43.4 33.0 39.9 | 1914 | 100.0 | 99.08 (98.6-99.4) | 95.9 | 0.0% | 1.07% | 47.2% |
+| 4 | 22,102 | 93.6% | 92.2 93.6 93.8 94.6 95.5 91.0 95.7 92.0 | 14027 | 100.0 | 99.76 (99.6-99.9) | 96.2 | 0.0% | 0.97% | 84.3% |
+| 8 | 22,192 | 95.4% | 95.7 94.3 95.6 95.6 95.5 95.6 95.1 95.7 | 15168 | 100.0 | 99.79 (99.7-99.9) | 95.5 | 0.0% | 0.68% | 85.4% |
+
+<!-- reading -->
+Read `hist4` and `hist8` against `hist0`, the batch's own control at the same 100M cap; the bold reference is the same config at 50M and 4 seeds and says only that the longer cap by itself did little (46.3 to 49.2). **Move history is the largest single lever this project has found**: `hist4` 93.6% density (91.0-95.7) and `hist8` 95.4 (94.3-95.7) against 49.2 (33.0-64.7), every history seed above every control seed, stage-A ≥98 share 84-85% against 47.2, best30 99.76-99.79 against 99.08, onset unchanged at ~5-10M. The deep passes carry it through: at 30,000 episodes on seed 7 `hist4` puts 605 rows at ≥99.6 and 19 at 99.8, `hist8` 937 and 9, while `hist0` (124 rows under the old 99.2 gate) tops out at 99.4. The top rows — `b27t` @85065728 at 29,944 /30,000 and `b27k` @77594624 at 29,943 — lead the Hall of Fame's first place (99.65, 29,894) by 0.17 pp, z ≈ 3.9. **Verdict per cell**: `hist0` confirms b26's `pen01` and adds nothing; `hist4` is a full-size win; `hist8` is a small, consistent step further on density (worst seed 94.3 above six of `hist4`'s eight, spread 1.4 pp against 4.7) and on rows through every gate, level on the peaks — the default should move to 8. **Not settled**: what the bits do to the starvation orbit that phase 1 found (`plans/obs-history.md`; the prediction of no effect is falsified, the mechanism finding is not), and whether more history (16) or more hold (b28, the same `hist8` config with 100M more at the final anneal values) adds anything at 30,000 episodes. Promotion candidates in `hallOfFame/HOF.md` once measured basins are compared.
+<!-- /reading -->
+
+### Every arm
+
+| arm | obs_history | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b27a-hist0-seed1` | 0 | 1973 | 61.4% | 367 | 100.0 | 99.4 @86.8M | 95.6 | 0.0% |
+| `b27b-hist0-seed2` | 0 | 1994 | 52.9% | 239 | 100.0 | 99.2 @69.3M | 95.7 | 0.0% |
+| `b27c-hist0-seed3` | 0 | 1949 | 46.5% | 302 | 100.0 | 99.3 @92.6M | 95.8 | 0.0% |
+| `b27d-hist0-seed4` | 0 | 1951 | 47.6% | 136 | 99.8 | 98.6 @75.6M | 96.7 | 0.0% |
+| `b27e-hist0-seed5` | 0 | 2060 | 64.7% | 590 | 100.0 | 99.4 @92.3M | 95.7 | 0.0% |
+| `b27f-hist0-seed6` | 0 | 1780 | 43.4% | 121 | 99.8 | 99.2 @88.7M | 95.8 | 0.0% |
+| `b27g-hist0-seed7` | 0 | 1742 | 33.0% | 70 | 99.8 | 98.8 @79.2M | 95.2 | 0.0% |
+| `b27h-hist0-seed8` | 0 | 1822 | 39.9% | 89 | 99.8 | 98.7 @77.5M | 96.4 | 0.0% |
+| `b27i-hist4-seed9` | 4 | 2739 | 92.2% | 1648 | 100.0 | 99.8 @95.2M | 97.0 | 0.0% |
+| `b27j-hist4-seed10` | 4 | 2738 | 93.6% | 1644 | 100.0 | 99.7 @78.4M | 96.1 | 0.0% |
+| `b27k-hist4-seed11` | 4 | 2783 | 93.8% | 1792 | 100.0 | 99.8 @83.5M | 96.6 | 0.03% |
+| `b27l-hist4-seed12` | 4 | 2774 | 94.6% | 1908 | 100.0 | 99.7 @58.9M | 96.5 | 0.0% |
+| `b27m-hist4-seed13` | 4 | 2790 | 95.5% | 1869 | 100.0 | 99.8 @91.9M | 96.3 | 0.03% |
+| `b27n-hist4-seed14` | 4 | 2737 | 91.0% | 1462 | 100.0 | 99.6 @74.7M | 96.2 | 0.0% |
+| `b27o-hist4-seed15` | 4 | 2779 | 95.7% | 1991 | 100.0 | 99.9 @60.2M | 95.9 | 0.0% |
+| `b27p-hist4-seed16` | 4 | 2762 | 92.0% | 1713 | 100.0 | 99.8 @75.7M | 95.2 | 0.0% |
+| `b27q-hist8-seed17` | 8 | 2799 | 95.7% | 1938 | 100.0 | 99.8 @71.3M | 96.8 | 0.0% |
+| `b27r-hist8-seed18` | 8 | 2698 | 94.3% | 1814 | 100.0 | 99.7 @67.6M | 92.7 | 0.0% |
+| `b27s-hist8-seed19` | 8 | 2780 | 95.6% | 1929 | 100.0 | 99.9 @59.3M | 96.4 | 0.0% |
+| `b27t-hist8-seed20` | 8 | 2840 | 95.6% | 1916 | 100.0 | 99.8 @92.3M | 96.4 | 0.0% |
+| `b27u-hist8-seed21` | 8 | 2753 | 95.5% | 1845 | 100.0 | 99.8 @76.9M | 95.8 | 0.0% |
+| `b27v-hist8-seed22` | 8 | 2728 | 95.6% | 1916 | 100.0 | 99.8 @97.0M | 94.8 | 0.0% |
+| `b27w-hist8-seed23` | 8 | 2757 | 95.1% | 1893 | 100.0 | 99.8 @99.8M | 94.6 | 0.0% |
+| `b27x-hist8-seed24` | 8 | 2837 | 95.7% | 1917 | 100.0 | 99.7 @62.2M | 96.4 | 0.0% |
+
+<!-- /progress_update: batch b27 -->
+
 <!-- progress_update: batch b26 -->
 ## Batch b26 — the `step_penalty` sweep, 4 values x 4 seeds, 50M, closed 2026-09-07
 
