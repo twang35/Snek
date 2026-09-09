@@ -1,0 +1,18 @@
+{
+ "arms": [
+  "b28i-hist8a25-seed9",
+  "b28j-hist8a25-seed10",
+  "b28k-hist8a25-seed11",
+  "b28l-hist8a25-seed12",
+  "b28m-hist8a25-seed13",
+  "b28n-hist8a25-seed14",
+  "b28o-hist8a25-seed15",
+  "b28p-hist8a25-seed16"
+ ],
+ "batch": "b28",
+ "box": "desktop",
+ "claimed_iso": "2026-09-09T02:39:47",
+ "claimed_ts": 1788946787.3946476,
+ "kind": "wave",
+ "wave": 1
+}
