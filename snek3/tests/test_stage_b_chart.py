@@ -233,3 +233,29 @@ def test_summarise_pools_full_rows_only_and_counts_the_stopped_ones():
     assert 'nothing to pool' in stage_b_chart.text_summary([stopped], 'arm')
     figure, _ = stage_b_chart.build_figure(rows, "arm")    # draws, with the stopped row hollow
     assert figure is not None
+
+
+def test_the_guide_sits_at_the_gate_of_the_pass_drawn():
+    """Stage B and hof5000 draw the hof5000 cut, hof30k the hof30k cut (user, 2026-09-09), read from
+    `eta` so the guide moves when a gate does; `--level` still overrides."""
+    from tools import eta
+    assert stage_b_chart.region_level(None) == eta.HOF_THRESHOLD == 99.2
+    assert stage_b_chart.region_level('hof5000') == eta.HOF_THRESHOLD
+    assert stage_b_chart.region_level('hof30k') == eta.HOF30K_THRESHOLD == 99.6
+    assert stage_b_chart.region_level('something-else') == stage_b_chart.REGION_LEVEL
+    facts = stage_b_chart.summarise([row(1000, 996, episodes=1000), row(2000, 992, episodes=1000)], level=99.6)
+    assert facts['at_or_above'][99.6] == 1 and facts['at_or_above'][99.0] == 2
+    assert 'at or above  99.6%' in stage_b_chart.text_summary([row(1000, 996, episodes=1000)], 'arm', level=99.6)
+
+
+def test_redraw_draws_each_pass_at_its_own_gate(runs_dir, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(stage_b_chart, 'render', lambda rows, path, name=None, level=None: seen.__setitem__(name or path, level))
+    results.write(results.stage_b_path('arm'), {'rows': [row(1000, 99)]})
+    results.write(results.stage_b_path('arm', 'hof30k'), {'rows': [row(1000, 99)]})
+    stage_b_chart.redraw('arm')
+    assert seen['arm'] == 99.2
+    stage_b_chart.redraw('arm', 'hof30k')
+    assert seen['arm'] == 99.6
+    stage_b_chart.redraw('arm', 'hof30k', level=98.0)
+    assert seen['arm'] == 98.0

@@ -34,16 +34,26 @@ from matplotlib.ticker import FuncFormatter
 import imageio
 
 from env import constants
-from tools import progress_chart, results
+from tools import eta, progress_chart, results
 
 # One deliberately wider figure than `progress_chart`'s: a stage-B pass has one series and up to a
 # few thousand points along the step axis, where an arm's chart has two axes and a trend line.
 FIGSIZE = (5.0, 2.4)
-# The dotted guide, the rug beneath it and the title's count all read this one number. **99 since
-# 2026-08-30** (user's call), and 98 before: an arm's stage-B rows now reach 99.2%, so a 98% guide sat
-# under most of the cloud and marked a region that was no longer the interesting one. `--level` still
-# moves it, and `summarise` reports 95/98/99/100 whatever it is set to.
-REGION_LEVEL = 99.0
+# The dotted guide, the rug beneath it and the title's count all read one number, **the gate of the pass
+# drawn** (user, 2026-09-09): a stage-B and a hof5000 chart draw it at the hof5000 cut (99.2, the cut a
+# stage-B row is judged by and the cut that produced a hof5000 row) and a hof30k chart at the hof30k cut
+# (99.6, what produced its rows). Before that it was one constant for every pass: 99 from 2026-08-30 and
+# 98 before, and each time the rows outgrew it the guide sat under the cloud marking a region that was no
+# longer the interesting one; reading the gate from `eta` means it moves when the gate does. `--level`
+# still overrides it, and `summarise` reports 95/98/99/100 whatever it is set to. `REGION_LEVEL` stays
+# as the fallback for a label no pass owns.
+REGION_LEVEL = eta.HOF_THRESHOLD
+REGION_LEVELS = {None: eta.HOF_THRESHOLD, 'hof5000': eta.HOF_THRESHOLD, 'hof30k': eta.HOF30K_THRESHOLD}
+
+
+def region_level(label=None):
+    """The guide level for a pass's chart: the gate its rows are read against (`REGION_LEVELS`)."""
+    return REGION_LEVELS.get(label, REGION_LEVEL)
 POINT_COLOR = 'tab:red'
 REGION_COLOR = 'tab:green'
 # **No trend line, removed 2026-09-01 (user's call).** There was one — a 40-row trailing mean in dark
@@ -130,7 +140,7 @@ def summarise(rows, level=REGION_LEVEL):
             'best_percent': best,
             'best_steps': [int(row['step']) for row in full if row['perfect_percent'] == best],
             'at_or_above': {threshold: sum(1 for p in percents if p >= threshold)
-                            for threshold in (95.0, 98.0, 99.0, 100.0)},
+                            for threshold in sorted({95.0, 98.0, 99.0, 100.0, float(level)})},
             'widest_region': count, 'region_lo': region_lo, 'region_hi': region_hi}
 
 
@@ -154,14 +164,14 @@ def text_summary(rows, name, level=REGION_LEVEL):
                       else '  ({0} rows tie)'.format(len(facts['best_steps'])))]
     else:
         lines.append('  every row stopped early; nothing to pool')
-    for threshold in (95.0, 98.0, 99.0, 100.0):
-        lines.append('  at or above {0:>4.0f}%  {1:>10,}'.format(
+    for threshold in sorted(facts['at_or_above']):
+        lines.append('  at or above {0:>5g}%  {1:>10,}'.format(
             threshold, facts['at_or_above'][threshold]))
     if facts['widest_region']:
-        lines.append('  widest >={0:.0f}% run  {1:>10,}   steps {2:,} - {3:,}'.format(
+        lines.append('  widest >={0:g}% run  {1:>10,}   steps {2:,} - {3:,}'.format(
             level, facts['widest_region'], facts['region_lo'], facts['region_hi']))
     else:
-        lines.append('  widest >={0:.0f}% run  {1:>10}'.format(level, 'none'))
+        lines.append('  widest >={0:g}% run  {1:>10}'.format(level, 'none'))
 
     ranked = sorted(full_rows(rows), key=lambda row: (-row['perfect_percent'], int(row['step'])))[:TOP_N]
     lines.append('  top {0}:'.format(len(ranked)))
@@ -239,7 +249,7 @@ def build_figure(rows, name=None, level=REGION_LEVEL):
     axis.grid(True, linewidth=0.3, alpha=0.3)
     if name:
         facts = summarise(rows, level)
-        axis.set_title('{0} — {1:,} rows, {2:,} ep each, best {3:.1f}%, {4:,} at >={5:.0f}%'.format(
+        axis.set_title('{0} — {1:,} rows, {2:,} ep each, best {3:.1f}%, {4:,} at >={5:g}%'.format(
             name, facts['rows'], facts['episodes_per_row'][0], facts['best_percent'],
             facts['at_or_above'][level], level), fontsize=LABEL_SIZE)
     figure.tight_layout(pad=0.4)
@@ -264,8 +274,10 @@ def render(rows, path, name=None, level=REGION_LEVEL):
     return image
 
 
-def redraw(policy, label=None, out=None, level=REGION_LEVEL):
-    """Rebuilds a pass's PNG. Returns `(path, rows)`; the path is None when there is nothing."""
+def redraw(policy, label=None, out=None, level=None):
+    """Rebuilds a pass's PNG at the pass's gate (`region_level`), or `level`. Returns `(path, rows)`;
+    the path is None when there is nothing."""
+    level = region_level(label) if level is None else level
     rows = load(policy, label)
     if not rows:
         return None, rows
@@ -279,15 +291,17 @@ def main(argv=None):
     parser.add_argument('policy')
     parser.add_argument('--label', default=None, help='names the pass, as passed to the wave')
     parser.add_argument('--out', default=None, help='PNG path; defaults beside the result file')
-    parser.add_argument('--level', type=float, default=REGION_LEVEL,
-                        help='the region threshold, in percent (default 99)')
+    parser.add_argument('--level', type=float, default=None,
+                        help='the region threshold, in percent (default: the pass\'s gate -- 99.2 for '
+                             'stage B and hof5000, 99.6 for hof30k)')
     parser.add_argument('--watch', type=float, default=0.0, metavar='SECONDS',
                         help='redraw every SECONDS; works on a wave still running')
     args = parser.parse_args(argv)
 
     while True:
-        path, rows = redraw(args.policy, args.label, args.out, args.level)
-        print(text_summary(rows, results.run_name(args.policy), args.level))
+        level = region_level(args.label) if args.level is None else args.level
+        path, rows = redraw(args.policy, args.label, args.out, level)
+        print(text_summary(rows, results.run_name(args.policy), level))
         print('chart: {0}'.format(path or 'not written'))
         if not args.watch:
             return 0 if rows else 1
