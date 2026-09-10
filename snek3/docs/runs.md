@@ -6,6 +6,31 @@ goes directly under `## Established` in [`findings.md`](findings.md).
 
 ## Now
 
+**b28's `hof5000` pass is in and it is the deepest candidate pool measured -- 7,718 rows through the 99.6 /5,000 gate
+against b27 `hist8`'s 1,836, 606 at ≥99.8 against 85 -- and its `hof30k` is running on the desktop with the first two arms
+reading 99.79 /30k, level with the Hall of Fame's 99.81 rather than above it.** As of 2026-09-10 10:06:
+
+| box | batch | state | ETA |
+|---|---|---|---|
+| desktop | b28 w1 (`hist8a25`, seeds 9-16, 200M) | training and stage B closed (46,471 rows, 97.5%); `hof5000` closed ~10:00 (31,630 rows, 7,718 ≥99.6, 38 at 99.9, every arm with a 99.9 best); `hof30k` running over those 7,718 rows at stop target 99.8 on seed 7 -- `b28i` and `b28j` merged, `b28k` shards landing, five arms to go | ~44 h; clear ~06:00 Sat 2026-09-12 |
+| laptop | — | idle since b27 w2 closed on 2026-09-09; nothing unclaimed in the pool | free |
+
+**What is in.** `hof5000`: `b28m` @138215424 and `b28k` @161644544 top at 4,997 /5,000; the 99.9 rows all sit at 118M-190M,
+inside the extra 100M of hold. `hof30k` so far: `b28i` @192774144 29,769 /29,831 and `b28j` @186449920 29,780 /29,842, both
+stopped a few hundred episodes short of the 99.8 target, so neither is a record (the HOF pair is 29,943-29,944 /30,000). The
+gap is 0.02 points, under one standard error at 30,000 episodes: the hold has multiplied the near-record checkpoints by four
+without raising the top. Readings in [`charts.md`](charts.md).
+
+**To do, in order.** (1) When `hof30k` closes: if any row reads ≥99.83 /30,000 (z ≥ 1 over the pair) it is an `hof-promote`
+candidate; otherwise write b28's `results.md` reading as "wider plateau, same top", commit its `runs/` files, and the 100M
+cap stands as enough for this config. (2) Then the decision from the last update: whether `SNEK_OBS_HISTORY=8` becomes the
+default, and the `hist16` and step-penalty-above-0.01 sweeps on the `hist8` base -- the laptop is free for either now.
+
+**Watch.** b28's `runs/` files stay uncommitted until the pass closes (the `_checkpoint_evals*` are still being merged). The
+laptop's `.failed-b25-hof30k` marker stands.
+
+## b27 closed, b28 through stage B with hof5000 running, as it read at 2026-09-09 12:50 (superseded)
+
 **b27, the move-history batch, has every pass in: at 30,000 episodes on seed 7 both history cells beat the Hall of Fame's
 first place (28 rows at 99.8 against 99.65), and b28 — the same `hist8` config held for 100M more — is through training and
 stage B at 97.5% density with its `hof5000` pass running on the desktop.** As of 2026-09-09 12:50:
