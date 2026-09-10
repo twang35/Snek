@@ -56,20 +56,22 @@ def region_level(label=None):
     return REGION_LEVELS.get(label, REGION_LEVEL)
 POINT_COLOR = 'tab:red'
 REGION_COLOR = 'tab:green'
-# **No trend line, removed 2026-09-01 (user's call).** There was one — a 40-row trailing mean in dark
-# red, drawn on any pass with 40+ rows — and it was justified by the noise in a *100-episode* row:
-# 1.6 pp of sampling sd at p=0.973, wider than the gap between neighbouring checkpoints, so only an
-# average showed the shape. **Every row on this chart is 500 or 5,000 episodes**, where that sd is
-# 0.72 and 0.23 pp, so the noise it was smoothing is not the noise these rows have.
-#
-# It was worse than merely redundant on a re-measure pass (`above:` selector, e.g. `hof5000`). Those
-# rows are a *selected* subset — 274 of ~14,000 checkpoints for b4, chosen for scoring highly and
-# separated by tens of millions of transitions — so a trailing mean over them joins points that are
-# not neighbours and averages a set picked for being high. It draws a trend in the selection and
-# reads as a trend in the policy. The 40-row gate is also why it appeared on one arm of a batch and
-# not the rest, which is what made it look like a fault: of b4's arms only b4c (64 rows) crossed it.
-#
-# The pooled line below is what actually summarises a pass, and it is unbiased.
+TREND_COLOR = '#4fa3e0'
+TREND_HALF_WINDOW = 1_000_000
+TREND_LINEWIDTH = 0.8
+# **The trend line is a pooled rate over a step window, added 2026-09-09 (user's call), and it replaces a
+# design that was removed on 2026-09-01 for two reasons that still hold.** The removed line was a 40-row
+# trailing mean: (1) it averaged row *percentages*, and (2) on a re-measure pass (`above:` selector, e.g.
+# `hof5000`) the rows are a selected subset -- 274 of ~14,000 checkpoints for b4, separated by tens of
+# millions of transitions -- so a trailing mean over N rows joined points that were not neighbours and
+# drew a trend in the selection as a trend in the policy; its 40-row gate also put it on one arm of a
+# batch and not the rest. This one is defined on the *step* axis: at each row, the perfect games over the
+# episodes of every row within `TREND_HALF_WINDOW` transitions either side -- the basin mean `HOF.md`
+# quotes by hand, drawn along the arm -- so it only ever pools neighbours, is episode-weighted rather
+# than an average of percentages, and is broken (not bridged) wherever two consecutive rows are further
+# apart than the window. It appears on every pass with two or more full rows, so every arm of a batch
+# carries it. Window: 1M transitions is ~30 rows of a hof5000 pass (150k episodes, sd ~0.02 pp) and ~55
+# rows of a stage-B pass (27k episodes, sd ~0.05 pp).
 LABEL_SIZE = 7
 TICK_SIZE = 6
 TOP_N = 5
@@ -184,6 +186,37 @@ def text_summary(rows, name, level=REGION_LEVEL):
     return '\n'.join(lines)
 
 
+def pooled_trend(rows, half_window=TREND_HALF_WINDOW):
+    """`(steps, trend)` in step order: at each row, the pooled perfect rate (games / episodes) over every
+    row within `half_window` transitions either side, as a percentage. A row further than `half_window`
+    from its predecessor starts a new segment: the value before it is NaN, so a line through the result
+    breaks across the gap instead of bridging it. Empty for fewer than two rows."""
+    if len(rows) < 2:
+        return np.array([], dtype=np.int64), np.array([], dtype=np.float64)
+    order = sorted(rows, key=lambda row: int(row['step']))
+    steps = np.array([int(row['step']) for row in order], dtype=np.int64)
+    games = np.array([row['perfect_games'] for row in order], dtype=np.float64)
+    episodes = np.array([row['episodes'] for row in order], dtype=np.float64)
+    cum_games = np.concatenate([[0.0], np.cumsum(games)])
+    cum_episodes = np.concatenate([[0.0], np.cumsum(episodes)])
+    low = np.searchsorted(steps, steps - half_window, side='left')
+    high = np.searchsorted(steps, steps + half_window, side='right')
+    trend = 100.0 * (cum_games[high] - cum_games[low]) / (cum_episodes[high] - cum_episodes[low])
+    gap = np.diff(steps) > half_window
+    if gap.any():
+        # NaN on the row *before* each gap: matplotlib lifts the pen there and the next row starts a new segment.
+        out_steps = []
+        out_trend = []
+        for index in range(len(steps)):
+            out_steps.append(steps[index])
+            out_trend.append(trend[index])
+            if index < len(gap) and gap[index]:
+                out_steps.append(steps[index])
+                out_trend.append(np.nan)
+        return np.array(out_steps, dtype=np.int64), np.array(out_trend, dtype=np.float64)
+    return steps, trend
+
+
 def build_figure(rows, name=None, level=REGION_LEVEL):
     """The figure, built through the object API. Returns `(figure, axis)`.
 
@@ -218,6 +251,14 @@ def build_figure(rows, name=None, level=REGION_LEVEL):
     # measurements are independent samples, so joining them draws sampling noise as a trajectory.
     axis.plot(steps, percents, marker='.', markersize=1.6, linestyle='none',
               color=POINT_COLOR, alpha=0.55)
+    trend_steps, trend = pooled_trend(rows)
+    if trend.size:
+        axis.plot(trend_steps, trend, color=TREND_COLOR, linewidth=TREND_LINEWIDTH, alpha=0.95)
+        # Pinned to the axes just above the rug at the bottom right, opposite the pooled label: on any
+        # arm the line itself ends inside the cloud, where a label on it would sit on the dots.
+        axis.annotate('\u2014 pooled rate, \u00b1{0:g}M window'.format(TREND_HALF_WINDOW / 1e6),
+                      xy=(1.0, 0.0), xycoords='axes fraction', xytext=(-3, 9), textcoords='offset points',
+                      ha='right', va='bottom', fontsize=TICK_SIZE, color=TREND_COLOR)
 
     # Pinned before the rug is drawn, not after. Autoscale would move the floor the rug sits on as
     # soon as the rug extended it, leaving the marks hanging above the axis by a hair.

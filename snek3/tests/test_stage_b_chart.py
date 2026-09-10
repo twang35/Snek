@@ -145,6 +145,44 @@ def test_the_y_floor_is_pinned_below_both_the_worst_row_and_the_level():
     assert axis.get_ylim()[0] < stage_b_chart.REGION_LEVEL
 
 
+def test_pooled_trend_pools_games_over_episodes_within_the_step_window_not_row_percentages():
+    # Two rows a step apart, unequal sizes: the pooled rate is 150/200 = 75.0, not the mean of 50 and 100.
+    rows = [row(1000, 50, episodes=100), row(2000, 100, episodes=100)]
+    rows[0]['perfect_percent'] = 50.0
+    steps, trend = stage_b_chart.pooled_trend(rows, half_window=1_000_000)
+    assert list(steps) == [1000, 2000]
+    assert np.allclose(trend, [75.0, 75.0])
+
+
+def test_pooled_trend_only_pools_rows_inside_the_window():
+    rows = [row(0, 100), row(500_000, 90), row(5_000_000, 80)]
+    steps, trend = stage_b_chart.pooled_trend(rows, half_window=1_000_000)
+    # The first two see each other (95.0); the far row sees only itself (80.0).
+    assert np.isclose(trend[0], 95.0) and np.isclose(trend[1], 95.0)
+    assert np.isclose(trend[-1], 80.0)
+
+
+def test_pooled_trend_breaks_the_line_across_a_gap_wider_than_the_window():
+    rows = [row(0, 100), row(500_000, 90), row(5_000_000, 80)]
+    steps, trend = stage_b_chart.pooled_trend(rows, half_window=1_000_000)
+    # A NaN sits between the two segments so a line through the result lifts the pen over the gap.
+    assert len(steps) == 4 and np.isnan(trend[2]) and steps[2] == 500_000
+
+
+def test_pooled_trend_is_sorted_by_step_and_empty_below_two_rows():
+    steps, trend = stage_b_chart.pooled_trend([row(3000, 99), row(1000, 97), row(2000, 98)])
+    assert list(steps) == [1000, 2000, 3000]
+    assert stage_b_chart.pooled_trend([row(1000, 99)])[1].size == 0
+
+
+def test_the_figure_draws_the_trend_in_its_colour_on_two_or_more_rows_and_not_on_one():
+    figure, axis = stage_b_chart.build_figure([row(1000, 99), row(2000, 98), row(3000, 97)], name='x')
+    trend_lines = [line for line in axis.get_lines() if line.get_color() == stage_b_chart.TREND_COLOR]
+    assert len(trend_lines) == 1 and len(trend_lines[0].get_xdata()) == 3
+    figure, axis = stage_b_chart.build_figure([row(1000, 99)], name='x')
+    assert not [line for line in axis.get_lines() if line.get_color() == stage_b_chart.TREND_COLOR]
+
+
 def test_render_writes_a_png_atomically_and_leaves_no_partial(runs_dir):
     path = os.path.join(runs_dir, 'chart.png')
     image = stage_b_chart.render([row(1000, 99)], path, name='arm')
@@ -176,23 +214,18 @@ def connected_series(axis):
             if line.get_linestyle() not in ('none', 'None') and len(line.get_xdata()) > 2]
 
 
-def test_no_connecting_line_is_drawn_however_many_rows_there_are():
-    """There was one, gated at 40 rows, so it appeared on some arms of a batch and not others.
-
-    Removed 2026-09-01: it smoothed the sampling noise of a *100-episode* row (1.6 pp sd) and every
-    row on this chart is 500 or 5,000 episodes (0.72 and 0.23 pp). On a re-measure pass it was worse
-    than redundant — those rows are a selected subset, so a trailing mean over them tracks the
-    selection rather than the policy.
-
-    The gate is why 40 and 41 rows are the cases to test: 39 never had a line either.
-    """
-    for count in (5, 39, 40, 41, 200):
+def test_the_dots_are_never_connected_and_the_only_series_is_the_trend_at_every_row_count():
+    """The dots stay unconnected (adjacent checkpoints are independent samples). The one connected
+    series is the pooled-rate trend (2026-09-09, user's call), and it has no row-count gate: the
+    2026-09-01 line was gated at 40 rows and so appeared on some arms of a batch and not others,
+    which is why 39, 40 and 41 are the counts to test (`connected_series` cannot see a 2-row line)."""
+    for count in (3, 5, 39, 40, 41, 200):
         rows = [row(1000 * i, 495 - (i % 3), episodes=500) for i in range(1, count + 1)]
         figure, axis = stage_b_chart.build_figure(rows, 'arm')
         drawn = connected_series(axis)
-        assert drawn == [], (
-            '{0} rows drew {1} connected line(s); the chart is points and guides only'.format(
-                count, len(drawn)))
+        assert len(drawn) == 1 and drawn[0].get_color() == stage_b_chart.TREND_COLOR, (
+            '{0} rows drew {1} connected line(s); expected the trend alone'.format(count, len(drawn)))
+        assert len(drawn[0].get_xdata()) == count
 
 
 def test_the_two_horizontal_guides_survive():
@@ -213,12 +246,6 @@ def test_the_points_and_the_rug_are_still_drawn():
     figure, axis = stage_b_chart.build_figure(rows, 'arm', level=level)
     markers = [line for line in axis.get_lines() if line.get_marker() not in ('', 'None', None)]
     assert len(markers) == 2, 'expected the point cloud and the >=level rug'
-
-
-def test_the_trend_constants_are_gone_not_just_unused():
-    # Left behind, they read as a feature that is temporarily off and invite it back.
-    assert not hasattr(stage_b_chart, 'TREND_WINDOW')
-    assert not hasattr(stage_b_chart, 'TREND_COLOR')
 
 
 def test_summarise_pools_full_rows_only_and_counts_the_stopped_ones():
