@@ -9,7 +9,7 @@ instrumentation that are properties of the problem rather than results.
 
 | file | contents |
 |---|---|
-| [`runs.md`](runs.md) | what is running, what to run next. **Start here** |
+| [`runs.md`](runs.md) | every batch: config in human terms, why it ran, what it taught. **Start here** |
 | [`protocol.md`](protocol.md) | how to judge a run: metrics, stop criteria, the eval protocol |
 | [`running.md`](running.md) | how to launch things, and every `SNEK_*` knob |
 | [`environment.md`](environment.md) | the game, the observation vector, the reward terms |
@@ -23,9 +23,10 @@ instrumentation that are properties of the problem rather than results.
 what is *true* — the measurements, the incidents, the verdicts — and a skill links back here rather
 than restating them.
 
-**Keep the split clean.** `runs.md` is current state and forward plan only; results go to
-`results.md`, conclusions to `findings.md`, anything about *how to measure or judge* to
-`protocol.md`. snek2's equivalent grew to 950 lines of interleaved status and stopped being usable.
+**Keep the split clean.** `runs.md` is one entry per batch (config, why, learned) and a short list of
+open questions; what is running right now is `status.json`, never a doc. Results go to `results.md`,
+conclusions to `findings.md`, anything about *how to measure or judge* to `protocol.md`. snek2's
+equivalent grew to 950 lines of interleaved status and stopped being usable.
 
 Designs that are worth writing down before they are worth building go in
 [`../plans/`](../plans/), one file each.

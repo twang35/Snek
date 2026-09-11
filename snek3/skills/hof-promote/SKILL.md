@@ -177,8 +177,8 @@ PYTHONPATH=. python -m pytest -q tests/test_hof_entries.py
 
 `test_every_real_entry_has_its_recording_and_both_of_its_rows_in_hof_md` reads the real folder: every entry
 directory must have its gif and its two rows, or it names what is missing. Then commit `hallOfFame/` (the entry,
-the gif, `HOF.md`) and the doc lines that called it a candidate (`docs/runs.md`'s `Now`, the batch's readings in
-`docs/results.md` and `docs/charts.md`) in one commit.
+the gif, `HOF.md`) and the doc lines that called it a candidate (the batch's `Learned` paragraph and `## Open` in
+`docs/runs.md`, the batch's readings in `docs/results.md` and `docs/charts.md`) in one commit.
 
 `hallOfFame/` is committed output and `HOF.md` is documentation, so both go up without waiting —
 **unless the same commit touches code**, which sends the whole thing back to needing approval.

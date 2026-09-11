@@ -1,1134 +1,621 @@
-# Runs — current state and forward plan
-
-**Newest at the top, in every doc in this directory.** Current state first, then what is next,
-then how we got here. A batch that closes is written above the batch before it, and a new finding
-goes directly under `## Established` in [`findings.md`](findings.md).
-
-## Now
-
-**b28's `hof5000` pass is in and it is the deepest candidate pool measured -- 7,718 rows through the 99.6 /5,000 gate
-against b27 `hist8`'s 1,836, 606 at ≥99.8 against 85 -- and its `hof30k` is running on the desktop with the first two arms
-reading 99.79 /30k, level with the Hall of Fame's 99.81 rather than above it.** As of 2026-09-10 10:06:
-
-| box | batch | state | ETA |
-|---|---|---|---|
-| desktop | b28 w1 (`hist8a25`, seeds 9-16, 200M) | training and stage B closed (46,471 rows, 97.5%); `hof5000` closed ~10:00 (31,630 rows, 7,718 ≥99.6, 38 at 99.9, every arm with a 99.9 best); `hof30k` running over those 7,718 rows at stop target 99.8 on seed 7 -- `b28i` and `b28j` merged, `b28k` shards landing, five arms to go | ~44 h; clear ~06:00 Sat 2026-09-12 |
-| laptop | — | idle since b27 w2 closed on 2026-09-09; nothing unclaimed in the pool | free |
-
-**What is in.** `hof5000`: `b28m` @138215424 and `b28k` @161644544 top at 4,997 /5,000; the 99.9 rows all sit at 118M-190M,
-inside the extra 100M of hold. `hof30k` so far: `b28i` @192774144 29,769 /29,831 and `b28j` @186449920 29,780 /29,842, both
-stopped a few hundred episodes short of the 99.8 target, so neither is a record (the HOF pair is 29,943-29,944 /30,000). The
-gap is 0.02 points, under one standard error at 30,000 episodes: the hold has multiplied the near-record checkpoints by four
-without raising the top. Readings in [`charts.md`](charts.md).
-
-**To do, in order.** (1) When `hof30k` closes: if any row reads ≥99.83 /30,000 (z ≥ 1 over the pair) it is an `hof-promote`
-candidate; otherwise write b28's `results.md` reading as "wider plateau, same top", commit its `runs/` files, and the 100M
-cap stands as enough for this config. (2) Then the decision from the last update: whether `SNEK_OBS_HISTORY=8` becomes the
-default, and the `hist16` and step-penalty-above-0.01 sweeps on the `hist8` base -- the laptop is free for either now.
-
-**Watch.** b28's `runs/` files stay uncommitted until the pass closes (the `_checkpoint_evals*` are still being merged). The
-laptop's `.failed-b25-hof30k` marker stands.
-
-## b27 closed, b28 through stage B with hof5000 running, as it read at 2026-09-09 12:50 (superseded)
-
-**b27, the move-history batch, has every pass in: at 30,000 episodes on seed 7 both history cells beat the Hall of Fame's
-first place (28 rows at 99.8 against 99.65), and b28 — the same `hist8` config held for 100M more — is through training and
-stage B at 97.5% density with its `hof5000` pass running on the desktop.** As of 2026-09-09 12:50:
-
-| box | batch | state | ETA |
-|---|---|---|---|
-| desktop | b28 w1 (`hist8a25`, seeds 9-16, 200M) | 8 arms at cap, stage B in (46,471 rows, 97.5%); `hof5000` running over 36,550 candidates, ~18 h left; `hof30k` queued behind it (~12% of candidates pass the 99.6 gate on b27's rate, so ~4,000+ rows, about a day) | hof5000 ~06:30 2026-09-10; hof30k ~2026-09-11 |
-| laptop | — | **idle, and b27 w2 is closed.** The scheduler (pid 75048) and its `hof30k` pass died at 15:42 on 2026-09-08 (exit -9 at launch, no relaunch, no process left). The `hist4` 30k measurement was done by the desktop instead (`b27-hof30k-hist4-desktop`); on 2026-09-09 those files were published under the wave's own id `b27-hof30k-w2` on `laptop-results`, the dead `.pass-b27-hof30k-w2` marker removed and an empty laptop status pushed, so the pool reads the wave closed and a laptop scheduler started now finds every pass file in place and skips | free |
-
-**What is in.** b27 closed: stage B `hist0` 49.2% / `hist4` 93.6 / `hist8` 95.4; `hof30k` on seed 7: `hist4`
-605 rows ≥99.6 and 19 at 99.8 (`b27i`, `b27k`), `hist8` 937 rows ≥99.6 and 9 at 99.8 (`b27t`, `b27u`, `b27v`); `hist0`
-tops at 99.4. Top rows `b27t` @85065728 (29,944 /30,000) and `b27k` @77594624 (29,943), z ≈ 3.9 over the HOF's `b10ck`
-@30523392 (29,894). Both checkpoints are on disk (`savedPolicies/` on the desktop and laptop respectively, no rotation
-loss). The finding is written (`findings.md`). b28 window for window equals b27's `hist8` (0-100M 94.9% against 95.4) —
-25% of 200M is the same 50M anneal — so its 97.5 is the extra 100M of hold reading 99.8% density; best30 99.88 against
-99.79. Readings in [`charts.md`](charts.md).
-
-**To do, in order.** (1) Done 2026-09-09 14:50: b27 reads closed on the pool and its `results.md` reading is written (a
-`release` would have been wrong — it returns the wave's arms to the pool for retraining; publishing the pass under the
-wave's id is what closes it). (2) Done 2026-09-09 15:05: `b27t` @85065728 and `b27k` @77889536 are in `hallOfFame/` as a pair, the new record
-(99.81 /30,000 each, z = 0.19 between them, 3.8-3.9 over `b10ck`). (3) Decide whether `SNEK_OBS_HISTORY=8` becomes the default; a `hist16` cell
-and a step-penalty cell above 0.01 on the `hist8` base are the obvious next sweeps once b28's passes are in.
-
-**Watch.** The desktop's queued-line counts for `hof30k` still come from the running scheduler's old cut until it next
-restarts. `tools/eta.py`'s pooled-rate fix is committed. The laptop's `.failed-b25-hof30k` marker stands.
-
-## b27 passes closing, b28 waiting, as it read at 2026-09-08 11:00 (superseded)
-
-**b27, the move-history batch, has every arm through stage B, `hist4`'s 5,000-episode pass closed, `hist8`'s an hour out —
-and both history depths read ~94-95% stage-B density against the control's 49.2, `hist8` a small step above `hist4` on
-every density and stability column and level with it on the peaks.** As of 2026-09-08 11:00:
-
-| box | batch | state | ETA |
-|---|---|---|---|
-| desktop | b27 w3 (`hist8`, seeds 17-24) | hof5000 running, 6 of 8 arms merged, ~1.1 h left; hof30k queued behind it (~1,950 rows at the 99.6 gate, ~9.5 h at the box's 17.6 s a row) | 30k results ~22:00 |
-| laptop | b27 w2 (`hist4`, seeds 9-16) | hof5000 closed 10:36, all 8 arms on `laptop-results` and the site; hof30k queued but **paused** — `runs/.live/.paused` (10:01) holds it | ~8 h from the unpause (~1,320 rows at 22 s a row) |
-
-b28 (pinned desktop) waits behind b27 w3 in the pool.
-
-**What is in.** Stage B for all 24 arms: `hist0` 49.2% (33.0-64.7), `hist4` 93.6 (91.0-95.7), `hist8` 95.4 (94.3-95.7);
-stage-A ≥98 share 47.2 / 84.3 / 85.4; best30 99.08 / 99.76 / 99.79; onset the same. At 5,000 episodes `hist4` puts 169
-rows an arm through the new 99.6 gate and `hist8` 246 (six arms in), with the same top: a 99.9 best in each and ~12 rows an
-arm at ≥99.8. `hist8`'s worst seed (94.3) sits above six of `hist4`'s eight. The plan's prediction of no effect on the
-perfect rate is falsified; the finding is written when the batch closes. Readings in [`charts.md`](charts.md).
-
-**Changed today.** The `hof30k` gate is 99.6 /5,000, from 99.2 (`eta.HOF30K_THRESHOLD`; the hof5000 gate stays 99.2
-/500 as `eta.HOF_THRESHOLD`): over the 1,392 b24-b27 rows with both readings nothing below 99.6 /5k ever read 99.6 /30k,
-and 99.5 no longer places. Deployed to the desktop before either 30k pass launched. `hist0`'s 30k pass (124 rows) ran under
-the old gate and is not comparable in row count.
-
-**Watch.** The scheduler's status lines overcount both 30k passes (223 h laptop, 39 h desktop) until each scheduler restarts
-on the new code: the queued-line row count comes from the running scheduler's copy of the old cut, and the laptop's per-row
-rate from a single 2-row ledger entry — the pooled-rate fix to `tools/eta.py` is in the working tree, uncommitted. The
-laptop's `.failed-b25-hof30k` marker stands (`logs/laptop-queue/b25/`); b25's `hof30k` files for seeds 4-8 arrived from the
-desktop and are committed with this update.
-
-**Open from earlier.** `b25a` @106168320 at 99.6 /30k awaits a fresh 30,000 under the old era; b26's step-penalty curve has
-not turned (0.02, 0.05 next); a hist16 arm is the obvious next cell once b27 closes.
-
-## b27 w1 closed, w2 in stage B, w3 launched, as it read at 2026-09-07 23:30 (superseded)
-
-**b27, the move-history batch (`SNEK_OBS_HISTORY` 0 / 4 / 8 on b26's `pen01` base, 100M, 8 seeds a cell), is in flight
-on both boxes — and its depth-4 cell is reading 93.8% stage-B density against the control's 49.2 with one arm still to
-measure.** As of 2026-09-07 23:30:
-
-| box | batch | state | ETA |
-|---|---|---|---|
-| desktop | b27 w3 (`hist8`, seeds 17-24) | training, just launched (0%) | training ~02:00, stage B and hof passes ~04:00 |
-| laptop | b27 w2 (`hist4`, seeds 9-16) | stage B running, 7 of 8 arms merged (~15 min left); hof5000 then hof30k queued, the hof5000 estimated ~12 h at this density | passes into tomorrow morning |
-
-**What is in.** `hist0` (w1, desktop) closed with every pass: 49.2% density (33.0-64.7) against 46.3 for the same
-config at 50M (b26's `pen01`), best30 99.08, 99.4 /30k at best (`b27e` @52.4M, 44 rows ≥99.2 at 30,000) — the longer cap
-alone bought little. **`hist4` (w2, laptop), seven arms into stage B: 93.8% density (91.0-95.7), best30 99.76 (99.6-99.9),
-stage-A ≥98 share 84.3% against 47.2, 12,314 `hof5000` candidates at the 99 column** — every seed far above every control
-seed, onset unchanged. The plan (`plans/obs-history.md`) predicted no effect on the perfect rate; that prediction is
-falsified on the stage-A and stage-B evidence, pending the close. `hist8` says whether more history helps further or the
-gain is all in the first four moves. Readings in [`charts.md`](charts.md); the finding is written when the batch closes.
-
-**Watch.** `hist4`'s hof5000 pass will be the widest yet — ~1,300-1,700 rows ≥99.2 per arm — so the estimate of ~12 h
-is real, not the old floor; the 99.2 cut set today is what keeps it from being two days. If the pass is worth trimming,
-`eta.HOF_THRESHOLD` is the one knob.
-
-**Open from earlier today.** b24/b25's `hof30k` passes cover only their first arms; `b25a` @106168320 at 99.6 /30k
-awaits a fresh 30,000 under the old era. b26's step-penalty curve has not turned (0.02, 0.05 next) and a death trace
-of `b26b` @38.9M against a control would test the starvation-loop mechanism.
-
-## b26 closed, both boxes idle, as it read at 2026-09-07 18:30 (superseded)
-
-**b26, the step-penalty sweep and the first batch of the 26-value observation era, closed on both boxes with every
-pass; the shared queue is empty and both boxes are idle.** As of 2026-09-07 18:30:
-
-| box | batch | state | ETA |
-|---|---|---|---|
-| desktop | — | b26 wave 2 (`pen0001`, `pen0`) closed with hof5000/hof30k; nothing unclaimed | **free** |
-| laptop | — | b26 wave 1 (`pen01`, `pen001`) closed with its passes ~17:00; scheduler exited on the empty pool | **free** |
-
-**What closed.** **A step penalty of 0.01 reads 46.3% density (42.3-52.6) against the `pen0` control's 25.5 (16.3-33.5),
-every seed separated from all twelve other arms, best30 98.88 against 98.47** — the two smaller values sit inside the
-control's spread, and the one diagnostic that moves with it is late explained variance (0.82 against 0.77-0.81). Onset,
-entropy and KL are identical across cells: the penalty changes what the converged policy does, not how fast it learns.
-Verdict in [`results.md`](results.md), reading in [`charts.md`](charts.md), finding under `## Established` in
-[`findings.md`](findings.md), curve and traces in [`sweep.md`](sweep.md) §5 and `viewer/sweep.html` (b26 is in the sweep
-reducer now, via `plans/sweep-extra.json`).
-
-**Open from the morning.** b24/b25's `hof30k` passes cover only their first arms (the observation change broke them
-off); `b25a` @106168320 at 99.6 /30k awaits a fresh 30,000 for the HOF, under the old era. Both are the obs26 work's.
-
-**Next.** The step-penalty curve has not turned: 0.02 and 0.05 at 4 seeds on the same config, and 0.01 on the ladder top
-(γ 0.999, T 512, `mse`) to see whether the lever holds there. A death trace (`tools/death_trace.py`) of `b26b` @38.9M
-against a `pen0` checkpoint would say whether the penalty is buying fewer starvation loops, which is the mechanism the
-result fits.
-
-## b24/b25 closed, b26 in flight, as it read at 2026-09-07 16:30 (superseded)
-
-**b24 and b25 — the two 200M champion attempts — closed on stage B and hof5000; both 30k passes broke off part-way
-when the observation changed to 26 values, and the other agent's obs26 work owns finishing them. b26, the step-penalty
-sweep and the first batch of the new era, is in flight on both boxes.** As of 2026-09-07 16:30:
-
-| box | batch | state | ETA |
-|---|---|---|---|
-| desktop | b26 w2 (`pen0001`, `pen0`, 4 seeds each, 50M) | training at 85%, stage B queued behind it | training ~16:40, stage B and hof passes ~1.5 h after |
-| laptop | b26 w1 (`pen01`, `pen001`) | stage B running (~20 min left), hof5000 then hof30k queued | passes ~18:00 |
-
-**What closed.** **b25, the ladder top (γ 0.999, λ 0.99, T 512, `mse`, clip held) at 200M x 8: 77.5% density (64.3-83.0)
-against 64.4 for the same config at 50M, best30 99.34, 0.45% of evals below 80 — and `b25a` @106168320 reads 99.60
-[99.52-99.67] at 30,000 episodes, level with the HOF's second place and inside the record's interval.** b24, the
-horizon anneal at 200M x 8, matches it on the peak (best30 99.30, `b24a` 99.5 /30k) and trails on density (60.5%) and
-stability (0.83% below 80). Both batches' `hof30k` passes cover only the first arms (b25: a-c; b24: a-b) — the pass failed
-on the next arm at 15:03 when `env/constants.py` moved to `OBS_LEN 26` / era `obs26-20260907` (commit `b1259c912`) and the
-30-value checkpoints no longer load; the failed markers are `.failed-b25-hof30k` in `logs/laptop-queue/b25/` and
-`.failed-b24-hof30k` in the desktop's `queue-local/b24/`. The five unmeasured b25 arms include `b25h` (362 rows ≥99.2,
-best 99.6 /5000) and `b25f` (99.5 /5000). Verdicts in [`results.md`](results.md), readings in [`charts.md`](charts.md).
-
-**Next.** A fresh 30,000 on `b25a` @106168320 to confirm 99.6 for the HOF (`hof-promote`), once the old-era eval path
-exists; the remaining `hof30k` arms of b24/b25 the same way. b26's four cells read against its own `pen0` control when
-its stage B is in. The hof cut moved to 99.2 today (`eta.HOF_THRESHOLD`; the lowest rate over 500 whose interval reaches
-the record) so later passes carry a fifth of the rows b24/b25's did.
-
-**Tooling today.** The status estimates count checkpoints, not arms (`tools/eta.py`): a queued pass at the box's
-seconds per checkpoint over what its selector will pick, a running pass from its own progress — b25's hof5000 had read
-"~1m left" for five hours. A pass now publishes the arms it merged whatever its exit, so a failed pass no longer keeps
-finished arms off the site.
-
-## Both boxes idle after b22/b23, as it read at 2026-09-06 18:25 (superseded)
-
-**b22 and b23 — the first two rung pairs of the corner-grid ladder — closed with all their passes; both boxes are idle
-and the shared queue is empty. The user is holding off on queueing more for now.** As of 2026-09-06 18:25:
-
-| box | batch | state | ETA |
-|---|---|---|---|
-| desktop | — | b22 (γ 0.999 on λ 0.99; + rollout 512) closed with hof5000/hof30k, imported 18:20; nothing unclaimed | **free** |
-| laptop | — | b23 (+ `mse`; + clip hold) trained in 44 min at T 512's quarter-rate stage A, closed with its passes by ~17:45; scheduler exited on the empty pool | **free** |
-
-**What closed.** **The `mse` value loss on γ 0.999 / λ 0.99 / rollout 512 reads 61.6% density (49.8-78.1 per seed) against
-32.7 for the rung below, every seed separated, with the collapses gone (0.48% of evals below 50 against 3.54)** — the
-largest single step this project has measured; the clip hold on top reads 64.4% and 0.0% below 50, inside the mse cell's
-noise on density. γ 0.999 on λ 0.99 alone reads 36.3% with four times the base's drawdown; rollout 512 on top of it costs
-density and buys stability. Nothing beats the HOF's 99.65 at 30,000 (the mse cells top out at 99.2) but they produce ≥99
-/30k checkpoints in bulk: 64 in one wave. Verdicts in [`results.md`](results.md), readings in [`charts.md`](charts.md),
-finding under `## Established` in [`findings.md`](findings.md).
-
-**Next, when the user says so.** Run the ladder backwards to find what `mse` needs under it — `mse` + γ 0.999 without
-rollout 512, and `mse` on λ 0.99 alone — then 8 seeds of the best rung at a longer cap for a champion attempt. An
-optimizer batch was discussed (AdamW / RMSprop against Adam) and needs an `SNEK_PPO_OPTIMIZER` knob first; PPO already
-trains with Adam. Shaping off and `lranneal` are the remaining unstacked levers.
-
-**Tooling.** The sweep analysis landed (`e2de52473`): `tools/sweep_analysis.py` reduces b9-b21 to `viewer/sweep.json`,
-`docs/sweep.md` is the report, `viewer/sweep.html` the page. b22/b23 are not in the sweep manifest, so the reducer does
-not yet cover them; adding the ladder to `plans/hyperparam-sweep.json` (or a second manifest) is the next tooling step.
-
-## Both boxes idle after b18, as it read at 2026-09-06 14:00 (superseded)
-
-**b18 (gradient clip) closed with its hof passes at 13:34; both boxes are idle and the shared queue is empty. The
-one-knob sweeps at λ 0.98 — b15 through b21 — are all closed. Next is the corner grid, and its spec is the user's
-call.** As of 2026-09-06 14:00:
-
-| box | batch | state | ETA |
-|---|---|---|---|
-| laptop | — | idle since b18's wave 3 closed at 13:34; no trainer, close-out or shard process up | **free** |
-| desktop | — | idle since b18's wave 2 closed; nothing unclaimed on the pool | **free** |
-
-**What closed.** b18: **the gradient-norm clip is a no-op from off to 5.0** — every cell inside the base's noise on
-density (16.7-19.5% against 17.3) and best30; clipping off reads the base's density to the decimal and is more stable,
-so the base's collapses are policy-level, not rare huge gradients. The more useful result is the calibration: 0 and
-5.0 are both effectively no clip and differ by 3.8 pp on the share of evals below 80%, **so that column's noise at n=4
-is ~4 pp** — which puts b21's "a little more stable" and most of b20's lanes-as-stability-lever reading inside the noise.
-Best at depth `b18t-gc2-seed4` @11452416 and `b18h-gc01-seed4` @11976704, both 98.9 /30,000, below the HOF. Verdict in
-[`results.md`](results.md), table in [`charts.md`](charts.md), finding under `## Established` in
-[`findings.md`](findings.md).
-
-**Next: the corner grid.** What survived the λ 0.98 sweeps, all against b7's base: a clip anneal held at the floor for
-the last 10M (b17, +6-7 pp density), `lranneal` to zero (b17, +6 pp), the `mse` value loss (b19, +5 pp and 0.97% of
-evals below 80%, the one stability result outside the ~4 pp floor). Within noise and dropped or left at the base:
-entropy 0.01 (b15), target KL off (b16), lanes 128 (b20; 512 lanes is at the edge of the floor, a stability lever only
-if a cheap one is wanted), shaping (b21; off is the simplest config at no cost), gradient clip 0.5 (b18). b14's rollout
-512 (+11 pp) is on the λ 0.99 side of the split, and the corner grid is where the two sets meet. Both boxes are free for
-it now; a 24-arm batch across both is ~5 h of training plus passes.
-
-**Tooling.** `tools/progress_update.py` runs in 37 s instead of 170: every pending spec is read from `ops` in one
-`git cat-file --batch` rather than one `git show` per arm (540 processes through the laptop's git wrapper), and the
-manifest lists `runs/` once instead of a glob per arm per pass. What remains is the 1.4 GB stage-B JSON parse (~25 s);
-an mtime-keyed cache of the per-arm records would take it under 15 s if wanted.
-
-**Housekeeping.** `runs/b7*_checkpoint_evals_hof30k.json` (32 files, one `.png`) were written on the laptop at 08:06
-today and are on neither feed — a hof30k pass over b7's 32 arms, with one candidate: `b7av-fc100x100-seed2` @4096000,
-**99.0 /30,000 [98.9, 99.1]** on seed 7, from a checkpoint at 4.1M steps, below the HOF's 99.30 third place. b7 is
-closed, so they are committed with b18's archive.
-The 12 `runs/b16bg-kl04-seed1_checkpoint_evals-s*of12.json` shard files were deleted (user, 2026-09-06): a second stage-B
-pass over the arm, started 14 min after the first had merged and killed at 661 of 1,170 steps; every one of its rows was
-already in the merged file with an identical measurement.
-
-## b21 closed and b18 on its last stage B, as it read at 2026-09-06 12:35 (superseded)
-
-**b21 (shaping) closed with its hof passes; b18 (gradient clip) is on its last wave's stage B on the laptop and closes
-mid-afternoon; the desktop is idle and the shared queue holds nothing else.** As of 2026-09-06 12:35:
-
-| box | batch | state | ETA |
-|---|---|---|---|
-| laptop | b18 (gradient-norm clip, 24 arms, 3 waves) | waves 1 (laptop) and 2 (desktop) closed with hof5000/hof30k; wave 3 (2.0, 5.0) trained, stage B running from 12:08, 4 of 8 arms in | stage B ~13:20, hof passes after; closes ~13:40 (the daemon's own estimate) |
-| desktop | — | idle since b18's wave 2 closed; nothing unclaimed on the pool | **free for the corner grid** |
-
-**What closed.** b21: **the chase-safe shaping is a no-op for PPO** — dose 0 to 0.2 and gate 0 to 85 all inside the
-base's noise on density (16.3-18.2% against 17.3) and best30, every cell a little more stable; shaping *off* is the most
-stable cell (3.6% of evals below 80%) and gate85 the densest with the batch's best at depth (`b21s-gate85-seed3`
-@38748160, 98.9 /30,000, below the HOF). Both spec predictions falsified. Shaping off goes into the corner grid as a
-simplification. Verdict in [`results.md`](results.md), table in [`charts.md`](charts.md), finding under `## Established`
-in [`findings.md`](findings.md).
-
-**Live.** b18: 22 of 24 arms have stage-B rows and **the knob reads as a no-op so far** — clip off is 17.3%, the base's
-density to the decimal, and 0.1 / 0.25 / 1.0 / 2.0 read 19.1 / 16.7 / 16.7 / 19.5, every cell a little more stable than
-the base. 5.0 and 2.0's last two seeds are what is left; unless they surprise, the gradient-norm clip stays at 0.5 and
-leaves the grid.
-
-**Next: the corner grid.** With b18 the one-knob sweeps at λ 0.98 are done. The levers that survived, all at b7's base:
-a clip anneal held at the floor for the last 10M (b17, +6-7 pp), `lranneal` to zero (b17, +6 pp), the `mse` value loss
-(b19, +5 pp and the most stable cell), 256-512 lanes as a stability lever (b20); simplifications at no cost: shaping off
-(b21), and — pending its last wave — gradient clip left at 0.5 (b18). b14's rollout 512 is on the λ 0.99 side of the
-split. The corner grid's spec is the user's call; the desktop is free for it now and the laptop from ~13:40.
-
-**Housekeeping.** `runs/b16bg-kl04-seed1_checkpoint_evals-s*of12.json` (12 files) are stray per-shard files from a
-stage-B pass that later merged; untracked, harmless, not committed.
-
-## b21 on its last wave and b18 on its first, as it read at 2026-09-06 08:30 (superseded)
-
-**b17 (clip), b19 (switches) and b20 (lanes) closed with their hof passes; b21 (shaping) is on its last wave on the desktop
-and b18 (gradient clip) on its first on the laptop — both boxes pulling from the shared queue since 23:44 last night.**
-As of 2026-09-06 08:30:
-
-| box | batch | state | ETA |
-|---|---|---|---|
-| desktop | b21 (shaping, 24 arms, 3 waves) | waves 1 (desktop) and 2 (laptop) closed with hof5000/hof30k; wave 3 (gate85, gate0) training from 07:20, 61% | training done ~08:50, passes to ~10:30; then it claims b18's wave 2 |
-| laptop | b18 (gradient-norm clip, 24 arms, 3 waves) | wave 1 (0, 0.1) training from 07:55, ~15% | wave 1 done ~10:30 plus passes; 16 arms unclaimed, ~2.5 h a wave, training done ~15:40 |
-
-**The shared queue ran its first night without a fault** ([`../plans/archive/shared-queue.md`](../plans/archive/shared-queue.md)):
-one queue on `ops`, each box claiming a wave by pushing to the `claims` branch. The desktop claimed b17 w8, b20 w2, b21
-w1 and w3; the laptop b21 w2 and b18 w1; b20 was the first batch split across the boxes, and its wave 2 ran on the desktop
-rather than the laptop because the desktop came free first — that is the design, not a routing error. Queueing is the
-`queue-batch` skill; `at_a_glance.pool` in `status.json` is what is unclaimed and who holds what. `attention` is empty.
-
-**What closed.** b17: the static clip is flat from 0.05 to 0.2 and worse above; **annealing the clip and holding the
-last 10M at the floor reads 23.5-24.3% density (+6-7 pp) at best30 98.45-98.48 and better stability**, the floor's value
-not mattering and the hold mattering; `lranneal` does the same (23.7%). b19: **the mse value loss is the most stable cell
-at this base (0.97% of evals below 80%) and 5 pp denser**; advantage normalisation off is as stable and 4 pp short; Adam
-ε and the vf coefficient are within noise. b20: `collect_envs` is a throughput knob — every value within noise on density,
-512 lanes the smoothest endgame (2.2% below 80%) — and against b14 the rollout's gain came from depth, not batch size.
-Verdicts in [`results.md`](results.md), tables in [`charts.md`](charts.md), findings under `## Established` in
-[`findings.md`](findings.md).
-
-**Promoted to the HOF (user's decision, 2026-09-06 09:05): `b17cl-clipanneal001hold80-seed4` @11386880, 99.50 /30,000
-[99.4, 99.6]**, neighbours 99.4 and 99.3, from a checkpoint at 11.4M steps — third place, above `b9ch`'s 99.30 and not
-distinguishable from the lower `b10ck` entry (z = 0.9). Copy verified 496/500 on seed 11; entry in
-[`hallOfFame/HOF.md`](../hallOfFame/HOF.md). Nothing else at 30k this update reads above 99.3.
-
-**Live so far.** b21: the shaping dose is a no-op — 0.0, 0.05, 0.2 and gate60 all inside the base's noise on density and
-a little more stable, shaping *off* the most stable of them; wave 3 (gate85, gate0) is the last word on whether the gate
-matters. b18: too early to read.
-
-**Corner-grid candidates so far at λ 0.98**: a hold-at-floor clip anneal (b17), `lranneal` (b17), `mse` value loss
-(b19), 256-512 lanes as a stability lever (b20); b18 pending. b14's rollout 512 is on the λ 0.99 side of the split.
-
-**Tooling.** `tools/progress_update.py` now reads a batch's close from its files when the bus knows nothing of it —
-b19 closed under the old laptop queue and had no results section until this update.
-
-## b17 and b19 mid-flight, as it read at 2026-09-05 15:35 (superseded)
-
-**b14 (rollout), b15 (entropy) and b16 (target KL) closed with their hof passes; b17 (clip) is on wave 4 of 8 on the
-desktop and b19 (switches) on wave 2 of 3 on the laptop.** As of 2026-09-05 15:35:
-
-| box | batch | state | ETA |
-|---|---|---|---|
-| desktop | b17 (clip + anneals, 64 arms, 8 waves) | waves 1-3 closed with hof5000/hof30k; wave 4 (clip 0.1 anneal, lr anneal) training from 15:30 | training done ~03:40 2026-09-06; **b21 (shaping, 24 arms) behind it since the 21:32 swap**; box clears ~11:00 Sun |
-| laptop | b19 (switches, 24 arms, 3 waves) | wave 1 (noadvnorm, mse) closed with hof5000; wave 2 (Adam ε 1e-5, 1e-8) training from ~15:25 | ~19:00 today; then b20 (lanes, 16 arms) and **b18 (grad-norm clip, 24 arms, swapped in for b21 at 21:32)**; clears ~20:00 Sun |
-
-**‡ b15-b21 were generated from b7's base at λ 0.98, not the re-based λ 0.99.** Every arm's config table says
-`ppo_gae_lambda 0.98` (b13's and b14's say 0.99), and the spec notes name `b7aa-b7ad` as the control. Until this update
-the tables read them against b9's λ 0.99 cell (27.3% density), which made every b15-b17 cell look 8-14 pp short —
-b16's null-check cells included, which were predicted identical to the control. `viewer/references.json` now points
-b15-b21 at `b7aa-b7ad` (17.3%, best30 97.75, 6.2% of evals below 80%), and every reading below is against that.
-**Decision (user, 2026-09-05): b18, b20 and b21 stay queued at 0.98**, so b15-b21 are one comparable set against b7's
-cell. What 0.98 loses is the direct comparison with b11-b14; the corner grid is where the two sets meet.
-
-**What closed.** b14: density rises with rollout to 512 (38.3%) and stability with it to 1024; 512 joins the corner
-grid. b15: the entropy coefficient trades density for stability monotonically, the anneals average their endpoints,
-0.01 stays. b16: target KL is a no-op at 4 epochs. Verdicts in [`results.md`](results.md), tables in
-[`charts.md`](charts.md), findings under `## Established` in [`findings.md`](findings.md).
-
-**HOF candidates, not records.** `hof30k` rows at 99.4 /30,000: `b15ay-entanneal10-seed1` @24182784 and (2026-09-04)
-`b11ag-lr1e4-seed3` @33243136; the HOF's third place, `b9ch`, is 99.30 [99.2, 99.4]. Four b16 rows and three b15 rows
-read 99.3. Promotion is the `hof-promote` skill and the user's call; nothing approaches `b10ck`'s 99.65.
-
-**Live so far.** b17: clip is flat around the base from 0.05 to 0.2 and worse past it; loosening the clip *reduces*
-collapses; the 0.2→0.02 anneal matches the base on density with better stability. b19: **the mse value loss** reads
-22.2% density at 0.97% of evals below 80% (base 17.3% at 6.2%) — the most stable cell at this base, and denser;
-noadvnorm is as stable and 4 pp short.
-
-**Infrastructure today.** The desktop's `runner` is `daemon` ([`../plans/archive/rename-runner-to-daemon.md`](../plans/archive/rename-runner-to-daemon.md));
-the desktop scheduler restarted on the new code at 13:59 with b17 wave 3 adopted mid-training. `tools/progress_update.py`
-now tables every batch in `references.json` (b16 had closed without ever being tabled), separates an anneal cell from the
-fixed value it starts at, names the cells of a switches batch, and reads a laptop batch's state from the laptop's own
-status lines — uncommitted, awaiting review.
-
-## b14 and b15 mid-flight, as it read at 2026-09-04 19:10 (superseded)
-
-**b14 (rollout) wave 1 closed and wave 2 is training on the laptop; b15 (entropy) wave 1 closed on the
-desktop, which is now running the hall-of-fame passes queued ahead of b15's remaining waves; b11's two
-passes are done.** As of 2026-09-04 19:10:
-
-| box | batch | state | ETA |
-|---|---|---|---|
-| laptop | b14 (rollout, 24 arms) | wave 1 (32, 64) closed 18:30; wave 2 (192, 256) at 34-43M of 50M, 45 min in; wave 3 (512, 1024) to train | wave 2 close-out tonight; wave 3 through the morning of 2026-09-05 |
-| desktop | b15 (entropy coef, 40 arms) | wave 1 (0, 0.001) closed ~18:00; 4 waves queued **behind `b12-hof5000` (running since 19:03), `b12-hof30k`, `b13-hof5000`, `b15-hof5000`** | the tool's ~05:13 is training time alone; with three passes ahead at ~40-80 min each, closer to 08:00-10:00 2026-09-05 |
-| desktop | b11 hof passes | **done** — `hof5000` over 661 checkpoints, `hof30k` over 22 rows | — |
-
-Behind b15 on the desktop: b16-b21 (target-KL, clip, gradient clip, advantage normalisation, lanes,
-shaping), every one at λ 0.99 against **b9's λ 0.99 arms `b9bw`-`b9bz`** (best30 98.3-98.4, density 27.3%).
-`attention` is empty. **2026-09-05 12:50: b21 moved from the desktop to the laptop** (`move-batch`): `status.json`'s
-new `remaining` read ~31 h on the desktop against ~14 h on the laptop, so the laptop now runs b19, b20, b21
-in that order and the desktop b17 then b18.
-
-**b11's 30,000-episode result: a third-place candidate, not a record.** `b11ag-lr1e4-seed3` @33243136 read
-**99.4 /30,000** [99.3, 99.4], with its two neighbours at 99.3 and 99.1; `b11ba-lr1e3-seed3` @47382528 and
-`b11am-lr2.5e4-seed1` @47644672 read 99.2. That sits below `b10ck`'s 99.65 and 99.55 and above `b9ch`'s
-99.30, so it would enter [`hallOfFame/HOF.md`](../hallOfFame/HOF.md) third if promoted — the `hof-promote`
-skill's basin check is the step, and it is the user's call. The 22 rows at 30k were the ≥99 /5,000 rows
-from 661 measured at 5,000; the counts match the ledger.
-
-**What the two closed waves say.** b14 rollout 64 matches the reference on best30, stability and best row,
-and is a little below on density (22.9% vs 27.3%); rollout 32 is below on everything. b15 entropy 0 and
-0.001 are the most stable arms trained so far (1.7-1.9% of evals below 80%) at less than half the density
-(8.7-11.7%): the spec's condition for moving the default is falsified, and only the annealing schedules in
-waves 4-5 can still move the base. Readings in [`charts.md`](charts.md).
-
-**Infrastructure, 2026-09-04 evening.** The laptop joined the router's 6 GHz radio at 18:05 (the stuck
-5 GHz association is the suspect; verdict needs a day of load — [`../plans/laptop-wifi.md`](../plans/laptop-wifi.md)).
-`ssh the-claw-den` now works from outside the home LAN through a port forward
-([`../desktop/README.md`](../desktop/README.md), "Reach the box from outside the home LAN"); this update ran
-over a phone hotspot, live charts rsync'd from the box included. And `progress_update` now imports a finished
-hall-of-fame pass's files from `results` — b11's had been sitting there unread.
-
-**Standing decision**, unchanged: the γ × λ corner grid — γ {0.99, 0.9975, 0.999} × λ {0.98, 0.99, 0.999},
-with lr {3e-4, 2.5e-4} and minibatch {256, 512} as candidate extra axes — runs **after b14 closes**. Every
-one-knob sweep since b9 has come back "plateau, base stays": the corner grid is where the next gain is, if
-there is one.
-
-## b12 and b13 closed, b14 and b15 in flight, as it read at 2026-09-04 16:30 (superseded)
-
-**b12 (epochs) and b13 (minibatch) closed; b14 (rollout) is on the laptop with wave 1 in stage B; b15
-(entropy) is on the desktop at wave 1 of 5.** As of 2026-09-04 16:30:
-
-| box | batch | state | ETA |
-|---|---|---|---|
-| desktop | b12 (epochs, 40 arms) | **closed** — reading in [`results.md`](results.md), finding in [`findings.md`](findings.md) | — |
-| laptop | b13 (minibatch, 32 arms) | **closed** — same | — |
-| laptop | b14 (rollout, 24 arms, dequeued from the desktop) | wave 1 (32, 64) trained 10:32-16:14, `b14-stageb` 17 min in; waves 2-3 (192/256, 512/1024) to train | ~midday 2026-09-05 at wave 1's cadence; faster with the box to itself |
-| desktop | b15 (entropy coef, 40 arms) | wave 1 (0, 0.001) at ~80% of 50M, 70 min in; 4 waves queued (0.003, 0.005, 0.02, 0.03, four anneal schedules) | ~05:00 2026-09-05 |
-
-Behind b15 on the desktop: b16-b21 (target-KL, clip, gradient clip, advantage normalisation, lanes,
-shaping), every one at λ 0.99 against **b9's λ 0.99 arms `b9bw`-`b9bz`** (best30 98.3-98.4, density 27.3%).
-`attention` is empty. The laptop's Wi‑Fi was stable through the afternoon after the morning's toggle;
-the plan for it is [`../plans/laptop-wifi.md`](../plans/laptop-wifi.md).
-
-**Two more knobs are plateaus, and both killed a prior.** b12: 3-4 epochs is the top, every epoch past 4
-costs 2-5 pp of density, stability is *best* at 6-8 (8 was predicted to collapse — b4's 8-epoch collapses
-were its `fc (200,100)` net's) and breaks at 12-16 (42% of evals below 80% at 16). b13: minibatch 256-512 is
-the plateau (512 holds the batch's 100/500 row), 128 — predicted as the alternative default — is 8 pp below
-on every seed, 1024-2048 arrive but noisily. Neither moves the base; 512 and 3 epochs are the only cells
-that might ride along.
-
-**Early stage A on the two live batches.** b14 rollout 64 matches the reference on best30 and stability but
-reaches ≥98 on 18.6% of evals against 28.9%; rollout 32 is below on everything, as predicted. b15 entropy 0
-and 0.001 are the most stable arms trained so far (1.9-2.0% of evals below 80%, a third of the reference)
-with a lower top so far (best30 97.6-97.9 against 98.3).
-
-**Hall-of-fame passes.** b10's `hof5000` and `hof30k` ran on the laptop on 2026-09-03 (21 arms, 71 rows at
-30,000) and produced the current record, `b10ck` @30523392 at 99.65 /30,000 — see
-[`hallOfFame/HOF.md`](../hallOfFame/HOF.md); the "on hold" carried in earlier Now blocks was stale. **b11's
-are queued on the desktop** as of 17:21 (`b11-hof5000`, 661 checkpoints ≥99/500 from 25 arms, priority 5;
-`b11-hof30k` over its ≥99 rows at seed 7, priority 6), dispatching after b15 wave 1's stage B and before b15
-wave 2. **Standing decision**, unchanged: the γ × λ corner grid — γ {0.99, 0.9975, 0.999} × λ {0.98, 0.99,
-0.999}, with lr {3e-4, 2.5e-4} and minibatch {256, 512} as candidate extra axes — runs **after b14 closes**. Every one-knob sweep since b9 has come back "plateau, base stays": the
-corner grid is where the next gain is, if there is one.
-
-## b11 closed, b12 and b13 in flight, as it read at 2026-09-04 09:45 (superseded)
-
-**b11 closed on the desktop; b12 is on its stage B for wave 3 with two waves to train; b13 finished
-training on the laptop and its last close-out is measuring.** As of 2026-09-04 09:45:
-
-| box | batch | state | ETA |
-|---|---|---|---|
-| desktop | b11 (lr) | **closed**, every wave measured — reading in [`results.md`](results.md) | — |
-| desktop | b12 (epochs) | 24 of 40 trained (epochs 1-7 in, `b12-stageb-w3` 32 min in); epochs 8, 10, 12, 16 queued in two waves | ~15:25 today |
-| laptop | b13 (minibatch) | 32 of 32 trained; `b13-stageb-w4` (mb 1024, 2048) 20 min in, 26 of 32 arms measured | ~10:30 today |
-
-Behind b12 on the desktop: b14 (rollout) through b21, every one at λ 0.99 against **b9's λ 0.99 arms
-`b9bw`-`b9bz`** (best30 98.3-98.4, density 27.3%). `attention` is empty.
-
-**b11's answer: the learning rate is a plateau, not a lever.** 1e-4 through 5e-4 sit at 21-31% density
-within seed noise of the reference's 27.3%; 4e-5 is the slow end (2.2%) and 2e-3 the cliff (6.7%). The
-surprise is the sign of the stability effect — 8e-4 and 1e-3 were predicted to collapse and are the two most
-stable cells (4.6-4.9% of evals below 80%), with a lower ceiling. Base stays 3e-4; 2.5e-4 (30.9%, the best
-cell) goes into the corner grid as a second value. Full reading in [`results.md`](results.md), finding in
-[`findings.md`](findings.md).
-
-**b12 so far (epochs 1-7):** density climbs 10.8 → 15.7 → 26.5% from 1 to 3 epochs and plateaus at 23-27%
-through 6; 1 epoch is the *least* stable cell (4.2% drawdown below 50%), the reverse of its prediction, and
-stability keeps improving through 7. **b13 so far (minibatch 32-1024):** monotone rise to a plateau at
-256-512 (26.9-28.2%, 512 holds the batch's 100/500 row), 1024 falling to 20.6% on two seeds; stability
-U-shaped with the small end noisiest. Both readings in [`charts.md`](charts.md).
-
-**Standing decisions**, unchanged: `hof5000` on b10 is **on hold**; the γ × λ corner grid — γ {0.99, 0.9975,
-0.999} × λ {0.98, 0.99, 0.999}, now with lr {3e-4, 2.5e-4} as a candidate third axis — runs **after b14
-closes**.
-
-**Tooling notes from this update.** `tools/progress_update.py` now (a) survives an rsync to the box that
-hangs rather than aborting the whole update, (b) reads a laptop-run batch's specs from `logs/<batch>specs/`
-when `ops` no longer has them, and (c) states such a batch's state from `runs/` and the live pid files —
-without which b13 was invisible to the digest. Code change, awaiting review. Separately, the laptop's Wi‑Fi
-was found in a stuck association during this update (25-55% loss to the router at ‑55 dBm, cleared by a
-Wi‑Fi toggle, the desktop on the same router clean throughout); a hung `git fetch` or `rsync` is that
-before it is "off-LAN".
-
-## b11 on wave 1, as it read at 2026-09-03 18:01 (superseded)
-
-**b11 — the learning-rate sweep — has wave 1 trained and its stage B running; nothing is on the laptop.**
-As of 2026-09-03 18:01 the box's ledger reads 8 b11 arms done (lr 4e-5 and 1e-4, seeds 1-4), the
-`b11-stageb` wave 19 min in, and 24 b11 arms queued behind it in three waves (lr 1.5e-4, 2.5e-4, 5e-4,
-8e-4, 1e-3, 2e-3). At b10's cadence of ~2.5 h a wave, b11 closes around **01:40 on 2026-09-04**. The queue
-behind it now runs **b12 through b21** — epochs, minibatch, rollout, entropy, target-KL, clip, gradient
-clip, advantage normalisation, lanes, shaping — every one at the re-based λ 0.99, every one read against
-**b9's λ 0.99 arms `b9bw`-`b9bz`** (best30 98.3-98.4, density 27.3%). `attention` is empty.
-
-**b11 wave 1 at its cap, from the pulled reports:** lr 4e-5 best30 97.0-97.6, `sef` 65-79, still rising —
-the slow end the spec predicted; lr 1e-4 best30 97.8-98.6, `sef` 85, at the reference's ceiling on two
-seeds. No stage-B row yet; the table in [`charts.md`](charts.md) fills in when the wave's results land.
-
-**The update itself is now a tool.** `tools/progress_update.py` fetches, imports closed waves, pulls live
-charts, publishes the site, regenerates the batch tables and `charts.md` sections, and prints a digest;
-the skill runs it and writes only the readings, on Sonnet. This is the first update written that way —
-compare its readings against the tables before trusting the split.
-
-**Standing decisions** (from the b10 close, unchanged): `hof5000` on b10 is **on hold**; the γ × λ corner
-grid — γ {0.99, 0.9975, 0.999} × λ {0.98, 0.99, 0.999}, 4 seeds — runs **after b14 closes**.
-
-## b10 closed and b11 on wave 1, as it read at 2026-09-03 17:10 (superseded)
-
-
-**b10 — the γ sweep — closed on the desktop 2026-09-03 16:08, and b11 — the learning-rate sweep — is
-on wave 1 of 4.** At 17:10 b11's eight arms (lr 4e-5 and 1e-4 x seeds 1-4, `b11aa`-`b11ah`) were ~65%
-through 50M, 52 min in; wave 1 lands about 17:40 and its stage B follows. Waves 2-4 (lr 1.5e-4, 2.5e-4,
-5e-4, 8e-4, 1e-3, 2e-3) and then b12 (epochs), b13 (minibatch), b14 (rollout) are queued, **all at the
-re-based λ 0.99** — so b11-b14's reference cell is **b9's λ 0.99 arms `b9bw`-`b9bz`** (best30 98.3-98.4,
-density 27.3%), not b7. Ledger: 298 done, 124 queued, 8 running, `attention` empty, 146 GB free, load 13.
-**Nothing is running on the laptop.** The site republished at 17:11 with b10 complete and b11 live.
-
-**b11's first wave at 33M, read against b9's λ 0.99 seeds at their cap:** lr 4e-5 is the slow end as
-predicted — best30 93.4-96.4, `sef` 47-68, still climbing; lr 1e-4 is already at best30 97.8-98.6 with
-`sef` 72-81, on course for the reference. Neither has a stage-B row yet; wave 1's stage B says more.
-
-**b10's answer: the discount behaves like λ did — monotone to the top of the grid, with the same
-stability cost, and the undiscounted end is a cliff.** Record density is zero for every γ ≤ 0.93 (not one
-checkpoint of 28 arms passed the stage-A screen), appears at 0.96, then climbs through every value:
-0.9% → 3.6% → 10.4% → 17.3% (b7's 0.99) → 19.6% → 25.6% → **30.7% at γ 0.999**, where the batch's best30
-(98.55-98.60 at 0.9975-0.999) and its 277 `hof5000` candidates also sit. Drawdown climbs with it, 0.29% at
-0.99 → 1.55% at 0.999, as λ's did across b9's plateau. **γ 1.00 is different in kind**: its surviving
-checkpoints are the richest in the batch (38.6% of 1,535 rows, two 100/500 rows) but the deployed policy
-spends **44% of its post-competence evals below 50% perfect** — the undiscounted critic's targets are
-whole-game sums, and the arm collapses and recovers for its entire run. Full table under *Just closed*.
-
-**Decisions this puts in front of us:**
-
-1. **Run `hof5000` on b10 on the idle laptop** — its ≥99/500 rows number 726 (277 at γ 0.999, 178 at 1.00,
-   164 at 0.9975, 85 at 0.995), the same size as b9's pass (~76 min), and γ 0.999 has 4,003 → 6,614 stage-B
-   rows over b7's cell. Whether a γ 0.999 checkpoint matches `b9ch`'s 99.30 at depth is the question.
-   **Recommendation: run it**, ≥99 cut, then `hof30k` on the desktop for whatever clears 99 /5,000.
-2. **A γ × λ corner is now the obvious next batch.** b9 found λ 0.99-1.00 at γ 0.99 (27-30%); b10 finds
-   γ 0.999 at λ 0.98 (30.7%). Both are one knob off the same cell and neither was run with the other's
-   winner. A 3x3 grid — γ {0.99, 0.9975, 0.999} x λ {0.98, 0.99, 0.999} at 4 seeds, 36 arms, ~9 h —
-   would say whether the two add, and where the drawdown becomes b4's. It would go behind b14, or ahead of
-   b12-b14 if we would rather know this than the epochs/minibatch/rollout answers first.
-
-## Just closed: b10 — density is monotone in γ to 0.999, and γ 1.00 is a cliff
-
-**All eight waves and all eight stage-B passes closed 2026-09-03 16:08**, 64 arms at 50M on the desktop,
-22,741 stage-B rows, ~21 h end to end (the `hof30k` wave took ~35 min of it). b10 changes only `discount`
-off b7's cell — `fc (320,)`, 4 epochs, **λ 0.98**, lr 3e-4, entropy 0.01 — so **b7aa-b7ad are its γ 0.99
-arms**. Drawdown as in b8/b9: median share of post-competence stage-A evals below 50% (and 80%).
-
-| γ | value horizon 1/(1−γ) | rows | ≥98%/500 | per-seed share | ≥99 (`hof5000` cands) | best row | best30 (4 seeds) | sef | drawdown < 50% | < 80% |
-|---:|---:|---:|---:|---|---:|---:|---|---:|---:|---:|
-| 0.70 | 3.3 | 0 | – | never screened | 0 | – | 2.7 5.2 5.1 2.8 | 0.0 | never competent | |
-| 0.80 | 5 | 0 | – | never screened | 0 | – | 49.7 24.4 41.8 45.2 | 0.0 | never competent | |
-| 0.85 | 6.7 | 0 | – | never screened | 0 | – | 67.2 64.1 66.6 68.0 | 0.0 | 54.4% (2 of 4 reached 80%) | 99.7% |
-| 0.90 | 10 | 0 | – | never screened | 0 | – | 81.6 75.8 79.4 81.4 | 3.6 | 38.7% | 95.5% |
-| 0.91 | 11.1 | 0 | – | never screened | 0 | – | 85.5 79.9 77.5 84.7 | 5.8 | 26.5% | 92.6% |
-| 0.92 | 12.5 | 0 | – | never screened | 0 | – | 85.1 86.6 84.2 83.1 | 12.1 | 18.4% | 85.3% |
-| 0.93 | 14.3 | 0 | – | never screened | 0 | – | 86.9 88.5 87.1 87.7 | 21.0 | 13.9% | 74.0% |
-| 0.94 | 16.7 | 11 | 0.0% | 0 0 0 0 | 0 | 93.2 | 90.4 89.0 90.2 89.8 | 34.5 | 4.85% | 56.8% |
-| 0.95 | 20 | 95 | 0.0% | 0 0 0 0 | 0 | 97.8 | 93.6 91.6 93.2 93.0 | 51.5 | 3.35% | 44.7% |
-| 0.96 | 25 | 319 | 0.9% | 4.3 0 0 0 | 0 | 98.4 | 95.6 93.4 94.9 94.7 | 63.9 | 2.60% | 30.0% |
-| 0.97 | 33 | 756 | 3.6% | 0.8 5.1 2.0 7.1 | 2 | 99.4 | 96.4 94.7 95.4 95.6 | 75.6 | 0.28% | 19.8% |
-| 0.98 | 50 | 2,540 | 10.4% | 6.0 14.1 8.1 13.1 | 20 | 99.6 | 97.5 97.1 97.3 97.3 | 86.5 | 0.14% | 8.3% |
-| 0.99 (b7) | 100 | 4,003 | 17.3% | 18.5 19.0 16.5 15.1 | 50 | 99.6 | 97.8 97.8 97.7 97.7 | 90.9 | 0.29% | 6.2% |
-| 0.995 | 200 | 5,027 | 19.6% | 19.0 17.8 20.5 20.7 | 85 | **100.0** | 98.1 97.7 98.5 98.1 | 92.5 | 0.78% | **4.5%** |
-| **0.9975** | 400 | 5,844 | 25.6% | 24.3 29.0 20.3 28.5 | 164 | 99.8 | **98.6 98.4 98.7 98.7** | **92.6** | 1.30% | 4.7% |
-| **0.999** | 1,000 | **6,614** | **30.7%** | 21.7 22.9 39.2 35.4 | **277** | 99.8 | 98.5 98.2 98.7 98.6 | 91.7 | 1.55% | 4.9% |
-| 1.00 | ∞ | 1,535 | 38.6% | 36.4 45.8 39.4 33.9 | 178 | **100.0** | 98.4 97.3 98.7 98.3 | **39.2** | **44.4%** | 63.6% |
-
-**Four readings:**
-
-- **Below γ 0.94 the endgame is unreachable at 50M, and it is γ itself, not the GAE horizon.** 28 arms
-  across seven values produced no screened checkpoint at all; best30 climbs 4 → 40 → 66 → 80 → 82 → 85 →
-  88. b9's λ 0.90 at γ 0.99 sits at the same *advantage* horizon as b10's γ 0.92 at λ 0.98 (9-10 steps)
-  and reached 96.75 with 3.9% density against 84.75 and none: a discounted value target that cannot see
-  the +100 ten steps out cannot value the endgame, whatever λ does to the advantage.
-- **From 0.96 to 0.999 density is monotone**, 0.9% → 30.7%, with the base at 0.99 in the middle of the
-  ramp rather than at a peak — the same shape b9 found for λ, and the second time the default has been
-  left with a factor of 1.8 on the table. best30 peaks at 0.9975-0.999 (98.60, 98.55) with every seed
-  ≥98.2. γ 0.999 also produces the most stage-B rows of any cell yet (6,614) and the most `hof5000`
-  candidates (277 at ≥99/500).
-- **Stability moves the other way, again.** Drawdown below 50% is ≤0.3% from 0.97 to 0.99, then 0.78 →
-  1.30 → 1.55% up the plateau; the sub-80% share bottoms at 4.5-4.9% for 0.995-0.999. Same trade-off as
-  b8 and b9, now on a third knob.
-- **γ 1.00 collapses half the time and holds records the other half.** Median drawdown **44.4%**, `sef`
-  39.2, only 1,535 rows screened — and 38.6% of those are ≥98, two are 100/500, and 178 are `hof5000`
-  candidates. Undiscounted, the critic's target is the whole-game return and the rollout-boundary
-  bootstrap carries full weight (the spec predicted both); the policy oscillates between a near-perfect
-  regime and a broken one for its whole run. Not a base to build on; possibly a source of checkpoints.
-
-**Two more things.** `sef` ranks the top of this sweep backwards too (92.6 at 0.9975 vs 91.7 at 0.999,
-and 39.2 at the densest cell) — fourth reproduction. And b3's single-seed call on γ 0.9975 ("the
-stability candidate") was the right cell for the wrong reason: it is the batch's best30 and *not* its
-most stable. Per-arm numbers in [`results.md`](results.md), 121 panels in [`charts.md`](charts.md).
-
-## Just closed: b9 — λ 0.99+ doubles the record density, and the top is a plateau
-
-**All eight waves and all eight stage-B passes closed 2026-09-02 16:48**, 64 arms at 50M on the
-desktop, 43,969 stage-B rows. b9 changes only `ppo_gae_lambda` off b7's winning cell — `fc (320,)`,
-4 epochs, entropy 0.01, lr 3e-4, γ 0.99, clip 0.2 — so **b7aa-b7ad are its λ 0.98 arms** and the
-sweep is one curve. Drawdown is the median share of post-competence stage-A evals below 50% (and 80%)
-perfect, as in b8:
-
-| λ | GAE horizon | rows | ≥98%/500 | per-seed share | ≥98.5 (`hof5000` cands) | best row | best30 (4 seeds) | sef | drawdown < 50% | < 80% |
-|---:|---:|---:|---:|---|---:|---:|---|---:|---:|---:|
-| 0.00 | 1.0 | 8 | 0.0% | 0 0 0 0 | 0 | 94.0 | 88.7 85.1 90.8 88.5 | 24.1 | 11.29% | 68.6% |
-| 0.50 | 2.0 | 392 | 0.0% | 0 0 0 0 | 0 | 96.6 | 94.2 94.2 94.9 93.7 | 81.8 | 0.05% | 11.1% |
-| 0.80 | 4.8 | 1,133 | 0.8% | 0.4 1.7 0.4 0.7 | 3 | 98.6 | 96.6 95.6 96.1 96.2 | 85.9 | 0.02% | 9.3% |
-| 0.85 | 6.3 | 1,279 | 0.8% | 0.3 1.1 1.7 0.0 | 1 | 98.8 | 95.2 96.3 96.1 96.0 | 87.3 | 0.00% | 8.8% |
-| 0.90 | 9.2 | 2,130 | 3.9% | 3.7 5.3 5.1 1.1 | 16 | 99.2 | 96.5 97.1 96.9 96.5 | 89.4 | 0.07% | 6.5% |
-| 0.91 | 10.1 | 2,168 | 4.3% | 2.3 7.8 3.6 3.7 | 14 | 99.2 | 96.5 97.4 96.9 96.7 | 89.4 | 0.02% | 6.7% |
-| 0.92 | 11.2 | 2,363 | 4.8% | 2.0 6.9 3.8 5.7 | 18 | 99.2 | 96.5 97.6 96.8 96.8 | 89.6 | 0.02% | 6.1% |
-| 0.93 | 12.6 | 2,545 | 5.4% | 4.1 9.9 3.3 4.2 | 22 | 99.2 | 96.9 97.5 97.1 97.2 | 90.6 | 0.02% | 4.9% |
-| 0.94 | 14.4 | 2,359 | 4.6% | 4.5 5.6 2.8 5.2 | 21 | 99.2 | 97.0 96.6 96.7 96.9 | 90.8 | 0.00% | 5.6% |
-| 0.95 | 16.8 | 2,665 | 5.3% | 3.7 9.0 4.6 3.4 | 23 | 99.6 | 97.1 97.0 96.9 96.9 | 92.3 | 0.02% | 3.9% |
-| 0.96 | 20.2 | 2,882 | 8.3% | 4.6 12.7 8.1 7.0 | 67 | 99.6 | 96.8 97.8 97.2 97.4 | 92.0 | 0.03% | 5.0% |
-| 0.97 | 25.2 | 3,613 | 11.7% | 9.0 17.4 9.2 10.8 | 130 | 99.6 | 98.1 98.0 97.6 97.8 | **93.0** | 0.03% | **4.1%** |
-| 0.98 (b7) | 33.6 | 4,003 | 17.3% | 18.5 19.0 16.5 15.1 | 174 | 99.6 | 97.8 97.8 97.7 97.7 | 90.9 | 0.29% | 6.2% |
-| **0.99** | 50.3 | 5,173 | **27.3%** | 27.2 24.1 31.4 26.0 | 451 | **100.0** | 98.3 98.3 98.4 98.3 | 90.6 | 0.77% | 6.4% |
-| 0.995 | 66.9 | 4,998 | 27.3% | 24.8 27.4 34.3 22.3 | 496 | 99.8 | 98.2 98.5 98.8 98.1 | 89.1 | 1.03% | 7.7% |
-| 0.999 | 91.0 | 4,897 | 25.6% | 27.8 17.4 24.2 31.3 | 453 | **100.0** | 98.5 98.2 98.1 **99.0** | 87.9 | 1.26% | 8.1% |
-| **1.00** | 100 | 5,364 | **29.5%** | 25.2 32.7 29.6 30.8 | **574** | 99.8 | 98.4 98.5 98.4 98.3 | 88.4 | 2.10% | 8.7% |
-
-**Three readings, in order of weight:**
-
-- **Density is monotone in λ up to 0.99 and flat above it.** 0.00 → 0.50 → 0.80-0.85 → 0.90-0.95 →
-  0.96 → 0.97 → 0.98 → 0.99 reads 0, 0, 0.8, 4-5, 8.3, 11.7, 17.3, 27.3%; then 27.3, 25.6, 29.5.
-  The per-seed ranges of the four plateau groups all overlap (λ 0.99 24-31, λ 1.00 25-33), so n=4
-  cannot order them. In record-region checkpoints per four arms that is **693 at λ 0.98 against
-  1,412 at 0.99 and 1,582 at 1.00** — the row count rises too (4,003 → 5,173 → 5,364), so this is more
-  strong checkpoints, not a thinner gate. best30 moves with it: 97.75 → 98.33-98.45, and every
-  plateau seed is ≥98.1.
-- **Stability moves the other way, exactly as b8's trade-off said it would.** Drawdown below 50% is
-  ≤0.07% for every λ from 0.50 to 0.97, 0.29% at 0.98, then 0.77 → 1.03 → 1.26 → **2.10%** at λ 1.00;
-  the sub-80% share bottoms at 3.9-4.1% (λ 0.95-0.97) and rises to 8.7%. b8 found that the knobs which
-  steady the curve bank the fewest records; b9 finds the converse from the same knob — the λ that banks
-  the most records has the noisiest deployed policy. λ 1.00 at 50M matches b4's 2.0% at 50M, the
-  collapse b8 was built to fix. **This is why 0.99 rather than 1.00 is the recommendation above.**
-- **`sef` ranks the sweep backwards for the third time.** It peaks at **93.0 at λ 0.97** and falls to
-  88.4 at λ 1.00, so ranking on it picks the 11.7% end of the curve over the 29.5% end, a 2.5x miss.
-  The stage-A ≥98% share (20.4% at 0.98, 28.9% at 0.99, 30.5% at 1.00) tracks density, as
-  [`findings.md`](findings.md) said it would.
-
-**What it does not settle.** All of this is at 50M and 500 episodes: the plateau's ordering, whether
-any 100/500 row is a real record, and whether λ 1.00's drawdown keeps growing past 50M the way b4's
-did. The `hof5000` pass answers the second; the third would need a longer arm. **b3's single-seed
-call that λ 1.0 was a loser is inverted** — same pattern as the fc-layout ranking b7 overturned.
-
-**λ 0 is the floor**: 8 stage-B rows from four arms, `b9ab-lam0-seed2` screened none, onset of
-competence at 5-10M against 1.3-2.8M for every λ ≥ 0.80. Per-arm numbers in
-[`results.md`](results.md), 127 panels in [`charts.md`](charts.md).
-
-## Just closed: b8 — every knob cut the drawdown, none produced a record
-
-**Both waves and both stage-B passes closed 2026-09-01**, 16 arms at 100M on the desktop, plus a
-135-row `hof5000` pass on the laptop. b4 is the control, truncated to b8's 100M cap:
-
-| group | arms | drawdown < 50% | ≥98%/500 | ≥98.73 /5,000 |
-|---|---|---:|---:|---:|
-| `target_KL` 0.02 | `b8i`-`b8l` | 5.9% | **6.0%** | 1 |
-| entropy 0.01 → 0.001 | `b8e`-`b8h` | 3.5% | 5.0% | 0 |
-| entropy 0.003 | `b8a`-`b8d` | 3.7% | 4.3% | 0 |
-| λ 0.95 | `b8m`-`b8p` | **2.2%** | 2.3% | 0 |
-| **b4 control @100M** | `b4a`-`b4h` | 8.4% | 5.7% | 1 (at 200M) |
-
-**One champion-level row in 135 deep measurements, and no hall-of-fame candidate.** Both
-never-exercised knobs did fire — `target_KL` stopped the epoch loop on 1.9-3.3% of updates, the anneal
-completed 0.0100 → 0.0010 at the cap — so this is a real measurement of both, not a silent no-op. Per-arm
-numbers in [`results.md`](results.md), 32 charts in [`charts.md`](charts.md).
-
-## Just closed: b7, the fc-layout sweep — `fc (320,)` wins
-
-**All four waves and all four stage-B passes closed 2026-09-01**, 32 arms in ~11 h on the desktop.
-Pooled 10.9% of 28,006 stage-B rows in the ≥98%/500 record region, and the spread across layouts is
-3.4x:
-
-| layout | ≥98%/500 | | layout | ≥98%/500 |
-|---|---:|---|---|---:|
-| **`fc (320,)`** | **17.3%** | | `fc (200,100,50)` | 10.8% |
-| `fc (200,100)` | 11.8% | | `fc (160,160)` | 8.3% |
-| `fc (100,200,100)` | 11.6% | | `fc (300,100)` | 6.8% |
-| `fc (100,100)` | 11.3% | | `fc (400,200)` | 5.1% |
-
-**Every `fc 320` seed beats every seed of five of the seven other layouts** (exact Mann-Whitney
-p=0.029, the floor at 4-vs-4). This **inverts b3's single-seed ranking**, which put `fc 300,100`
-first and `fc 320` last of those three and is what queued b4 and b7 in the first place. Per-arm
-numbers in [`results.md`](results.md), the reading and the two retractions in
-[`findings.md`](findings.md), 64 charts in [`charts.md`](charts.md).
-
-**It also changes the primary metric for this kind of question.** `strong_eval_fraction` ranks b7's
-layouts *backwards* (Spearman −0.79 across the eight layout means); the stage-A ≥98% rate ranks them
-right (+0.80). Both are free from the same eval history — see [`findings.md`](findings.md).
-
-## b10 mid-flight, as it read at 2026-09-03 01:20 (superseded)
-
-**b10 — the γ sweep — is on the desktop, wave 4 of 8, and the laptop is idle.** At 2026-09-03 01:20
-the eight γ 0.93 and γ 0.94 arms (`b10ay`-`b10bf`) were 39-44% through 50M, 59 min in, so wave 4 lands
-around 02:40 and its stage B follows automatically; waves 5-8 (γ 0.95, 0.96, 0.97, 0.98, 0.995, 0.9975,
-0.999, 1.00) are queued behind it, then b11-b14 at their re-based λ 0.99. b10 should close mid-afternoon
-2026-09-03. Ledger: 252 done, 164 queued, 8 running, `attention` empty, 153 GB free, load 14. The
-laptop's only process is the stage-B chart window left from b9's `hof5000` pass, which is free to close.
-
-**New record, 2026-09-03: `b9ch-lam999-seed4` @47251456 at 99.30% /30,000 on seed 7**, promoted to
-[`hallOfFame/HOF.md`](../hallOfFame/HOF.md). The desktop `hof30k` pass re-measured b9's 33 checkpoints at
-≥99 /5,000 at 30,000 episodes, 10:21-10:55, exit 0: **18 beat `b5h`'s 98.96**, the mean 5,000 → 30,000
-drop was −0.14 pp, and the winner's four neighbours read 99.20. Six plateau arms hold a checkpoint above
-the old record; one is promoted. `record_gif.py`'s `HOF_RECORD` now names it.
-
-**b9's `hof5000` pass is closed and documented** (below, and in [`results.md`](results.md)): 727 rows,
-exit 0, **77 at ≥98.73 and 33 at ≥99**, and `b9ch-lam999-seed4 @47251456` at **99.40 /5,000** with a
-98.70 basin is the promotion candidate — [`hof-promote`](../skills/hof-promote/SKILL.md) is the next
-step and has not been run.
-
-**b10's first three waves say the discount is not a knob with a broad top — below ~0.95 the endgame
-is out of reach at 50M.** Six γ values, 24 arms, stage B closed on all of them, and **not one
-checkpoint passed the stage-A screen**: zero stage-B rows across the whole set. b7aa-b7ad (γ 0.99) are
-the reference:
-
-| γ | value horizon 1/(1−γ) | best30 | range | sef | drawdown < 50% | stage-B rows |
-|---:|---:|---:|---|---:|---:|---:|
-| 0.70 | 3.3 | 3.95 | 2.7-5.2 | 0.0 | never competent | 0 |
-| 0.80 | 5 | 40.27 | 24.4-49.7 | 0.0 | never competent | 0 |
-| 0.85 | 6.7 | 66.47 | 64.1-68.0 | 0.0 | 54.4% (2 of 4 reached 80%) | 0 |
-| 0.90 | 10 | 79.55 | 75.8-81.6 | 3.6 | 38.7% | 0 |
-| 0.91 | 11.1 | 81.90 | 77.5-85.5 | 5.8 | 26.5% | 0 |
-| 0.92 | 12.5 | 84.75 | 83.1-86.6 | 12.1 | 18.4% | 0 |
-| 0.93 / 0.94 (live, 21M) | 14.3 / 16.7 | 81.2-87.7 / 85.5-88.7 | | 4-27 | | — |
-| **0.99** (b7) | 100 | **97.75** | 97.7-97.8 | 90.9 | 0.29% | 4,003 |
-
-**‡ γ and λ are not interchangeable, even at the same GAE horizon.** b9's λ 0.90 at γ 0.99 has an
-advantage horizon 1/(1−γλ) of 9.2 steps and reached best30 96.75 with 3.9% record density; b10's
-γ 0.92 at λ 0.98 has a horizon of 10.2 and reaches 84.75 with none. The advantage estimator's horizon
-is not what a short γ costs — the *value target* is discounted too, and a critic that cannot see the
-+100 ten steps ahead cannot value the endgame. The spec's prediction for γ 0.80 ("fast early, then an
-endgame ceiling below perfect") is right; "same shape as 0.8, milder" for γ 0.90 understated it — the
-ceiling is still 20 points below perfect at 10 steps. Where the curve reaches the base is what waves
-5-8 measure; the queued γ 0.995-1.00 cells are the ones that could beat it.
-
-## b9 just closed, as it read at 2026-09-02 17:53 (superseded)
-
-**b9 closed on the desktop at 2026-09-02 16:48 — all 64 arms trained and all eight stage-B waves
-done — and b10, the γ sweep, is on wave 1 of 8.** At 17:53 its eight arms (γ 0.70 and γ 0.80 x seeds
-1-4, `b10aa`-`b10ah`) were 47-58% through 50M, 65 min in, so wave 1 lands about 18:45 and its stage B
-follows automatically. b9's eight waves took ~19 h end to end, so b10 closes around midday
-2026-09-03. Behind it: b11 (lr 4e-5, 32+8), b12 (1 epoch, 40+8), b13 (minibatch 32, 32+8), b14
-(rollout 32, 24+8). Ledger: 225 done, 189 queued, 8 running, `attention` empty, 157 GB free, load 14.
-**Nothing is running on the laptop.**
-
-**b9's answer: PPO's λ 0.98 default was not the top of the curve.** Record density (≥98%/500 stage-B
-rows) climbs monotonically through the whole sweep, **17.3% at λ 0.98 → 27.3% at λ 0.99**, then sits
-on a plateau — 27.3, 27.3, 25.6, 29.5% across 0.99, 0.995, 0.999 and 1.00, indistinguishable at four
-seeds. Every seed of λ 0.99 beats every seed of λ 0.98 (24.1-31.4 against 15.1-19.0, Mann-Whitney
-p=0.029, the floor). Three stage-B rows scored **100/500** — two adjacent `b9ch-lam999-seed4`
-checkpoints at 47.2-47.3M and `b9bw-lam99-seed1` at 48.4M — the first perfect 500s this project has
-measured. Full table and reading under *Just closed: b9* below.
-
-**Both decisions were taken the same evening (user, 2026-09-02 ~19:00):**
-
-1. **The `hof5000` pass on b9 ran on the laptop, 19:12-20:29** — 36 arms, the 727 checkpoints at
-   ≥99/500 (the cut was raised from 98.5 to 99 in the same decision), 8 shards, exit 0. **77 rows at
-   ≥98.73 and 33 at ≥99, against 6 and 0 for all of b7.** `b9ch-lam999-seed4 @47251456` measures
-   **99.40 [99.1, 99.5]** with a 27-neighbour basin at 98.70 — a stronger candidate on both numbers
-   than `b5h` was when it was promoted (99.20 own, 98.54 basin, confirmed 98.96 /30,000). **Next:
-   `hof-promote` on it**, a 30,000-episode confirm at seed 7. Table in [`results.md`](results.md).
-2. **λ 0.99 is the new default** (`ppo/algo.py`, commit `6b5f8390e`, deployed to the box) **and b11-b14's
-   128 specs were re-based to it on `ops`** before any of them started. b10 runs at 0.98 as queued: γ and
-   λ set the GAE horizon together (1/(1−γλ)), so it stays a clean one-knob sweep off b7's cell, and its
-   winner is read against b7aa-b7ad. Rationale for 0.99 over 1.00: the plateau's density within noise,
-   the tightest seed spread of any group (98.3-98.4), a third of λ 1.0's drawdown.
-
-**‡ Two things to know about the daemon's read.** The glance line labels the running b10 wave
-"g85, wave 2 of 8" while the ledger's eight running arms are the g70/g80 cell, wave 1 — a labelling
-quirk, not a dispatch problem. And `p0q-ep8-long` still reads `failed` from the retired `p`-prefix
-era; `attention` is empty.
-
-## b9 at wave 5, as it read at 2026-09-02 08:38 (superseded)
-
-**Batch b9 — the λ sweep — is on the desktop and nothing is on the laptop.** 40 of 64 arms trained at
-2026-09-02 08:38; `b9-stageb-w5` is the only job running (41 m in, no trainers), stage B is closed on
-waves 1-4, and waves 6-8 are queued as 24 arms covering **λ 0.96, 0.97, 0.99, 0.995, 0.999 and 1.00**.
-Behind b9 sit b10 (γ 0.70), b11 (lr 4e-5), b12 (1 epoch), b13 (minibatch 32) and b14 (rollout 32) —
-197 jobs done, 221 queued, load 16 on 8 trainers' worth of box, 161 GB free.
-
-**b9 changes only `ppo_gae_lambda` off b7's winning cell, so b7aa-b7ad *are* its λ 0.98 arms** and the
-sweep reads as one curve:
-
-| λ | GAE horizon | best30 | range | sef | ≥98%/500 |
-|---:|---:|---:|---|---:|---:|
-| 0.00 | 1.0 | 88.28 | 85.1-90.8 | 24.1 | 0.0% |
-| 0.50 | 2.0 | 94.25 | 93.7-94.9 | 81.8 | 0.0% |
-| 0.80 | 4.8 | 96.12 | 95.6-96.6 | 85.9 | 0.8% |
-| 0.85 | 6.3 | 95.90 | 95.2-96.3 | 87.3 | 0.8% |
-| 0.90 | 9.2 | 96.75 | 96.5-97.1 | 89.4 | 3.9% |
-| 0.91 | 10.1 | 96.88 | 96.5-97.4 | 89.4 | 4.3% |
-| 0.92 | 11.2 | 96.92 | 96.5-97.6 | 89.6 | 4.8% |
-| 0.93 | 12.6 | 97.17 | 96.9-97.5 | 90.6 | 5.4% |
-| 0.94 | 14.4 | 96.80 | 96.6-97.0 | 90.8 | pending |
-| 0.95 | 16.8 | 96.97 | 96.9-97.1 | **92.3** | pending |
-| **0.98** (b7) | **33.6** | **97.75** | 97.7-97.8 | 90.9 | **17.3%** |
-
-**Density is monotone in λ across every measured value, and the biggest step is the last one.** 0.93
-to 0.98 is 5.4% to 17.3%, a 3.2x jump larger than every increment below it combined — so **the sweep
-has not found a peak and the interesting arms are the six still queued**, which bracket 0.98 on both
-sides. λ 0.98 also has the tightest seed spread of any group (97.7-97.8 against 96.5-97.6 at λ 0.92).
-
-**λ 0 is a floor worth having measured**: best30 88.28, `sef` 24.1, and 8 stage-B rows from four arms
-against λ 0.93's 2,545. `b9ab-lam0-seed2` screened **zero** checkpoints. A one-step advantage cannot
-learn this task.
-
-**‡ `sef` picks the wrong λ, exactly as predicted when b8 closed.** It rises to 92.3 at λ 0.95 and
-falls to 90.9 at λ 0.98, so ranking on it would take the 5.4%-and-below end of the curve over the
-17.3% end. This is now reproduced on two batches and two knobs — see [`findings.md`](findings.md).
-
-**‡ One stale ledger entry, not a live problem:** `p0q-ep8-long` reads `failed`, from the retired
-`p`-prefix era. `attention` is `None` and the box is otherwise clean.
-
-**What this says about the forward plan.** b9's own result so far is "the default was right, and
-possibly not high enough" — which makes b10-b14 sweeps *off a λ that may still move*. If λ 0.99 or
-0.995 beats 0.98, every batch queued behind b9 is holding a superseded λ. Worth deciding whether to
-let b10-b14 run as queued or re-base them once b9's top end lands.
-
-## b9's first wave, as it read at 2026-09-01 22:50 (superseded)
-
-**The b9-b14 sweep is running on the desktop; the laptop is idle.** b9 is on wave 6 of 8 —
-λ 0.94 and λ 0.95 x 4 seeds (`b9bg`-`b9bn`, 50M each) — 64% done at 2026-09-02 07:22, 4,600-8,300
-steps/s per arm, 1 h 03 m in. Waves 1-4 (λ 0, 0.50, 0.80, 0.85, 0.90, 0.91, 0.92, 0.93 x 4 seeds, 32
-arms) have finished both stages; two more waves and b9's stage B are queued behind the current one,
-then b10 (γ, 64+8 arms), b11 (lr, 32+8), b12 (epochs, 40+8), b13 (minibatch, 32+8) and b14 (rollout
-length, 24+8), each with `auto_stage_b`. **Nothing is running on the laptop.**
-
-**b9's finished waves already answer part of the question the ‡ note below raised, and it's the
-opposite of the worry.** Pulling the 32 finished arms' stage-B rows off the `results` branch, the
-≥98%/500 density climbs monotonically with λ at this 50M cap: 0% at λ 0 and λ 0.50, 0.8% at λ
-0.80-0.85, then 3.9/4.3/4.8/5.4% across λ 0.90-0.93 — closing in on the 5-6% region b4 and b8's
-controls showed at their own caps, not falling away from it. So far, higher λ is not costing record
-density the way b8's λ 0.95 did at 100M; whether that holds, turns over, or is just b9 not yet having
-reached b8's regime is what the currently-training λ 0.94/0.95 pair and the waves above 0.95 will
-say. Not yet checked against drawdown — that reading waits for stage A's post-competence share, same
-as b8's.
-
-**Batch b8 closed 2026-09-01 and it did not find what it was looking for.** Details below; the short
-version is that all four stability knobs cut b4's drawdown and none of them beat the control on record
-density, and [`findings.md`](findings.md) now has the 2x2 showing that **epochs and network shape are
-the lever** — b7's 32 four-epoch arms sit at 0.1% drawdown against b8's 2.3% and b4's 2.0% at a
-matched cap.
-
-**‡ This is why the b9-b14 sweep needs care in how it's read.** b9 sweeps λ, and λ 0.95 was b8's
-*best* knob on drawdown and its *worst* on density at b8's 100M cap — the two metrics ran opposite
-across all four knobs ([`findings.md`](findings.md)). Decide before b9's stage B closes which of the
-two its arms are being ranked on; ranking on `sef` or on drawdown would have picked b8's weakest
-group there. b9's own density trend above is a first read, not the final one — it is at 50M, not
-b8's 100M, and the drawdown side is still unread.
-
-## b8 mid-flight, as it read at wave 1's 71M (superseded)
-
-**Batch b8 — "what fixes b4's collapse" — is training on the desktop, wave 1 of 2, ~70% done at
-2026-09-01 14:03.** Eight arms at 100M transitions each: entropy **0.003** x seeds 1-4
-(`b8a`-`b8d`) and the **0.01 -> 0.001 anneal** x seeds 1-4 (`b8e`-`b8h`). 2 h 49 m in, ~7,000
-steps/s per arm, 69-75M done, so wave 1 lands around 15:15 and its stage B follows automatically.
-Wave 2 (`target_KL` 0.02, λ 0.95) and b8's stage B are queued behind it. **Nothing is running on the
-laptop.**
-
-Read at b8's own horizon against b4's control truncated to the same 71M — **both treatments are
-marginally ahead and neither is resolved.** n=4 cannot resolve an effect below ~10 pp, and best30 is
-a peak statistic that is still rising in every arm:
-
-| group | n | best30 | range | sef |
-|---|---:|---:|---|---:|
-| b4 control, entropy 0.01, truncated to 71M | 8 | 96.69 | 95.8-97.3 | 85.8 |
-| b8 entropy 0.003 | 4 | 96.98 | 96.5-97.4 | 88.2 |
-| b8 entropy anneal 0.01 -> 0.001 | 4 | 96.93 | 95.9-98.0 | 87.1 |
-
-`b8g-entanneal-seed3` at best30 **98.0** is already above every b4 arm's final best30 at twice the
-budget, which is the single most encouraging number in the batch and also exactly the kind of
-maximum-over-8 that this project keeps having to retract. Wait for stage B.
-
-**‡ One caveat on b8's design, now that b7 has closed: it holds `fc (200,100)`, which b7 has just
-shown to be the *wrong* shape.** b8 is still the right experiment — it is asking what fixes b4's
-drawdowns, and b4 is `fc (200,100)`, so the control has to match — but a stability knob that helps
-here has to be re-confirmed on `fc (320,)` before it goes into a champion attempt.
-
-## The b8 design, as queued
-
-**"What fixes b4's collapse".** 4 stability knobs x 4 seeds at 100M, holding b4's config fixed
-(`fc (200,100)`, 8 epochs, b2's reward, seeds 1-4) so exactly one knob moves per group, with **b4
-itself as the control** at 8 seeds — no control arms queued. Priorities 60/70 put both waves behind
-every b7 wave, which is why wave 1 only started once b7's fourth close-out was done.
-
-| wave | knob | why it, and not something else |
-|---:|---|---|
-| **1** | entropy **0.003** | the only knob whose stability signal in b3 is monotone in both directions: the share of post-competence evals below 80% perfect ran 2.9% at 0.003, 12.2% at the 0.01 reference, **45.6%** at 0.03 |
-| **1** | entropy **0.01 → 0.001** | the anneal in `ppo/schedules.py`, **never used by an arm**. Explore early, commit late; it completes exactly at this cap |
-| 2 | **`target_KL` 0.02** | **never exercised** — `epochs_run` is 8 in all 97,656 of b4's recorded updates. 0.02 binds on the tail and not the body: b4's `approx_kl` is 0.0035 median and 0.0079 at p95, but **0.023 at p99 and 0.514 at worst**, 146x the median |
-| 2 | **λ 0.95** | b3's two λ arms had the best drawdown profile in the sweep — 0.0% below 50% *and* below 80%, mean 93.9 against the reference's 88.2 — at one seed each |
-
-**Why this and not a second fc sweep at a smaller learning rate.** `lr 1e-4` is the one knob b3
-measured as peaked, and it came out worse on the very axis the consistency argument is about: 14.5% of
-its post-competence evals below 80% against the reference's 12.2%, best30 95.0 against 96.6, **zero**
-≥98%/500 rows against 6, and the latest competence onset in the sweep. Smaller lr bought slower
-learning, not steadier learning. It is n=1, so it is not settled — but b7 is already resolving the
-network axis, and the collapse is the larger unexplained effect.
-
-**Both new knobs were smoke-tested before queueing**, because a silently-ignored knob costs four arms:
-the anneal reads 0.0091 at 10% of a 0.01→0.001 run, which is the linear value, and `target_KL` at a
-deliberate 0.001 stops the epoch loop after 1 of 8 epochs with `stopped_early=True`.
-
-**Batch b4 closed on the desktop 2026-08-31**: pooled **7.3%** of stage-B rows at ≥98%/500 against
-b6's 12.9% and b5's 9.6%, and best30 **97.0-97.9** against 97.8-98.5 for both. **The arm built from
-b3's two best single knobs is the weakest of the three 8-seed batches** — shape and epochs interact
-negatively, and a one-knob-at-a-time sweep licenses no stacking. That is the finding b7 was built on.
-Its charts were imported and redrawn 2026-09-01, and a laptop `hof5000` pass re-measured its 274
-≥98.5% candidates at 5,000 episodes: **one row clears the snek2 champion and none reaches 99%**
-([`results.md`](results.md)). **‡ The b5-vs-b6 half of that comparison did not survive the same
-re-measure** — the two are identical at 5,000 episodes and b5 is ahead on champion-level rows; see
-[`findings.md`](findings.md).
-
-**Before that — 2026-08-30 17:34 — three things closed and both boxes went idle.**
-
-| what | where | outcome |
+# Runs — every batch's config, why it ran, and what it taught
+
+**One entry per batch, newest at the top.** Each entry is the config in human terms (what varies, off
+which base, how many seeds, how long), why the batch was worth running, and what was learned — a
+hundred words each, at most. What is *running right now*, on which box, with what ETA, is
+`status.json` (`git fetch origin ops-status && git show origin/ops-status:status.json`) and the
+[live page](https://twang35.github.io/Snek/), not this file. Per-arm numbers are
+[`results.md`](results.md), conclusions with their evidence are [`findings.md`](findings.md), the
+records are [`../hallOfFame/HOF.md`](../hallOfFame/HOF.md). The status logs this file used to carry
+are in git history before 2026-09-10.
+
+## Open
+
+- **b28's `hof30k` pass** decides whether the 100M hold moved the top: a row at ≥99.83 /30,000 is an
+  `hof-promote` candidate, otherwise b28 reads "wider plateau, same top" and the 100M cap stands.
+- **Should `SNEK_OBS_HISTORY=8` become the default.** b27 says yes; nothing has run against it yet.
+- **Next sweeps on the `hist8` base**: a `hist16` cell, and step penalties above 0.01 (0.02, 0.05) —
+  b26's curve never turned.
+- **b24/b25's unmeasured `hof30k` arms**, and a fresh 30,000 on `b25a` @106168320, need the old
+  30-value observation era to load.
+
+## At a glance
+
+| batch | varies | base | cells × seeds | cap | result in one line |
+|---|---|---|---:|---:|---|
+| [b28](#b28--the-hist8-config-held-for-100m-more) | 100M more hold | pen01 + hist8, anneal over 25% | 1 × 8 | 200M | 97.5% density and 4x the near-record rows; first 30k rows level with the HOF, not above. **Passes still running** |
+| [b27](#b27--move-history-depth) | `SNEK_OBS_HISTORY` 0 / 4 / 8 | pen01 | 3 × 8 | 100M | **the largest lever found**: 49 → 94-95% density; `b27t`/`b27k` 99.81 /30k, the record |
+| [b26](#b26--step-penalty) | `SNEK_STEP_PENALTY` 0 / 1e-4 / 1e-3 / 0.01 | horizon anneal, obs26 | 4 × 4 | 50M | 0.01 nearly doubles density (25.5 → 46.3%); smaller values do nothing |
+| [b25](#b25--the-ladder-top-at-200m) | cap and seeds | ladder top | 1 × 8 | 200M | longer cap paid everywhere: 77.5% density, `b25a` 99.60 /30k |
+| [b24](#b24--the-horizon-anneal-at-200m) | a different road to γ 0.999 / λ 0.999 | horizon anneal | 1 × 8 | 200M | same peak as b25 (99.5 /30k), lower density (60.5%) and stability |
+| [b23](#b23--corner-grid-ladder-rungs-3-4) | + `mse` value loss; + clip hold | b22 rung 2 | 2 × 4 | 50M | `mse` is the largest single step measured: 32.7 → 61.6%, collapses gone |
+| [b22](#b22--corner-grid-ladder-rungs-1-2) | + γ 0.999; + rollout 512 | λ 0.99 | 2 × 4 | 50M | γ 0.999 adds density and drawdown; rollout 512 on top trades one for the other |
+| [b21](#b21--chase-safe-shaping) | shaping dose 0-0.2, gate 0 / 60 / 85 | PPO reference | 6 × 4 | 50M | no-op for PPO; shaping off is the most stable cell |
+| [b20](#b20--collect-lanes) | `SNEK_COLLECT_ENVS` 32-512 | PPO reference | 4 × 4 | 50M | a throughput knob; 512 lanes the smoothest endgame |
+| [b19](#b19--the-switches) | adv norm off, `mse`, Adam ε, vf coef | PPO reference | 6 × 4 | 50M | `mse` most stable and +5 pp; the rest within noise |
+| [b18](#b18--gradient-norm-clip) | grad clip 0-5.0 | PPO reference | 6 × 4 | 50M | no-op; collapses are policy-level, and the stability column's noise is ~4 pp |
+| [b17](#b17--clip-and-the-anneals) | clip 0.05-0.4, clip/lr anneals, hold | PPO reference | 16 × 4 | 50M | static clip flat; holding the annealed floor for the last 10M is +6-7 pp; `b17cl` 99.50 /30k |
+| [b16](#b16--target-kl) | `target_kl` 0.003-0.05 | PPO reference | 10 × 4 | 50M | no-op at 4 epochs |
+| [b15](#b15--entropy-coefficient) | entropy 0-0.03, four anneals | PPO reference | 10 × 4 | 50M | density and stability trade monotonically; anneals average their endpoints |
+| [b14](#b14--rollout-horizon) | rollout 32-1024 | λ 0.99 | 6 × 4 | 50M | density peaks at 512 (+11 pp), stability improves through 1024 |
+| [b13](#b13--minibatch) | minibatch 32-2048 | λ 0.99 | 8 × 4 | 50M | plateau at 256-512; 128 is 8 pp short |
+| [b12](#b12--epochs) | epochs 1-16 | λ 0.99 | 10 × 4 | 50M | 3-4 is the top; the collapse cliff is at 12-16, not 8 |
+| [b11](#b11--learning-rate) | lr 4e-5 to 2e-3 | λ 0.99 | 8 × 4 | 50M | plateau 1e-4 to 5e-4, cliffs at both ends; stability rises with lr |
+| [b10](#b10--discount-γ) | γ 0.70-1.00 | PPO reference | 16 × 4 | 50M | monotone to 0.999; γ 1.00 collapses half the time and held the record (`b10ck` 99.65) |
+| [b9](#b9--gae-λ) | λ 0-1.00 | PPO reference | 16 × 4 | 50M | 0.99 doubles density over the 0.98 default, plateau above; λ 0.99 became the default |
+| [b8](#b8--the-stability-knobs-on-b4s-config) | entropy 0.003, entropy anneal, `target_kl` 0.02, λ 0.95 | b4's config | 4 × 4 | 100M | every knob cut the drawdown, none beat the control on density |
+| [b7](#b7--network-shape) | 8 `fc` layouts | PPO reference | 8 × 4 | 50M | `fc (320,)` wins; b3's ranking inverted; `sef` ranks backwards |
+| [b4](#b4--fc-200100--8-epochs) | b3's two best knobs stacked | PPO reference | 1 × 8 | 200M | the weakest 8-seed batch: shape and epochs interact negatively |
+| [b5, b6](#b5-b6--fc-320--8-epochs-and-fc-200100--4-epochs) | `fc 320` + 8 epochs; `fc (200,100)` + 4 epochs | PPO reference | 1 × 8 each | ~220-270M | a 500-episode lead that 5,000 erased; `b5h` and `b6b` the first HOF entries |
+| [b3](#b3--the-ppo-tuning-sweep) | 15 one-knob arms | PPO reference | 15 × 1 | 10M | no winner at n=1; PPO's record density is 11.6x DQN's |
+| [b2](#b2--snek2s-record-config-on-the-torch-stack) | snek2 b29's five knobs | DQN defaults | 1 × 4 | 3M steps | the phase-3 gate met; a snek3 step is four game moves |
+| [b1](#b1--the-ddqn-baseline) | nothing | DQN defaults | 1 × 4 | 3M steps | no checkpoint at 95/100; the wrong config to gate on |
+
+## The bases
+
+Every batch is a few knobs off one of these. The names below are what each entry's "base" means.
+
+| base | what it is | used by |
 |---|---|---|
-| **batch b6** stage B, 8 arms | laptop | done in 226.1 min, status 0. Pooled **12.8%** of rows ≥98%/500 |
-| **batch b5** stage B, 8 arms | desktop | done in 222.6 min, status 0. Pooled **9.6%**; best row **100.0%/500** |
-| **the parallelism sweep**, 11 waves | desktop | all 53 jobs done. **The eval side answered; the training side did not** |
+| **DQN defaults** | double DQN, snek3's own defaults: `fc 320`, lr 1e-5, γ 0.99, IS weights on, target update every 8 steps, food-distance reward 0.001, chase-safe shaping off. One collect lane, 3M counted steps | b1 |
+| **b29 repro** | DQN defaults with snek2 batch 29's five record knobs: IS weights **off**, target update **1000**, γ **0.9975**, food-distance reward **0**, chase-safe shaping **0.1 at gate 75** | b2 |
+| **PPO reference** | PPO on the b2 reward (shaping 0.1, gate 75, food-distance 0): `fc (320,)`, 4 epochs, minibatch 256, rollout 128 × 128 lanes, lr 3e-4, γ 0.99, **λ 0.98**, entropy 0.01, clip 0.2, target KL off, gradient-norm clip 0.5, vf coef 0.5, Adam ε 1e-7, advantage normalisation on, huber value loss. 50M transitions. The control arms are `b7aa`-`b7ad` | b3, b7, b9, b10, b15-b21; b4-b6 and b8 with the shape or epochs changed |
+| **λ 0.99** | the PPO reference at λ 0.99, the default since 2026-09-02. Control `b9bw`-`b9bz` | b11-b14, b22 |
+| **ladder top** | λ 0.99 + γ 0.999 + rollout 512 + `mse` value loss + clip annealed 0.2 → 0.001 over the first 80% of the cap and held | b23 (built rung by rung), b25 |
+| **horizon anneal** | the user's config: γ 0.99 → 0.999 and λ 0.95 → 0.999 annealed over the first half of the cap, entropy 0.01 → 0.001, lr 2.5e-4, minibatch 512, rollout 256, huber, clip 0.2 static | b24; b26 under the 26-value observation |
+| **pen01** | the horizon anneal + step penalty 0.01, 26-value observation | b27; b28 with the anneal over 25% of a 200M cap |
 
-Full per-arm numbers and the b5/b6 comparison are in [`results.md`](results.md); the charts are in
-[`charts.md`](charts.md); the sweep is in [`findings.md`](findings.md).
+**Two observation eras.** Until 2026-09-07 the observation was snek2's 30 values (`obs30`); from b26
+on it is 26 (`obs26-20260907`, [`environment.md`](environment.md)), and `SNEK_OBS_HISTORY=N` appends
+2N more. Checkpoints load only in the era they trained in, which is why b24/b25's deep passes stopped
+part-way.
 
-**b6 leads b5 on the pooled headline but the sign test is a coin (5 of 8, p≈0.29→0.73), and rank 1 is
-a tie at 98.5 best30.** More importantly the two batches differ in **two** knobs — `fc (200,100)` + 4
-epochs against `fc (320,)` + 8 epochs — so this is not the network-shape test
-[`results.md`](results.md) and this file have both been calling for. **b4 ran that test on 2026-08-31
-and b7 is sweeping the axis outright** — see the top of this section.
+**How a batch is read.** Stage B measures every screened checkpoint at 500 episodes; the headline is
+the share of rows at ≥98% perfect (record density), then the collapse share (post-competence stage-A
+evals below 50% and 80%), then best30. `hof5000` re-measures the top rows at 5,000 episodes and
+`hof30k` at 30,000 on seed 7, and only a 30,000-episode number is a record. n=4 separates cells only
+at complete separation (Mann-Whitney p=0.029). Details in [`protocol.md`](protocol.md).
 
-### Next, in the order the evidence argues for
+---
 
-**The sweep after b8 is designed: [`../plans/hyperparam-sweep.md`](../plans/hyperparam-sweep.md)**
-(2026-09-01, revised) -- batches b9-b21, one knob each at four seeds on b7's `fc (320,)` base at 50M, with
-b7aa-b7ad as the shared control; the machine-readable grid is `plans/hyperparam-sweep.json` and
-`tools/sweep_specs.py` expands a batch into specs. **b9 (λ, 16 values) and b10 (γ, 16 values) were
-queued on the desktop 2026-09-01 20:30, 128 arms behind b8's stage B**, every never-exercised value of
-b9-b21 smoke-tested on the laptop first. The clip and learning-rate anneal knobs for b17 are
-committed and deployed (box at `13def02e8`, 2026-09-01 ~21:00), and **b11-b14 were queued behind
-b9-b10 the same evening** -- 256 arms in the queue, six batches at a time from here on.
+## b28 — the `hist8` config held for 100M more
 
-1. ~~**One batch varying only the network**, matched epochs and matched budget.~~ **Done: b7, closed
-   2026-09-01.** `fc (320,)` won and b3's ranking inverted. What this opens, in order:
-   **a champion attempt at `fc (320,)` + 4 epochs**, which no batch has yet run at length — b5 was
-   `fc 320` at *8* epochs and b7 was 4 epochs at only 50M, and the two best cells of the grid have
-   never been in the same arm; and the **DQN** half of the same sweep, since `dqn/net.py` takes the
-   same `fc_layers` config, which would say whether the shape effect is PPO's or the task's.
-2. **Re-confirm whatever b8 finds on `fc (320,)`.** b8 holds b4's `fc (200,100)` because b4 is its
-   control, and b7 has since shown that shape to be the weaker one, so a stability knob that helps b8
-   is a candidate rather than a result until it is re-run on the winning shape.
-3. **Re-run the worker sweep with long waves.** 3.2-minute waves cannot resolve it — see
-   [`findings.md`](findings.md). ~30 min per wave is what the earlier hand-measurement used.
-4. **Sweep arm count**, which the queue cannot express: `_dispatch` takes pending jobs in priority
-   order up to `max_trainers` regardless of priority value, so any group of 8+ trainer jobs launches
-   as exactly 8. It needs a `runtime.json` commit between waves, or a real sweep job type.
-
-### Next for PPO
-
-**‡ Rewritten 2026-09-01, because b7 refuted the paragraph that was here.** It read "two hidden
-layers beat every single-layer width tried", from b3's one-seed-each densities — `fc 300,100` 9.0%,
-`fc 200,100` 7.9%, `fc 320` 5.6%, `fc 500` 3.2%, `fc 200` 0.8%. At four seeds and 50M those three
-reverse: `fc 320` **17.3%**, `fc 200,100` 11.8%, `fc 300,100` 6.8%. What survives from the old
-paragraph is the capacity half — width past 320 hurts, and `fc (400,200)` is now last of eight — and
-the convenient fact that **`fc 320` is snek2's shape, carried across so a champion's weights convert,
-and every batch in both eras has used it.** `dqn/net.py` takes the same `fc_layers` config, so the
-same sweep is one batch away for DQN and has never been run — see [`findings.md`](findings.md).
-
-**The follow-up wave, designed and not yet launched** — push the axis that moved rather than resample
-the flat ones: epochs 12 and 16, minibatch 128, rollout 256, and `fc 200,100` + epochs 8 as the one
-interaction worth a slot. Depth belongs to a "better agent" batch rather than to a seed-matched
-comparison, which has to hold the network at 320 to stay matched against b2.
-
-## The b2-era plan — superseded, kept for the reasoning
-
-**Written 2026-08-29, before b3, b5, b6 and b4 ran.** Item 3 below describes a 4-arm b4 holding
-`fc 320` fixed, which was never run: the `b4` name was reused on 2026-08-30 for the network-shape
-test, and *that* is the b4 that closed on 2026-08-31. What survives here is why each item was
-queued, which is worth more than the schedule was.
-
-1. **Read b2 against b1 and against b29/b41/b47.** A b2-vs-b29 difference smaller than the
-   b29-vs-b41 process-noise gap is noise, not a port regression — snek2 ran that config three times
-   precisely to have the yardstick.
-2. **Phase 6 — `ppo/`.** The reason snek3 exists, and the design is
-   [`../plans/archive/ppo.md`](../plans/archive/ppo.md). **Phases 6a, 6b and 6c are all closed** — the algorithm seam
-   is in `train.py` with three fixed-seed DQN arms byte-identical across it, `ppo/` is written and
-   tested (122 fixtures, 14 of 14 mutants killed), and batch b3 has run 15 arms. Deployed to the
-   desktop 2026-08-29 once b2's stage-B wave published. **6d — batch b4 — is next**, at **18M**
-   transitions to match b2 (3M counted steps x 6 transitions per step; the plan's 12M was wrong).
-
-   **‡ Two claims made from the 6b gate arm are withdrawn, and both were withdrawn by b3.** The gate
-   arm was 508k transitions on snek3's *unshaped* defaults, and neither conclusion survived a shaped
-   arm at 20x the budget:
-
-   - **"PPO is behind DQN rather than beside it"** — withdrawn. Matched on transitions *and* on
-     reward function, the two ranges top out at the same number (96.9 best30), and on the ≥98%/500
-     count PPO is ~10x denser. The gate arm's gap was the reward function, not the algorithm.
-   - **"`clip_fraction` 0.03 says the learning rate is low"** — falsified outright. Raising it to
-     1e-3 and 3e-3 both made things *worse* (85.2 and 69.9 best30 at 3M, the latter at sd 18.4), and
-     1e-4 was worse than 1e-3. The learning rate is peaked at the default and a low clip fraction did
-     not mean what I read into it.
-
-   The gate arm's chart stays at [`../runs/ppo-smoke.png`](../runs/ppo-smoke.png) as a record of
-   what an unshaped PPO arm does. It is a gate arm, not a p-series arm.
-
-3. **Batch b4 — the seed-matched gate batch.** 4 arms, seeds 1-4, **18M transitions**, b2's env
-   config, **fc 320 held fixed** so the comparison is seed-matched against b1, b2, b29, b41 and b47.
-   **b3 hands it the reference config unchanged**, because b3 found no winner — which makes b4 a
-   cleaner comparison than the plan expected rather than a blocked one. Phase 3's ≥90% bar is already
-   cleared by b3, so b4's job is the comparison, not the gate.
-
-**The stage-A queue is next after b2 and the numbers are now measured rather than projected.** Stage A
-is **66%** of an arm's 8.1 h (not 90%), and streaming recovers **3.3-3.4x** of it (not 5.7x) — see
-[`findings.md`](findings.md). Cutting episodes does not work: 4x fewer buys 1.6x, because the cost is
-lane drain. Every way of recovering it makes the epsilon schedule's feedback lag
-([`invariants.md`](invariants.md) invariant 2), so the lag must be **bounded** rather than left to
-float. b1 is the baseline any such change is measured against.
-
-| an arm at 3M counted steps | training | stage A | total |
-|---|---:|---:|---:|
-| as b2 runs today | 2.79 h | 5.33 h | **8.1 h** |
-| + the two bit-exact fixes (landed) | 2.33 h | 5.33 h | 7.7 h |
-| + a bounded eval queue, 2 workers per 4 trainers | 2.33 h | ~0 | **2.3 h** |
-
-The queue's arithmetic closes: 4 trainers at 299 st/s demand 1.20 checkpoints/s, and one streamed
-worker supplies 0.54-0.89, so **two workers serve four trainers** — six processes on the desktop's 16
-cores.
-
-## Backlog
-
-One line per idea, with a prior. A design that is settled enough to implement gets a file in
-[`../plans/`](../plans/) and a row here.
-
-| idea | prior |
+| | |
 |---|---|
-| **PPO** | [`../plans/archive/ppo.md`](../plans/archive/ppo.md) — **phases 6a and 6b closed 2026-08-29; batch b3 is next.** No longer a backlog item. The reason snek3 exists. On-policy and wide, so it is the algorithm that actually exploits a 196k env-steps/s vectorised env, where DQN's replay ratio caps the loop at ~4,000 steps/s |
-| **Batched or asynchronous self-eval** | **the next change. 8.1 h an arm becomes ~2.3 h, measured.** The win is keeping the lanes full, so a queue drained by streaming workers gets it; the drained shape is the whole cost and cutting episodes does not touch it. Cost is a lag on the epsilon schedule — **bound it**, do not let queue depth set it |
-| **Replay ratio < 1** | ~~the only way past ~4,000 agent steps/s~~ **do not use this to reproduce snek2.** Ratio 1.0 already matches snek2's 1 gradient step per transition; lowering it makes snek3 *less* data-efficient than snek2 ever was. It remains a real dynamics knob, worth 2x at batch 512, but it is not a comparability fix — `SNEK_MAX_STEPS` is |
-| **Drop observation indices 10/12/14** | ~1.5x on the observation build. Region enumeration is 33% of the connectivity cost and those three indices are its only consumers. Batch 45 reached 99% with them in, so this is a cost question |
-| **Munchausen-DQN, SAC-discrete** | the discrete off-policy actor-critic options, if PPO underperforms. **TD3 does not apply** — it is continuous-action and this task has three discrete actions |
+| base | pen01 + `SNEK_OBS_HISTORY=8` (b27's `hist8` cell) |
+| varies | the cap: 200M, with `SNEK_PPO_ANNEAL_FRACTION` 0.25 so every anneal spans the same first 50M as b27 and the last 150M run at the final values |
+| cells × seeds | 1 × 8 (seeds 9-16, `b28i`-`b28p`) |
+| control | b27's `hist8` arms, seeds 17-24 |
 
-## How we got here — the closed phases
+**Why.** b27's `hist8` rows at 30,000 episodes sat at 99.8 with the anneal still finishing at 100M.
+The question is whether the ceiling is the config or the cap: does holding the converged values for
+another 100M raise the top, or only widen the plateau under it? The same anneal length keeps the first
+100M window-for-window comparable with b27.
 
-History, kept because each phase gate is a claim someone may want to re-check. Nothing here is
-current state.
+**Learned so far** (stage B and `hof5000` closed, `hof30k` running 2026-09-10). The first 100M
+matches b27's `hist8` (94.9% against 95.4), so the extra hold is what reads 97.5% density and 7,718
+rows through the 99.6 /5,000 gate — 4.2x b27's — with 38 at 99.9 and every arm holding a 99.9 best.
+The first two 30k arms read 99.79, level with the record pair's 99.81 and inside one standard error.
+Provisional verdict: the hold multiplies near-record checkpoints without raising the top.
 
-**Batch b2 — b29's record config on the torch stack, seeds 1-4, 3M steps. Closed 2026-08-29**, all
-four arms and the stage-B wave `done`; results on the `results` branch, unread into
-[`results.md`](results.md). Launched on the desktop 2026-08-29 08:09. This is the phase-3 gate re-run on the configuration snek2 actually set
-records with; b1 ran snek3's bare defaults and that was the wrong batch to gate on.
+## b27 — move history depth
 
-| knob | snek3 default | b2 = b29 |
-|---|---|---|
-| `SNEK_IS_WEIGHTS` | 1 | **0** |
-| `SNEK_TARGET_UPDATE_PERIOD` | 8 | **1000** |
-| `SNEK_DISCOUNT` | 0.99 | **0.9975** |
-| `SNEK_FOOD_DISTANCE_REWARD` | 0.001 | **0** |
-| `SNEK_CHASE_SAFE_SHAPING` | 0.0 | **0.1** |
-| `SNEK_CHASE_SAFE_GATE` | 85 | **75** |
-| `SNEK_FC_LAYERS` | 320 | 320 |
+| | |
+|---|---|
+| base | pen01 (horizon anneal + step penalty 0.01, 26-value observation) |
+| varies | `SNEK_OBS_HISTORY` 0 / 4 / 8 — two bits per past move, `[turned left, turned right]`, read off the body ([`../plans/obs-history.md`](../plans/obs-history.md)) |
+| cells × seeds | 3 × 8, 100M |
+| control | `hist0`, the batch's own |
 
-**Five knobs differ, not the two b1's write-up first suggested.** The target-update period and the
-discount are substantial algorithmic differences, and they were nearly missed by reading the results
-summary instead of snek2's own b47 spec. Read the spec.
+**Why.** The user's question: does the policy need to see its recent path? The plan's phase-1
+investigation found the best checkpoints die by *starving* in a closed loop while the food sits
+reachable (87-96% of failures), a failure history should not touch — so the registered prediction
+was **no effect on the perfect rate**. Built and run anyway to measure it, at 100M and 8 seeds so a
+negative would be a clean one.
 
-Seed N is pinned to arm letter N, so every arm is seed-matched against b29a-d, b41a-d, b47a-d **and**
-snek3's own b1a-d. Budget ~7 h an arm; the desktop auto-queues one stage-B wave for the batch.
+**Learned.** The prediction was wrong, by the widest margin in the project: `hist4` 93.6% density and
+`hist8` 95.4 against `hist0`'s 49.2, every history seed above every control seed, stage-A ≥98 share
+84-85% against 47, onset unchanged. At 30,000 episodes `hist4` and `hist8` each put rows at 99.8 where
+the HOF's top was 99.65; `b27t` @85065728 and `b27k` @77889536 (99.81 each, indistinguishable) are
+the record pair. `hist8` is a small, consistent step past `hist4` on density and rows through every
+gate, level on the peaks. Mechanism — what the bits do to the starvation orbit — is not settled.
 
-### ‡ Interim reading at 0.36-0.41M of 3M — the phase-3 gate is met; the lead over b47 was a units artefact
+## b26 — step penalty
 
-Read 2026-08-29 09:13, ~1 h in, at **106 counted steps/s an arm** (the 290 st/s in the log excludes the
-self-eval; stage A is ~2/3 of the wall clock). ETA ~16:00. Both tables are 100-episode graph evals, so
-b2 and b47 are on the same instrument and the counts are directly comparable.
+| | |
+|---|---|
+| base | horizon anneal, under the new 26-value observation (the first `obs26` batch) |
+| varies | `SNEK_STEP_PENALTY` 0 / 0.0001 / 0.001 / 0.01, a per-step reward cost |
+| cells × seeds | 4 × 4, 50M |
+| control | `pen0`, the batch's own; b24's 200M arms are a loose reference only |
 
-**‡ Corrected 2026-08-29: a snek3 counted step is four game moves and a snek2 step was one.** See
-[`findings.md`](findings.md). Every b2 step number below is 4x a b47 step number in game moves,
-buffer rows and gradient steps alike, so **the "b2 leads b47 on every seed" headline compares b2 at
-1.4-1.6M transitions against b47 at 0.34-0.39M.** The b47 column is truncated to the same *counter*
-value, which is not the same work. Data efficiency is identical in both eras (1 gradient step per
-transition), so nothing here is a learning-rate difference — it is a budget difference.
+**Why.** The death-trace finding: the best checkpoints fail by orbiting reachable food, and a per-step
+cost is the only reward term that charges for a lap that does not eat. Three decades of penalty to
+find where it starts to bite against the b2 preset's per-step terms.
 
-| seed | step | b2 ≥95 | b2 ≥98 | b2 best30 | b47 ≥95 | b47 ≥98 | b47 best30 |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| 1 | 0.36M | 0 | 0 | 85.9 | 0 | 0 | 34.1 |
-| 2 | 0.37M | 7 | 1 | 92.7 | 0 | 0 | 67.0 |
-| 3 | 0.34M | 0 | 0 | 81.0 | 0 | 0 | 55.0 |
-| 4 | 0.39M | **52** | **17** | **96.8** | 0 | 0 | 68.3 |
+**Learned.** 0.01 is a real lever at n=4 and the other two are not: 46.3% density (42.3-52.6) against
+the control's 25.5 (16.3-33.5), every seed separated from all twelve other arms; 0.001 and 0.0001 sit
+inside the control's spread. The scale explains the shape — a perfect game is ~1,800 steps, so 0.01 is
+~18 of a ~195 return, a tenth; 0.001 is one percent. Onset, late entropy and KL are identical across
+cells: the penalty changes what the converged policy *does*, not how fast it learns. The curve had
+not turned, so 0.02 and 0.05 are open.
 
-b47 at its own furthest point — 1.38-1.63M, where snek2 froze mid-batch — had best30 82.2 / 90.5 /
-**96.0** / 83.6 and ≥95 counts 0 / 8 / 173 / 0.
+## b25 — the ladder top at 200M
 
-**‡ "b2d at 0.39M has already passed b47c's best30 at 1.63M" is withdrawn.** b2d at 0.39M counted
-steps had done **1.56M** transitions and 1.56M gradient steps; b47c at 1.63M had done 1.63M and 1.63M.
-The two are at matched values on both axes, so the correct statement is **b2d matches b47c at matched
-work**, not that it beats it at a quarter of the budget. The matched-work comparison is the one to
-make from here: read b2 at 4x b47's step number.
+| | |
+|---|---|
+| base | ladder top (γ 0.999, λ 0.99, rollout 512, `mse`, clip 0.2 → 0.001 over 80% then held) |
+| varies | the cap and seed count: 200M × 8 against b23's 50M × 4 |
+| cells × seeds | 1 × 8 |
+| control | b23's `g999roll512msehold` cell |
 
-**The phase-3 gate (≥90% perfect) is met on both readings and by two arms.** b2d's trailing-30 perfect
-rate peaks at 96.8% and it has 52 single evals at ≥95/100 including a 100; b2b is at 92.7% with 7. b1
-never reached one such eval in 3M steps, so the five knobs are the whole difference — which is snek2's
-own batch-28/29 finding, reproduced.
+**Why.** The first champion attempt on the corner grid's best rung. Every one-knob sweep had read at
+50M and 4 seeds; the sweep design's last step was always "the best cell at 200M+, 8 seeds, deep
+passes on the winner".
 
-**‡ Same shape as b47, different carrier.** One arm carries the batch and two produce nothing ≥95, as
-in b47 (carrier seed 3) and b41 (also seed 3) and b29 (seed 2). b2's carrier is seed 4, so it is now 1
-of 4 for every seed and the carrier is a coin, not a property of the seed. **Do not read b2a or b2c as
-a regression**: snek2 saw the same on the same config.
+**Learned.** The longer cap paid on every column: 77.5% density (64.3-83.0, seven of eight seeds above
+the reference's best) against 64.4, best30 99.34, stage-A ≥98 share 72.7% against 58.2, and the
+collapses stayed gone (0.45% of evals below 80). `b25a` @106168320 reads 99.60 /30,000 — level with
+the HOF's second place and the first checkpoint outside the γ 1.00 cell to get there — but the 30k
+pass covers only three of eight arms, because the observation changed to 26 values under it and the
+rest no longer load. Not promoted; awaits a fresh 30,000 under the old era.
 
-**What is not yet answered is phase 5**, which needs a ≥98%/500 *region* from the stage-B wave rather
-than these 100-episode rows. b2d's 17 rows ≥98/100 and 7 ≥99/100 make a region plausible and not
-assured — snek2's winner's-curse drops on this instrument were −2.6, −3.2 and −6.2 pp. And the snek2
-side of that comparison is **b29's own close-out, not b47's**: b47 was frozen at 69-81% of its 2M cap
-and never closed out, so no b47 ≥98%/500 data exists.
+## b24 — the horizon anneal at 200M
 
-**b1-vs-b2 is unaffected by the correction** — both arms ran the same collector at the same ratio, so
-they share the 4x and their step axes are directly comparable. "The five knobs are the whole
-difference" stands.
+| | |
+|---|---|
+| base | horizon anneal (the user's config, first run here) |
+| varies | nothing within the batch; it is a second 200M × 8 config beside b25 |
+| cells × seeds | 1 × 8 |
+| control | b23's `g999roll512msehold` cell, and b25 as the same-cap comparison |
 
-**b1 is closed** ([`results.md`](results.md)): four arms at 3M, peak perfect 42.1 / 58.3 / 56.7 /
-81.9%, **no checkpoint anywhere at 95/100**, every arm still climbing at its cap. Its stage-B wave
-has run and published 0 rows an arm, which is the honest measurement rather than a failure.
+**Why.** A different road to the same horizon: instead of starting at γ 0.999 / λ 0.99 (the ladder
+top), anneal γ 0.99 → 0.999 and λ 0.95 → 0.999 over the first half so the critic learns short before
+it learns long, with the entropy anneal, huber, minibatch 512 and rollout 256 as the user's other
+choices. Prediction: earlier onset than b25, then a denser but less stable second half.
 
-**Phases 0-4 are closed and batch b1 has run.** `env/`, `vectorized/`, the measurement engine,
-checkpoint I/O, the eval wave, the charts, the viewers, `dqn/`, `train.py` and the desktop daemon are
-all in, and the box runs snek3 rather than snek2. **The phase-3 gate is still open** — see Now.
+**Learned.** It matches the ladder top on the peak and trails it on the rest: best30 99.30 against
+99.34, `b24a` @196706304 at 99.5 /30k against 99.6, but 60.5% density against 77.5 and twice the evals
+below 80 (0.83% against 0.45). "Less stable" held, "denser" did not. Only two arms were measured at
+30k before the observation change broke the pass. The ladder top was the one to carry forward — yet
+the anneal is the config b26-b28 built on, because the user's step-penalty question was asked on it.
 
-**Phase 0 — the two env implementations agree.** 36,000 states × 30 observation indices, **0
-mismatches**, across a growth regime (24,000 states, 49 episodes, lengths to 60) and a coiled endgame
-regime (12,000 states, 280 episodes, 26 perfect games), with rewards, terminations, both shaping
-terms and the win path in parity too. **17 of 17 hand-made mutants killed.**
+## b23 — corner-grid ladder, rungs 3-4
 
-**Phase 1 — the snek2 champion plays in torch.** `b44a-lowlr7-b29b-ckpt2739000` converted and
-measured **98.8% perfect over 3,000 episodes** against snek2's 98.73%, inside the ±0.6 pp gate. The
-conversion itself is exact rather than close: on 12,864 states the two networks' Q-values differ by
-at most 2.7e-5 on values of magnitude ~30.6, and the **argmax is identical on every state**, so the
-policies are the same function. `watch.py` plays it and `record_gif.py` records it.
+| | |
+|---|---|
+| base | b22's rung 2 (λ 0.99 + γ 0.999 + rollout 512) |
+| varies | rung 3 adds the `mse` value loss; rung 4 adds the clip anneal 0.2 → 0.001 over 80% of the cap, held for the last 10M |
+| cells × seeds | 2 × 4, 50M |
+| control | b22's `g999roll512` cell |
 
-**Phase 2 — the flat protocol reproduces the tiered one.** All **3,222** checkpoints of
-`b45a-lowlr8-b29b` converted and measured, against snek2's own close-out: mean per-row difference
-**−0.004 pp** on a 0.041 pp standard error, and observed spread / predicted spread **1.00**. 14
-minutes on four shards. Three findings came out of it, including a **5.7x correction to the cost of
-stage A** — see [`findings.md`](findings.md).
+**Why.** The sweep's levers stacked one at a time: `mse` was b19's most stable cell and the hold was
+b17's density lift, both measured on b7's λ 0.98 base. The ladder says whether they still help on the
+horizon rungs, and in what order.
+
+**Learned.** `mse` on this base is the largest single step this project has measured: 61.6% density
+against 32.7 (every seed separated), best30 98.92, and the drawdowns γ 0.999 and λ 0.99 had added
+gone (0.48% below 50 against 3.54). The hold adds nothing on density (64.4%, inside `mse`'s spread)
+and takes out the last collapses. Neither beats the HOF's 99.65 at 30,000 — both top out at 99.2 —
+but they produce ≥99 /30k checkpoints in bulk, 64 in one wave against a dozen from all of b9-b21.
+b17's hold lift does not repeat on a base that already has few late collapses.
+
+## b22 — corner-grid ladder, rungs 1-2
+
+| | |
+|---|---|
+| base | λ 0.99 (`b9bw`-`b9bz`) |
+| varies | rung 1 adds γ 0.999; rung 2 adds rollout 512 on top |
+| cells × seeds | 2 × 4, 50M |
+| control | b9's λ 0.99 cell |
+
+**Why.** b9 found the λ plateau at γ 0.99 and b10 found γ 0.999 at λ 0.98 — each one knob off the
+same cell, never run together. b14's rollout 512 was the other lever on the λ 0.99 side. The ladder
+tests whether the horizon gains add and what they cost.
+
+**Learned.** γ 0.999 on λ 0.99 adds density and adds drawdown: 36.3% against 27.3 (a lean, not a
+separation), above both parents, with 3.6% of evals below 50 against 0.8 — a fifth of the way to
+γ 1.0's regime. Rollout 512 on top does *not* add: 32.7%, below rung 1 on everything but stability,
+where it halves the share below 80. The prediction "densest cell yet" is falsified — b14's +11 pp was
+measured on γ 0.99, and on γ 0.999 the longer rollout trades density for stability instead. Best at
+depth 99.1 /30k.
+
+## b21 — chase-safe shaping
+
+| | |
+|---|---|
+| base | PPO reference (λ 0.98) |
+| varies | `SNEK_CHASE_SAFE_SHAPING` 0 / 0.05 / 0.2 at gate 75; gate 0 / 60 / 85 at dose 0.1 |
+| cells × seeds | 6 × 4, 50M |
+| control | `b7aa`-`b7ad` |
+
+**Why.** The one reward knob every other batch held fixed, and snek2's record lever (batches 28-29:
+the gate mattered more than the dose). Shaping off had never reached 95/100 in DQN's 3M steps; for
+PPO the question was whether it did anything at all. Run last for that reason.
+
+**Learned.** A no-op for PPO: dose 0 to 0.2 and gate 0 to 85 all inside the base's noise on density
+(16.3-18.2% against 17.3) and best30, every cell a little more stable than the base, and shaping
+*off* the most stable of them (3.6% of evals below 80). Both spec predictions — a late onset with
+shaping off, worse at gate 85 — falsified. Shaping off is a free simplification; it has not yet been
+adopted.
+
+## b20 — collect lanes
+
+| | |
+|---|---|
+| base | PPO reference (λ 0.98) |
+| varies | `SNEK_COLLECT_ENVS` 32 / 64 / 256 / 512 at rollout 128 |
+| cells × seeds | 4 × 4, 50M |
+| control | `b7aa`-`b7ad` |
+
+**Why.** The other half of the update batch: lanes × rollout is transitions per update, so 256 lanes
+at T 128 is the same batch as 128 lanes at T 256 from twice the episodes at half the depth. Read
+beside b14 to separate depth from batch size and episode diversity.
+
+**Learned.** A throughput knob, not a learning knob: density within noise at every value (17.3-20.7%),
+best30 97.75-98.35 with the base at the bottom, row counts scaling with the update cadence rather than
+the policy. The prediction that 32 lanes would be worse than rollout 32 is falsified. What moves is
+stability — 512 lanes has 0.0% of evals below 50 and 2.2% below 80 against 6.2 — and against b14 the
+direction is clear: rollout 512 read +11 pp on its base, 512 lanes +0.5 on this one, so **the
+rollout's gain was depth**. 128 stays for speed.
+
+## b19 — the switches
+
+| | |
+|---|---|
+| base | PPO reference (λ 0.98) |
+| varies | advantage normalisation off; `mse` value loss instead of huber; Adam ε 1e-5 and 1e-8; vf coef 0.1 and 1.0 |
+| cells × seeds | 6 × 4, 50M |
+| control | `b7aa`-`b7ad` |
+
+**Why.** Four knobs with two or three sensible values each and no curve to map, gathered into one
+batch as a check that no default was silently costing something. Both switches were predicted to
+*add* collapses: an unnormalised advantage lets a +100 terminal dominate a minibatch, and squared
+error lets it dominate the critic.
+
+**Learned.** Both switches removed collapses instead — 6.2% of evals below 80 to ~1% — which locates
+the base's collapses in the critic and the advantage scale rather than the policy step. `mse` is the
+most stable cell at this base (0.97%) *and* 5 pp denser (22.2%) with the highest stage-A ≥98 share;
+advantage normalisation off is as stable and 4 pp short. Adam ε and the vf coefficient are within
+noise, so the *form* of the value loss is the lever. `mse` entered the corner grid and is in every
+base since b23.
+
+## b18 — gradient-norm clip
+
+| | |
+|---|---|
+| base | PPO reference (λ 0.98) |
+| varies | `SNEK_PPO_GRADIENT_CLIPPING` 0 (off) / 0.1 / 0.25 / 1.0 / 2.0 / 5.0 |
+| cells × seeds | 6 × 4, 50M |
+| control | `b7aa`-`b7ad` at 0.5 |
+
+**Why.** Never swept, and a direct test of the tail-update hypothesis: b4's worst updates had
+approx-KL 146x the median. If collapses come from rare huge gradients, clipping off should make them
+worse and tightening should make them rarer, without touching the epoch count.
+
+**Learned.** A no-op from off to 5.0: every cell inside the base's noise on density (16.7-19.5%
+against 17.3) and best30; off reads the base's density to the decimal and is more stable. The
+collapses are policy-level, not rare huge gradients. The more useful result is a calibration: 0 and
+5.0 are both effectively no clip and differ by 3.8 pp on the share of evals below 80, so **that
+column's noise at n=4 is ~4 pp** — which put b21's "a little more stable" and most of b20's
+stability reading inside the noise.
+
+## b17 — clip, and the anneals
+
+| | |
+|---|---|
+| base | PPO reference (λ 0.98) |
+| varies | static clip 0.05 / 0.1 / 0.15 / 0.3 / 0.4; clip annealed to 0.02, 0.005, 0.001, 0.1, from 0.1 and from 0.4; lr annealed to 0 and to 3e-5; both anneals; clip anneals to 0.02 and 0.001 over 80% of the cap **then held** for the last 10M (`SNEK_PPO_ANNEAL_FRACTION`, written for this batch) |
+| cells × seeds | 16 × 4, 50M |
+| control | `b7aa`-`b7ad` at clip 0.2 |
+
+**Why.** The trust region has been PPO's headline knob since the paper, and the Atari recipe anneals
+both clip and lr to zero. Prediction: the anneals win on collapse share; the question is what they
+cost on density. The hold cells ask whether the endgame wants to be *at* the small clip rather than
+still descending toward it.
+
+**Learned.** The static clip is flat from 0.05 to 0.2 and worse above, and loosening it *reduces*
+collapses — the reverse of the prediction. Every anneal beats the base on best30, but the plain anneals
+only match it on density whatever the floor; the two hold cells read +6-7 pp (23.5-24.3%) with the
+batch's most `hof5000` candidates, and lr → 0 does the same (+6). **The endgame wants a small trust
+region held for a long time.** `b17cl-clipanneal001hold80-seed4` @11386880 — a checkpoint at 11.4M —
+read 99.50 /30,000 and is in the HOF.
+
+## b16 — target KL
+
+| | |
+|---|---|
+| base | PPO reference (λ 0.98) |
+| varies | `SNEK_PPO_TARGET_KL` 0.003 / 0.005 / 0.008 / 0.01 / 0.013 / 0.015 / 0.02 / 0.03 / 0.04 / 0.05 |
+| cells × seeds | 10 × 4, 50M |
+| control | `b7aa`-`b7ad` at 0 (off) |
+
+**Why.** Early-stops the epoch loop when the policy has moved too far. From b4's approx-KL
+distribution, 0.02 fires on ~1% of updates, 0.005 on ~25%. If collapses come from the tail of large
+updates, cutting the tail should show. 0.04 and 0.05 were kept as null checks predicted identical to
+the control.
+
+**Learned.** A no-op at 4 epochs: no column trends along the sweep and no cell leaves the reference's
+noise. The stop does fire — same-seed arms at 0.03-0.05 diverge from one another during onset, where
+approx-KL is large — and changes nothing stage B can see; with 4 epochs there are three stopping points
+and the clip already bounds the step. Off stays. The null cells earned their place: they were what
+caught b15-b21's base mix-up (below).
+
+## b15 — entropy coefficient
+
+| | |
+|---|---|
+| base | PPO reference (λ 0.98) |
+| varies | `SNEK_PPO_ENTROPY_COEF` 0 / 0.001 / 0.003 / 0.005 / 0.02 / 0.03; anneals 0.1 → 0.001, 0.03 → 0.001, 0.01 → 0.001, 0.01 → 0 |
+| cells × seeds | 10 × 4, 50M |
+| control | `b7aa`-`b7ad` at 0.01 |
+
+**Why.** b3 at n=1 had the share of evals below 80 running 2.9% at 0.003, 12.2% at 0.01, 45.6% at
+0.03 — the one stability signal monotone in both directions — and b8 had run 0.003 and the anneal on
+the wrong shape. If lower entropy was monotone down to 0.001 with no density loss, the default would
+move.
+
+**Learned.** Density and stability trade monotonically: 0 and 0.001 are the most stable arms trained
+to that point (1.7-1.9% below 80) at half the density (8.7-11.7%); 0.03 is the densest cell (24.1%)
+with 14% of evals below 80. The anneals average their endpoints, and the hard-explore 0.1 → 0.001 is
+the worst cell in the batch (23.8% below 80). The condition for moving the default was falsified;
+0.01 stays. `b15ay` read 99.4 /30k, a candidate not a record.
+
+**‡ b15-b21 ran at λ 0.98, not the re-based 0.99.** They were generated from b7's frozen base after
+b11-b14 had been re-based, so their reference is `b7aa`-`b7ad` (17.3%), not b9's λ 0.99 cell (27.3%).
+Read against the wrong base every cell looked 8-14 pp short; the null-check cells caught it. The user
+kept b18-b21 at 0.98 so b15-b21 stay one comparable set.
+
+## b14 — rollout horizon
+
+| | |
+|---|---|
+| base | λ 0.99 |
+| varies | `SNEK_PPO_ROLLOUT` 32 / 64 / 192 / 256 / 512 / 1024 at 128 lanes |
+| cells × seeds | 6 × 4, 50M |
+| control | `b9bw`-`b9bz` at 128 |
+
+**Why.** T sets transitions per update (128 × T) and how far GAE can see before it bootstraps; 32
+truncates a 50-step horizon. b3's rollout 64 had lost 2.5 pp at n=1. Note T 1024 writes 8x fewer
+checkpoints, so shares are compared, not counts.
+
+**Learned.** Density rises with T to 512 (38.3% against 27.3, +11 pp) and stability keeps improving
+through 1024 (2.9% below 80 against 6.4); 32 is the short side of the plateau (13.0%, 17% below 80)
+and 64 matches the base on everything but density. 512 joined the corner grid, where b22 found its
+gain does not survive γ 0.999, and b20 showed the gain was depth rather than batch size.
+
+## b13 — minibatch
+
+| | |
+|---|---|
+| base | λ 0.99 |
+| varies | `SNEK_PPO_MINIBATCH` 32 / 64 / 128 / 192 / 384 / 512 / 1024 / 2048 |
+| cells × seeds | 8 × 4, 50M |
+| control | `b9bw`-`b9bz` at 256 |
+
+**Why.** Moves gradient noise and gradient steps per epoch at once (512 steps per epoch at 32, 8 at
+2048), read beside b12 to separate step count from data reuse. 128 was the predicted alternative
+default; b3's 1024 had been the worst non-diverged arm.
+
+**Learned.** A plateau at 256-512 (26.9-28.2%, 512 holding the batch's one 100/500 row) with density
+lost on both sides: 128 — the predicted alternative — is 8 pp below on every seed, 32 is 6.8% with 15%
+of evals below 80, and 1024-2048 arrive but noisily. Stability is best at 64-192. Nothing moved the
+base; 512 was the only cell that might ride along, and it did in the horizon anneal.
+
+## b12 — epochs
+
+| | |
+|---|---|
+| base | λ 0.99 |
+| varies | `SNEK_PPO_EPOCHS` 1 / 2 / 3 / 5 / 6 / 7 / 8 / 10 / 12 / 16 |
+| cells × seeds | 10 × 4, 50M |
+| control | `b9bw`-`b9bz` at 4 |
+
+**Why.** The axis that had moved most: gradient steps per transition was b3's one monotone knob, and
+at n=8 8 epochs lost to 4 at both network shapes (b4 vs b6, b5 vs b7). Prediction: 6 is where b4's
+collapse pattern starts and 8 collapses.
+
+**Learned.** 3-4 is the top (26.5-27.3%); every epoch past 4 costs 2-5 pp of density; 1 epoch is the
+*least* stable cell (4.2% below 50, 19% below 80), the reverse of its prediction. Stability is best at
+6-8 — 8 epochs did not collapse, so b4's collapses were its `fc (200,100)` net's, not the epoch
+count's — and breaks at 12-16 (42% of evals below 80 at 16). Base stays at 4.
+
+## b11 — learning rate
+
+| | |
+|---|---|
+| base | λ 0.99 |
+| varies | `SNEK_PPO_LEARNING_RATE` 4e-5 / 1e-4 / 1.5e-4 / 2.5e-4 / 5e-4 / 8e-4 / 1e-3 / 2e-3 |
+| cells × seeds | 8 × 4, 50M |
+| control | `b9bw`-`b9bz` at 3e-4 |
+
+**Why.** b3 had said a low lr did not buy stability (1e-4 had *more* evals below 80) and that 3e-3
+diverged; this locates both ends at four seeds. Prediction: 8e-4 and 1e-3 collapse visibly.
+
+**Learned.** A plateau, not a lever: 1e-4 through 5e-4 sit at 21-31% within seed noise of the
+reference's 27.3; 4e-5 is the slow end (2.2%) and 2e-3 the cliff (6.7%). The surprise is the sign of
+the stability effect — 8e-4 and 1e-3 were predicted to collapse and are the two most stable cells
+(4.6-4.9% below 80), with a lower ceiling. 2.5e-4 is the best cell (30.9%) and went into the horizon
+anneal; 3e-4 stays the default. `b11ag` @33243136 read 99.4 /30k.
+
+## b10 — discount γ
+
+| | |
+|---|---|
+| base | PPO reference (λ 0.98; queued before the λ re-base, kept so it stays a clean one-knob sweep) |
+| varies | `SNEK_DISCOUNT` 0.70 / 0.80 / 0.85 / 0.90-0.98 by 0.01 / 0.995 / 0.9975 / 0.999 / 1.00 |
+| cells × seeds | 16 × 4, 50M |
+| control | `b7aa`-`b7ad` at 0.99 |
+
+**Why.** b3 at n=1 had called γ 0.995 the stability candidate and 0.9975 was snek2's record DQN γ.
+γ also sets the shaping discount, so the dense reward moves with it, correctly. The low end asks how
+short a value horizon can still reach the endgame; γ 1.00 asks what an undiscounted critic does.
+
+**Learned.** Below γ 0.94 the endgame is unreachable at 50M — 28 arms produced no screened checkpoint
+— and it is γ itself, not the GAE horizon: b9's λ 0.90 at the same advantage horizon reached 96.75.
+From 0.96 to 0.999 density is monotone (0.9 → 30.7%), the default again mid-ramp; drawdown rises with
+it. **γ 1.00 is different in kind**: 44% of post-competence evals below 50, the policy oscillating for
+its whole run — and the richest checkpoints in the batch. `b10ck` @30523392 read 99.65 /30k, the
+record until b27.
+
+## b9 — GAE λ
+
+| | |
+|---|---|
+| base | PPO reference |
+| varies | `SNEK_PPO_GAE_LAMBDA` 0 / 0.5 / 0.8 / 0.85 / 0.90-0.97 by 0.01 / 0.99 / 0.995 / 0.999 / 1.00 |
+| cells × seeds | 16 × 4, 50M |
+| control | `b7aa`-`b7ad` at 0.98 |
+
+**Why.** The first batch of the one-knob sweep ([`../plans/hyperparam-sweep.md`](../plans/hyperparam-sweep.md)):
+every PPO knob at four seeds off b7's winning cell, with `b7aa`-`b7ad` as a free control at the same
+cap. Prediction: a broad flat top at 0.95-0.99; λ 1.0 the worst arm (b3 said so at n=1).
+
+**Learned.** The default was not the top. Density is monotone to 0.99 — 17.3% at 0.98 to 27.3%, every
+0.99 seed above every 0.98 seed — and flat from 0.99 to 1.00 (25.6-29.5%). Stability moves the other
+way: λ 1.00 has 2.1% of evals below 50, b4's collapse. `sef` ranked the sweep backwards a third time.
+**λ 0.99 became the default** (a third of λ 1.0's drawdown, the tightest seed spread) and b11-b14 were
+re-based before they ran. `b9ch-lam999-seed4` @47251456 read 99.30 /30k, the first entry above 99 at
+depth. b3's "λ 1.0 loses" is inverted.
+
+## b8 — the stability knobs, on b4's config
+
+| | |
+|---|---|
+| base | b4's config: PPO reference with `fc (200,100)` and 8 epochs |
+| varies | entropy 0.003; entropy 0.01 → 0.001 annealed over the cap; `target_kl` 0.02; λ 0.95 |
+| cells × seeds | 4 × 4, 100M |
+| control | b4 itself, truncated to 100M |
+
+**Why.** "What fixes b4's collapse." Four candidates that each had a stability signal: entropy 0.003
+from b3, the anneal and `target_kl` because neither had ever been exercised (b4 ran 8 epochs in all
+97,656 updates), λ 0.95 from b3's two λ arms. Held on b4's shape so the control matches, knowing b7
+was about to show that shape to be the wrong one.
+
+**Learned.** Every knob cut the drawdown (8.4% below 50 to 2.2-5.9%) and none beat the control on
+record density; λ 0.95, the best on stability, was worst on density. Both new knobs were confirmed
+live by the smoke tests. No HOF candidate: one row of 135 above 98.73 at 5,000. The lesson that
+shaped everything after: **steadying the curve and banking record checkpoints trade off**, and
+epochs and shape were the lever, not these.
+
+## b7 — network shape
+
+| | |
+|---|---|
+| base | PPO reference |
+| varies | `SNEK_FC_LAYERS` (320,) / (200,100) / (100,200,100) / (100,100) / (200,100,50) / (160,160) / (300,100) / (400,200) |
+| cells × seeds | 8 × 4, 50M |
+| control | `fc (320,)` is the reference cell |
+
+**Why.** The network-shape test the docs had called for since b3: one knob, matched epochs, matched
+budget. b3 at one seed had put `fc (300,100)` first and `fc 320` last of those three, and b4-b6 had
+confounded shape with epochs.
+
+**Learned.** `fc (320,)` wins at 17.3% density, every seed beating every seed of five of the seven
+other layouts (p=0.029); `fc (400,200)` is last at 5.1%, so width past 320 hurts. b3's ranking
+inverted. At 5,000 episodes the win is volume, not quality — the layout means span 0.39 pp while
+candidate counts span 31 to 174. And `strong_eval_fraction` ranks the layouts *backwards* (Spearman
+−0.79): the stage-A ≥98 rate is the screen instead. `fc 320` is also snek2's shape, so a champion's
+weights still convert. Became the base for b9-b21.
+
+## b4 — `fc (200,100)` + 8 epochs
+
+| | |
+|---|---|
+| base | PPO reference |
+| varies | b3's two best single knobs stacked: `fc (200,100)` and 8 epochs |
+| cells × seeds | 1 × 8, 200M |
+| control | b5 and b6, which each carry one of the two knobs |
+
+**Why.** b3 had ranked epochs 8 and `fc (200,100)` first and second at n=1; the natural next arm was
+both together at eight seeds and length. Also completes the 2×2 with b5 and b6.
+
+**Learned.** The weakest of the three 8-seed batches: 7.3% density against b6's 12.9 and b5's 9.6,
+best30 below both on every seed, and the collapses that b8 was built to fix (8.4% of evals below 50
+at 100M). Holding shape, 4 epochs beats 8; holding epochs, `fc 320` beats `fc (200,100)` — **the two
+knobs interact negatively, so a one-knob-at-a-time ranking licenses no stacking**. One row above 98.73
+at 5,000, none at 99. b3's epochs ranking retired.
+
+## b5, b6 — `fc 320` + 8 epochs, and `fc (200,100)` + 4 epochs
+
+| | |
+|---|---|
+| base | PPO reference |
+| varies | b5: 8 epochs at `fc (320,)`; b6: `fc (200,100)` at 4 epochs |
+| cells × seeds | 1 × 8 each; cap 400M, stopped at 255-271M (b5) and 215-231M (b6) |
+| control | each other, imperfectly |
+
+**Why.** b3's two leads — the epoch count and the two-layer net — each run at eight seeds and length
+to see whether either held. Meant as a network-shape comparison, which it was not: the two differ in
+two knobs.
+
+**Learned.** b6 led at 500 episodes (12.8% against 9.6) and the lead vanished at 5,000: identical means
+(97.80 both), b5 ahead on champion-level rows (29 to 20) and on the top checkpoint. **A 500-episode
+ranking of two close batches did not survive 5,000** — the finding behind the `hof5000` pass. Running
+b5 longer bought nothing; b6 longer paid modestly. `b5h` @9027584 (98.96 /30k) and `b6b` @133120000
+(98.73) were the first HOF entries, and `b5h` beat snek2's champion at matched depth.
+
+## b3 — the PPO tuning sweep
+
+| | |
+|---|---|
+| base | PPO reference, freshly defined |
+| varies | one knob per arm: lr 1e-4 / 5e-4 / 1e-3 / 3e-3; γ 0.995 / 0.9975; λ 0.95 / 1.0; entropy 0.003 / 0.03; `fc` 200 / 500 / (200,100) / (300,100); rollout 64; minibatch 1024; epochs 8 |
+| cells × seeds | 15 × 1 (seed 1), 10M; `b3b`-`b3d` stopped at 3M |
+| control | `b3a`, the reference |
+
+**Why.** The first PPO batch after the gate arm: find out which knobs move anything before spending
+seeds. A tuning pass, not a gate — nothing is seed-matched, so no row supports a between-config claim
+on its own.
+
+**Learned.** No winner: nine arms within 0.8 pp on best30 and three metrics giving three orderings.
+One axis moved monotonically — gradient steps per transition (minibatch 1024 89.7, reference 96.6,
+epochs 8 97.2). The lr is peaked at 3e-4; 1e-3 and 3e-3 are worse. PPO's record density is 11.6x
+DQN's at the same protocol, though every 500-episode high fell 1.3-2.0 pp on re-measure. The
+two-layer lead and the epochs-8 lead were both later inverted at four seeds (b7, b12) — the cost of
+n=1.
+
+## b2 — snek2's record config on the torch stack
+
+| | |
+|---|---|
+| base | DQN defaults |
+| varies | the five knobs of snek2's batch 29: IS weights off, target update 1000, γ 0.9975, food-distance reward 0, chase-safe shaping 0.1 at gate 75 |
+| cells × seeds | 1 × 4, 3M counted steps |
+| control | b1, and snek2's b29 / b41 / b47 seed for seed |
+
+**Why.** The phase-3 gate of the port, re-run on the configuration snek2 actually set records with,
+after b1 gated on the wrong one. Five knobs differ, not the two b1's write-up suggested — found by
+reading snek2's b47 spec rather than its results summary.
+
+**Learned.** The gate is met (`b2d` best30 96.8, 52 evals at ≥95/100; b1 had none), so the five knobs
+are the whole b1-b2 difference — snek2's own batch-28/29 finding reproduced. One seed carries the
+batch, as in every snek2 run of this config; the carrier is a coin. And **a snek3 counted step is four
+game moves where snek2's was one**, so "b2 leads b47 at a quarter of the budget" was a units artefact:
+at matched work b2d *matches* b47c. Every cross-era step comparison since reads `transitions`.
+
+## b1 — the DDQN baseline
+
+| | |
+|---|---|
+| base | DQN defaults |
+| varies | nothing |
+| cells × seeds | 1 × 4, 3M counted steps |
+| control | snek2's baseline-class runs |
+
+**Why.** The port's phase-3 gate: does the torch stack learn at all, at snek3's own defaults, before
+anything is tuned.
+
+**Learned.** No checkpoint in any arm reached 95/100, so stage B measured nothing — the honest result,
+not a failure. Every arm was still climbing at the cap (b1d 0 → ~80% perfect, monotonically). It was
+the wrong batch to gate on: snek3's defaults are shaping off and IS weights on, the class snek2 also
+found far from records, and the gate's wording did not say whether it meant a trailing rate or a
+single checkpoint. b2 fixed both.
+
+## Not batches
+
+The PPO gate arm `ppo-smoke` (508k transitions, untuned defaults, 1% perfect), the converted snek2
+policies `b44a-import` and `b45a-import` (the port's phase-1 and phase-2 fidelity checks), and the
+2026-08-30 parallelism sweep (eval workers and shards; the eval side answered, the training side did
+not) are in [`results.md`](results.md) and [`findings.md`](findings.md). None is seed-matched against
+anything here.

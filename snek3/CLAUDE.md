@@ -206,7 +206,7 @@ the next session does not hit it — [`skills/README.md`](skills/README.md).
 
 | file | contents |
 |---|---|
-| [`docs/runs.md`](docs/runs.md) | what is running, what to run next. **Start here** |
+| [`docs/runs.md`](docs/runs.md) | every batch: its config in human terms, why it ran, what it taught. **Start here.** What is *running* is `status.json`, not this file |
 | [`docs/protocol.md`](docs/protocol.md) | how to judge a run: metrics, stop criteria, how to launch |
 | [`docs/findings.md`](docs/findings.md) | what is established, what is falsified |
 | [`docs/results.md`](docs/results.md) | every arm: config, final numbers, verdict |
@@ -284,13 +284,16 @@ the registry, so `ppo/algo.py` is covered the moment it is added. Two consequenc
 carry `transitions` beside `step` — game moves, prefill included. Read that, not `step`, when
 comparing anything across a change in `SNEK_COLLECT_ENVS`, `SNEK_FORK_BRANCHES`, or eras.
 
-Keep the split clean: `runs.md` is current state and forward plan only, results go to `results.md`,
-conclusions to `findings.md`, anything about *how to measure or judge* to `protocol.md`. snek2's
-equivalent grew to 950 lines of interleaved status and stopped being usable.
+Keep the split clean: `runs.md` is one entry per batch — config, why, what was learned, ~100 words
+each — plus a short `## Open` list; live state (box, ETA, what is queued) is `status.json` and is never
+written into a doc; results go to `results.md`, conclusions to `findings.md`, anything about *how to
+measure or judge* to `protocol.md`. snek2's equivalent grew to 950 lines of interleaved status and
+stopped being usable, and snek3's `runs.md` did the same before its 2026-09-10 rewrite.
 
 **Newest at the top of every doc, and of every section inside one.** A batch that closes is written
-*above* the batch before it in `results.md` and `charts.md`, a new finding goes directly under
-`## Established` in `findings.md`, and `runs.md` runs current state -> forward plan -> history. The
+*above* the batch before it in `results.md`, `charts.md` and `runs.md` (a new batch gets its entry and
+its `At a glance` row when it is queued, and its `Learned` paragraph when it closes), and a new
+finding goes directly under `## Established` in `findings.md`. The
 reason is the reader: these files only grow, and the thing worth reading is always the last thing
 learned — it should not be a scroll to the bottom to find it. Reference sections that are not
 chronological (`Imported policies`, `Reading this table`, `protocol.md`, `running.md`,

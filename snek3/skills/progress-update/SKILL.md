@@ -70,7 +70,7 @@ arrived). Not a restatement of the numbers. Three to eight sentences.
 
 | file | takes |
 |---|---|
-| `docs/runs.md` | current state and forward plan **only** — move the stale `Now` block down, do not append |
+| `docs/runs.md` | a closed batch's **Learned** paragraph (≤100 words: the result, what surprised, what it changed) and its one-line result in `At a glance`; a newly queued batch's entry (base, varies, cells × seeds, **Why**). Update `## Open` if the plan moved. **No state, box, ETA or "superseded" blocks** — that is `status.json` |
 | `docs/results.md` | a closed batch's reading, in the skeleton's block; the verdict on each cell |
 | `docs/findings.md` | a conclusion, established or falsified, directly under `## Established` |
 | `docs/charts.md` | the reading block of every live or just-closed batch |

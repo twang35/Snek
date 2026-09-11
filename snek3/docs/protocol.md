@@ -159,5 +159,6 @@ written `.partial` then `os.replace`d, checkpoints land every 1,000 steps), and 
 nothing** (each shard resumes from its own file).
 
 **When arms are stopped, update [`charts.md`](charts.md) and [`results.md`](results.md) in the same
-pass**, and move the batch's rationale out of [`runs.md`](runs.md). Without the rationale a future
-session cannot tell a surprising result from an arm that was never going to answer anything.
+pass**, and write the batch's `Learned` paragraph in [`runs.md`](runs.md) under its `Why`. Without the
+rationale a future session cannot tell a surprising result from an arm that was never going to answer
+anything.

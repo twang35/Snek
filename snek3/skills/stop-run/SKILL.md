@@ -112,6 +112,6 @@ also named under `attention` after two hours (`queue-batch`, "Pin, unpin, releas
 
 ## 3. After stopping
 
-Update `docs/charts.md` and `docs/results.md` in the same pass, and move the batch's rationale out of
-`docs/runs.md` into `results.md`. **Without the rationale a later session cannot tell a surprising
-result from an arm that was never going to answer anything.**
+Update `docs/charts.md` and `docs/results.md` in the same pass, and write the batch's `Learned`
+paragraph in `docs/runs.md` saying it was stopped and why, under its `Why`. **Without the rationale a
+later session cannot tell a surprising result from an arm that was never going to answer anything.**
