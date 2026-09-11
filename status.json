@@ -1,0 +1,24 @@
+{
+  "iso": "2026-09-11T05:46:26",
+  "ts": 1789130786.376606,
+  "box": "laptop",
+  "project": "snek3",
+  "pid": 17382,
+  "at_a_glance": {
+    "running": [],
+    "queued": [],
+    "attention": [
+      "** b25-hof30k failed and is not retried; delete /Users/tony_wang/Projects/Snek/snek3/logs/laptop-queue/b25/.failed-b25-hof30k to retry",
+      "** b27-hof30k-w2 failed and is not retried; delete /Users/tony_wang/Projects/Snek/snek3/logs/laptop-queue/b27/.failed-b27-hof30k-w2 to retry"
+    ],
+    "remaining": null,
+    "pool": [
+      "b31 training | 8/8 arms | pinned desktop | hist8 with mse value loss instead of huber, anneals final at 50M of 100M",
+      "desktop holds b30-w1 (8 arms)"
+    ]
+  },
+  "running": [],
+  "queued_ids": [],
+  "panels": [],
+  "window_pid": 17677
+}
