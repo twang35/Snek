@@ -113,6 +113,29 @@ def test_an_eval_spec_waits_for_its_arms_and_needs_their_checkpoints_here():
     assert claims.next_claim(specs, held + [ev], 'laptop', 8, has_checkpoints=lambda p: True)['batch'] == 'b30'
 
 
+def test_the_pool_training_line_carries_what_the_batchs_labels_share_within_150_chars():
+    specs = _batch('b30', 8, 100)
+    for i, spec in enumerate(sorted(specs.values(), key=lambda s: s['id'])):
+        spec['label'] = 'b30: hist8, gamma 0.99->1.0 and lambda 0.95->1.0 final at 50M of 100M, seed {0} of 8, 100M'.format(i + 1)
+    assert claims.pool_view(specs, [])['lines'] == [
+        'b30 training | 8/8 arms | hist8, gamma 0.99->1.0 and lambda 0.95->1.0 final at 50M of 100M'], \
+        'the per-arm tail (seed N of M) is cut at the last comma; the batch prefix is dropped'
+    # sweep_specs' shape: `<batch>: <cell>, seed N of M -- wave W of K`; a single-arm batch keeps its whole label
+    one = {'b17aa-clip005-seed1': dict(_spec('b17aa-clip005-seed1'), label='b17: clip005, seed 1 of 4 -- wave 1 of 8')}
+    assert claims.pool_view(one, [])['lines'] == ['b17 training | 1/1 arms | clip005, seed 1 of 4 -- wave 1 of 8']
+    # no label, or cells whose labels part mid-word (`hist4` / `hist8`): the line as before, no fragment
+    assert claims.pool_view(_batch('b18', 8), [])['lines'] == ['b18 training | 8/8 arms']
+    cells = _batch('b27', 8, 100)
+    for i, spec in enumerate(sorted(cells.values(), key=lambda s: s['id'])):
+        spec['label'] = 'b27: hist{0}, seed {1} of 4 -- wave 1 of 2'.format(4 if i < 4 else 8, i % 4 + 1)
+    assert claims.pool_view(cells, [])['lines'] == ['b27 training | 8/8 arms']
+    # the whole line stays within POOL_LINE_MAX, the description ending in `...`
+    long = 'b31: ' + 'x' * 300 + ', seed 1 of 8'
+    view = claims.pool_view({'b31a-x-seed1': dict(_spec('b31a-x-seed1'), label=long)}, [])
+    assert len(view['lines'][0]) <= claims.POOL_LINE_MAX and view['lines'][0].endswith('...')
+    assert view['lines'][0].startswith('b31 training | 1/1 arms | xxx')
+
+
 def test_the_eval_probe_is_the_checkpoint_directory(tmp_path):
     os.makedirs(os.path.join(str(tmp_path), 'b7a-x-seed1'))
     assert claims.default_has_checkpoints(['b7a-x-seed1'], policy_dir=str(tmp_path))

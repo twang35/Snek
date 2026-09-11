@@ -45,6 +45,7 @@ scheduler; the scheduler imports this.
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -288,6 +289,41 @@ def ledger(specs, records, published, running):
     return view
 
 
+POOL_LINE_MAX = 150      # a pool line with its description; the user reads status.json in a terminal
+
+
+def batch_description(batch_specs):
+    """What a batch's training specs say they are, from their `label`s: the text every label shares,
+    without the `b30: ` prefix and cut back to the last comma or ` -- ` so it never ends mid-phrase.
+    `sweep_specs` writes `<batch>: <what varies>, seed N of M -- wave ...`, so the shared part is the
+    what-varies clause. '' when no spec carries a label."""
+    labels = [str(spec.get('label') or '').strip() for spec in batch_specs]
+    labels = [label for label in labels if label]
+    if not labels:
+        return ''
+    shared = os.path.commonprefix(labels)
+    if len(labels) > 1 or shared != labels[0]:
+        cut = max(shared.rfind(', '), shared.rfind(' -- '))
+        if cut <= 0:
+            cut = shared.rfind(' ')     # labels that part mid-word (`hist4` / `hist8`): no fragment
+        if cut > 0:
+            shared = shared[:cut]
+    shared = re.sub(r'^b\d+[a-z]*\s*[:-]\s*', '', shared).strip(' ,-')
+    return shared
+
+
+def with_description(line, description, limit=POOL_LINE_MAX):
+    """`line | description`, the description shortened with `...` so the whole stays under `limit`."""
+    if not description:
+        return line
+    room = limit - len(line) - len(' | ')
+    if room < 8:
+        return line
+    if len(description) > room:
+        description = description[:room - 3].rstrip(' ,-') + '...'
+    return line + ' | ' + description
+
+
 def pool_view(specs, records, published=frozenset(), running=None, status_ages=None, malformed=(),
               stranded_after=STRANDED_AFTER_SECONDS):
     """The pool as the status shows it.
@@ -340,9 +376,10 @@ def pool_view(specs, records, published=frozenset(), running=None, status_ages=N
         # A line that names a batch and no box is unclaimed work by construction, so the word is dropped;
         # the count is out of the batch's training specs on ops, claimed or not (`16/24 arms`).
         if entry['phase'] == 'training':
-            total = sum(1 for spec in specs.values()
-                        if batch_of(spec['id']) == entry['batch'] and spec.get('type', 'train') == 'train')
-            lines.append('{0} training | {1}/{2} arms{3}'.format(entry['batch'], count, total, pin))
+            batch_specs = [spec for spec in specs.values()
+                           if batch_of(spec['id']) == entry['batch'] and spec.get('type', 'train') == 'train']
+            line = '{0} training | {1}/{2} arms{3}'.format(entry['batch'], count, len(batch_specs), pin)
+            lines.append(with_description(line, batch_description(batch_specs)))
         else:
             lines.append('{0} eval | {1}{2}'.format(entry['batch'], ', '.join(entry['ids']), pin))
     for box in sorted(held):

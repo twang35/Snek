@@ -49,7 +49,7 @@ per type.
 | `env` | no | any `SNEK_*` knob; wins over the runtime defaults. See `docs/running.md` |
 | `priority` | no | lower runs first, **across the whole pool**: batches by their lowest spec, then name; within a batch by priority then id. Default 100. Set it deliberately: a new batch at 200 runs before one waiting at 240 on either box |
 | `box` | no | `"desktop"` or `"laptop"`: only that box may claim it. **Absent means either**, which is the normal case |
-| `label` | no | one line for `at_a_glance`. **ASCII only** — `--` not an em dash, `>=` not `≥`: `status.json` is read by a human and non-ASCII publishes as `\uXXXX` |
+| `label` | no | one line for `at_a_glance`; the part a batch's labels share (before `, seed N of M`) is the pool line's description. **ASCII only** — `--` not an em dash, `>=` not `≥`: `status.json` is read by a human and non-ASCII publishes as `\uXXXX` |
 | `notes` | no | why this arm exists, for the reader of the spec. ASCII only |
 
 **Omit `selector` and `episodes` on an eval.** Absent means `tools/closeout.py`'s own defaults, which
@@ -126,7 +126,7 @@ git fetch origin ops-status && git show origin/ops-status:status.json
 
 **The fetch is mandatory** — without it you read an old local ref whose embedded timestamp looks like a
 dead daemon. `at_a_glance.pool` is the shared queue: what is unclaimed, by batch, and what each box holds
-(`b18 training | 16/24 arms`; `laptop holds b21-w2 (8 arms)`); `desktop_running`/`desktop_queued` are the desktop's own, `laptop_running`/
+(`b18 training | 16/24 arms | <what the arms' labels share>`; `laptop holds b21-w2 (8 arms)`); `desktop_running`/`desktop_queued` are the desktop's own, `laptop_running`/
 `laptop_queued` the laptop's, `attention` anything needing a human. A batch pushed while both boxes are
 busy shows under `pool` until a wave boundary on one of them: that is normal, not stuck. Nothing needs
 restarting. `PYTHONPATH=. python -m tools.claims show` prints the same pool from the laptop.

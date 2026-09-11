@@ -75,7 +75,8 @@ git fetch origin ops-status && git show origin/ops-status:status.json
 `at_a_glance` reads in this order: **`pool` is the shared queue**, then `desktop_running` / `desktop_queued` /
 `attention` / `desktop_remaining` are the box, and `laptop_running` / `laptop_queued` / `laptop_remaining` are the
 laptop's scheduler, as of `laptop_iso` (the laptop's own clock). The pool is what is unclaimed, by batch
-(`b18 training | 16/24 arms`, the count out of the batch's arms on `ops`), and what each box holds
+(`b18 training | 16/24 arms | hist8, lr 2.5e-4->0 ...`: the count out of the batch's arms on `ops`, then what
+the arms' `label`s share, the line capped at 150 chars), and what each box holds
 (`laptop holds b21-w2 (8 arms)`), the daemon's own
 read each network cycle (`tools.claims show --json`). The laptop scheduler's last publish before it exits
 is **empty**, so empty lists mean an idle laptop, and lines under a `laptop_iso` hours old mean it died —
