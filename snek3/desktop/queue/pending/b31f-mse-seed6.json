@@ -1,4 +1,5 @@
 {
+ "box": "desktop",
  "env": {
   "SNEK_ALGO": "ppo",
   "SNEK_CHASE_SAFE_GATE": "75",
@@ -35,7 +36,7 @@
  "id": "b31f-mse-seed6",
  "label": "b31: hist8 with mse value loss instead of huber, anneals final at 50M of 100M, seed 6 of 8, 100M",
  "max_steps": 100007936,
- "notes": "Batch b31: b28's hist8 config at 100M with SNEK_PPO_VALUE_LOSS mse instead of huber and nothing else changed: the horizon anneals (gamma 0.99->0.999, lambda 0.95->0.999, entropy 0.01->0.001) reach their finals at 50M (SNEK_PPO_ANNEAL_FRACTION 0.5 of the 100M cap), the same 50M ramp as b27. lr 2.5e-4, clip 0.2 fixed. Why: mse was the largest single step on the corner-grid ladder (b19 +5 pp and the most stable cell; b23 32.7 -> 61.6% with the collapses gone) but has never been tried on the horizon-anneal base, which has run huber since b24. Reference: b27's hist8 cell (100M, huber). Everything else b28: hist 8, step penalty 0.01, epochs 4, mb 512, T 256, adv norm, grad 0.5, adam eps 1e-7, vf 0.5, target_kl 0, chase-safe 0.1 gate 75, fc 320, 128 lanes, seeds 1-8 pinned to the arm letter. Queued 2026-09-10 behind b29 and b30 (priority 320).",
+ "notes": "Batch b31: b28's hist8 config at 100M with SNEK_PPO_VALUE_LOSS mse instead of huber and nothing else changed: the horizon anneals (gamma 0.99->0.999, lambda 0.95->0.999, entropy 0.01->0.001) reach their finals at 50M (SNEK_PPO_ANNEAL_FRACTION 0.5 of the 100M cap), the same 50M ramp as b27. lr 2.5e-4, clip 0.2 fixed. Why: mse was the largest single step on the corner-grid ladder (b19 +5 pp and the most stable cell; b23 32.7 -> 61.6% with the collapses gone) but has never been tried on the horizon-anneal base, which has run huber since b24. Reference: b27's hist8 cell (100M, huber). Everything else b28: hist 8, step penalty 0.01, epochs 4, mb 512, T 256, adv norm, grad 0.5, adam eps 1e-7, vf 0.5, target_kl 0, chase-safe 0.1 gate 75, fc 320, 128 lanes, seeds 1-8 pinned to the arm letter. Queued 2026-09-10 behind b29 and b30 (priority 320); pinned to the desktop 2026-09-11.",
  "policy": "b31f-mse-seed6",
  "priority": 320,
  "project": "snek3",
