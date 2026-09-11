@@ -1,0 +1,18 @@
+{
+ "arms": [
+  "b29a-lrclip0-seed1",
+  "b29b-lrclip0-seed2",
+  "b29c-lrclip0-seed3",
+  "b29d-lrclip0-seed4",
+  "b29e-lrclip0-seed5",
+  "b29f-lrclip0-seed6",
+  "b29g-lrclip0-seed7",
+  "b29h-lrclip0-seed8"
+ ],
+ "batch": "b29",
+ "box": "laptop",
+ "claimed_iso": "2026-09-10T23:00:43",
+ "claimed_ts": 1789106443.147115,
+ "kind": "wave",
+ "wave": 1
+}
