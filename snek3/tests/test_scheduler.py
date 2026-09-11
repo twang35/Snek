@@ -535,6 +535,41 @@ def test_a_waiting_driver_republishes_every_ten_minutes_so_the_percent_moves(box
     assert published.glance(-1)['running'] == []
 
 
+def test_a_driver_publishes_its_live_arms_pictures_with_the_ten_minute_republish(box):
+    clock = {'now': 0.0}
+
+    def sleep(seconds):
+        clock['now'] += 400.0
+
+    calls = Calls()
+
+    class Slow(FakeProcess):
+        def poll(self):
+            code = FakeProcess.poll(self)
+            if code is not None:
+                with open(os.path.join(box['runs'], 'b1a-x-seed1_evals.json'), 'w') as handle:
+                    json.dump({'summary': {'step': 100}}, handle)
+            return code
+    slow = Slow(1, polls=3)
+    calls.popen = lambda argv, **kwargs: slow
+    for name in ('b1a-x-seed1.png', 'b1a-x-seed1.md', 'b1a-x-seed1_evals.json'):
+        open(os.path.join(box['runs'], name), 'w').close()
+    feed, published = FakeFeed(), Published()
+    d = scheduler.Driver([_spec('b1a-x-seed1', 'b1: x')], runs_dir=box['runs'], logs_dir=box['logs'],
+                            popen=calls.popen, call=calls.call, sleep=sleep, python='py', ensure_workers=no_workers, stage_b=False,
+                            reporter=scheduler.Reporter(published), clock=lambda: clock['now'], results=feed)
+    d.run()
+    # at launch (t=0) and at the poll that crosses 600 s (t=800) -- the arm's exit at t=1200 is within
+    # ten minutes of the last one, so the status republishes (3) and the pictures do not (2); the picture
+    # and the report, never the 3.6 MB `_evals.json`; the exit publishes the arm's finals through `publish`
+    assert len(published.statuses) == 3
+    assert feed.live == [{'b1a-x-seed1': ['b1a-x-seed1.md', 'b1a-x-seed1.png']}] * 2
+    assert feed.published == [('b1a-x-seed1', ['b1a-x-seed1.md', 'b1a-x-seed1.png', 'b1a-x-seed1_evals.json'])]
+    # no feed: nothing asked of anyone
+    d2 = driver([spec('b1a-x-seed1')], box, Calls(), wave=1)
+    assert d2.results is None and d2.run() == 0
+
+
 def test_a_publisher_that_fails_never_stops_the_driver(box):
     from tools import laptop_status
     logged = []
@@ -1130,11 +1165,15 @@ def test_a_republish_request_publishes_at_the_next_poll_and_is_consumed(box, tmp
 
 class FakeFeed(object):
     def __init__(self):
-        self.published = []
+        self.published, self.live = [], []
 
     def publish(self, job_id, paths):
         self.published.append((job_id, sorted(os.path.basename(p) for p in paths)))
         return True
+
+    def publish_live(self, files_by_policy):
+        self.live.append({k: sorted(os.path.basename(p) for p in v) for k, v in files_by_policy.items()})
+        return bool(files_by_policy)
 
 
 def test_the_driver_publishes_an_arm_at_its_cap_and_each_pass_its_merged_files(tmp_path, box):

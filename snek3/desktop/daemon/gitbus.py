@@ -4,7 +4,7 @@
 |---|---|---|---|
 | `ops` | laptop | yes, read-only | `queue/pending/*.json` specs, `config/runtime.json` |
 | `ops-status` | **desktop daemon** | no | `status.json` |
-| `results` | **desktop scheduler** (`tools/results_feed.py`) | no | `results/<job-id>/*` -- each finished arm's and pass's files |
+| `results` | **desktop scheduler** (`tools/results_feed.py`) | no | `results/<job-id>/*` -- each finished arm's and pass's files, and every live arm's picture every ten minutes |
 | `laptop-results` | laptop scheduler (`tools/results_feed.py`) | by `tools/site_build.py` | the same, for the laptop's work |
 | `laptop-status` | laptop scheduler (`tools/laptop_status.py`) | yes, read-only | the laptop's `status.json`, folded into ours as `at_a_glance.laptop_*` |
 | `site` | **desktop daemon** (`tools/site_build.py`) | no | the GitHub Pages viewer: a snapshot, one commit rewritten per build |
@@ -27,6 +27,17 @@ whether the push landed; `push_unpushed` retries the branches that have commits 
 remote. The daemon calls the second on every network cycle, so a push that fails during a router
 reboot lands on the next pass without anything being lost or double-counted — the commit is already
 made, so a retry is idempotent.
+
+## Every written branch is one parentless commit, rewritten each publish (2026-09-10)
+
+`_commit_and_push` used to append a commit per publish. Nothing read the history -- `site_build`,
+`progress_update` and `claims.published_ids` all read the tip's tree, `push_unpushed` only asks whether
+HEAD is ahead of the remote -- and the history was the cost: the `results` pack reached 372 MB, and a
+live picture per arm per ten minutes on top would have been ~30 MB a day. So each publish now writes the
+staged tree as a **new root commit** (`write-tree`, `commit-tree` with no parent, `reset --soft`) and
+force-pushes it with a lease, as `site` always was. The worktree is persistent and a publish stages only
+the directories it touched, so the tree still carries every earlier job; only the commit chain goes.
+The first publish after this change collapses a branch's existing history the same way.
 """
 
 import os
@@ -219,6 +230,24 @@ def publish_status(host, status_json_text):
     return _commit_and_push(worktree, host['STATUS_BRANCH'], host, 'status update')
 
 
+def publish_jobs(host, jobs, message):
+    """Copies several jobs' files onto the results branch -- `{job_id: [paths]}`, each into
+    `results/<job-id>/` -- as one commit and one push. Returns `(pushed, files copied)`. The live
+    pictures of a wave go through here: eight arms, one push."""
+    worktree = host['RESULTS_WORKTREE']
+    clear_stale_locks(worktree)
+    copied = 0
+    for job_id, paths in sorted(jobs.items()):
+        destination = os.path.join(worktree, 'results', job_id)
+        os.makedirs(destination, exist_ok=True)
+        for source in paths:
+            if os.path.exists(source):
+                shutil.copy2(source, destination)
+                copied += 1
+        _git(['add', '-A', os.path.join('results', job_id)], cwd=worktree)
+    return _commit_and_push(worktree, host['RESULTS_BRANCH'], host, message), copied
+
+
 def publish_results(host, job, artifact_paths):
     """Copies a job's artifacts onto the `results` branch. Returns True if the push landed.
 
@@ -226,17 +255,7 @@ def publish_results(host, job, artifact_paths):
     it. It means the caller must not yet report the job as published, which is the distinction snek2
     collapsed.
     """
-    worktree = host['RESULTS_WORKTREE']
-    clear_stale_locks(worktree)
-    destination = os.path.join(worktree, 'results', job.id)
-    os.makedirs(destination, exist_ok=True)
-    copied = 0
-    for source in artifact_paths:
-        if os.path.exists(source):
-            shutil.copy2(source, destination)
-            copied += 1
-    _git(['add', '-A', os.path.join('results', job.id)], cwd=worktree)
-    pushed = _commit_and_push(worktree, host['RESULTS_BRANCH'], host, 'results for ' + job.id)
+    pushed, copied = publish_jobs(host, {job.id: list(artifact_paths)}, 'results for ' + job.id)
     if not copied:
         # Worth a line: a job that produced nothing and a job whose artifacts moved look the same
         # afterwards, and only one of them is a bug.
@@ -281,14 +300,28 @@ def push_unpushed(host):
 
 
 def _commit_and_push(worktree, branch, host, message):
-    """Commits whatever is staged and pushes. Returns True if the *push* landed.
+    """Writes whatever is staged as the branch's one parentless commit and pushes. Returns True if the
+    *push* landed. Nothing is committed when nothing changed and the tip is already a root, so an
+    unchanged republish is a no-op push.
 
     A missing git identity is the one failure worth raising for, because it makes every publish fail
     forever and no retry can fix it — so the commit uses `check=True` while the push does not.
     """
-    if _git(['status', '--porcelain'], cwd=worktree).strip():
-        _git(['commit', '-q', '-m', message], cwd=worktree, check=True)
+    if _git(['status', '--porcelain'], cwd=worktree).strip() or _has_parent(worktree):
+        snapshot_commit(worktree, message)
     return push(worktree, branch, host)
+
+
+def _has_parent(worktree):
+    return bool(_git(['rev-parse', '--verify', '--quiet', 'HEAD^'], cwd=worktree).strip())
+
+
+def snapshot_commit(worktree, message):
+    """Replaces HEAD with a new root commit of the index: the branch is a snapshot, never a history."""
+    tree = _git(['write-tree'], cwd=worktree, check=True).strip()
+    commit = _git(['commit-tree', tree, '-m', message], cwd=worktree, check=True).strip()
+    _git(['reset', '-q', '--soft', commit], cwd=worktree, check=True)
+    return commit
 
 
 def ref_head(repo, ref):

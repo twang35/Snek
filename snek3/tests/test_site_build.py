@@ -63,7 +63,7 @@ def world(tmp_path):
 def _build(world, **kwargs):
     lines = []
     result = site_build.build(repo=world['repo'], remote='origin', branch='site', worktree=world['worktree'],
-                              feeds=('results', 'laptop-results'), runs_dir=world['runs'], build_dir=world['build'],
+                              feeds=site_build.FEEDS, runs_dir=world['runs'], build_dir=world['build'],
                               viewer_dir=world['viewer'], log=lines.append, **kwargs)
     return result, lines
 
@@ -129,3 +129,50 @@ def test_a_file_deleted_from_a_feed_leaves_the_site(world):
     result, _ = _build(world, push=False)
     assert result['built'] and result['flattened'] == 1 and result['arms'] == 1
     assert not os.path.exists(os.path.join(world['build'], 'b41a-b29repro-seed1.png'))
+
+
+def test_a_feed_is_one_parentless_commit_whose_tree_keeps_every_earlier_job(world):
+    """`gitbus.publish_results` / `publish_jobs`: every publish rewrites the branch as a new root commit,
+    force-pushed with a lease; the persistent worktree means the tree still holds every job published
+    before; a publish that changes nothing pushes nothing; and a branch with history collapses to one
+    commit on its first publish after the change."""
+    from desktop.daemon import gitbus
+    _commit_feed(world['remote'], 'laptop-results', {'results/b1a-x-seed1/b1a-x-seed1.png': b'old'}, 'old history')
+    _commit_feed(world['remote'], 'laptop-results', {'results/b1a-x-seed1/b1a-x-seed1_evals.json': b'{}'}, 'more history')
+    _git(['fetch', '-q', 'origin', 'laptop-results'], world['repo'])
+    assert _git(['rev-list', '--count', 'origin/laptop-results'], world['repo']) == '2'
+    host = {'REPO_PATH': world['repo'], 'RESULTS_WORKTREE': str(world['worktree']) + '-results',
+            'RESULTS_BRANCH': 'laptop-results', 'GIT_REMOTE': 'origin'}
+    gitbus.ensure_worktree(host['REPO_PATH'], host['RESULTS_WORKTREE'], host['RESULTS_BRANCH'], host['GIT_REMOTE'])
+    _git(['config', 'user.email', 't@t'], host['RESULTS_WORKTREE']); _git(['config', 'user.name', 't'], host['RESULTS_WORKTREE'])
+    png = os.path.join(world['runs'], 'b30a-h1-seed1.png')
+    with open(png, 'wb') as handle:
+        handle.write(b'\x89PNG t1')
+
+    class Job(object):
+        id = 'b30a-h1-seed1'
+    assert gitbus.publish_results(host, Job(), [png]) is True
+    tree = lambda: sorted(_git(['ls-tree', '-r', '--name-only', 'origin/laptop-results'], world['repo']).splitlines())
+    assert _git(['rev-list', '--count', 'origin/laptop-results'], world['repo']) == '1', 'history collapsed'
+    assert tree() == ['results/b1a-x-seed1/b1a-x-seed1.png', 'results/b1a-x-seed1/b1a-x-seed1_evals.json',
+                      'results/b30a-h1-seed1/b30a-h1-seed1.png'], 'the earlier jobs are still in the tree'
+    first = _git(['rev-parse', 'origin/laptop-results'], world['repo'])
+    assert gitbus.publish_results(host, Job(), [png]) is True
+    assert _git(['rev-parse', 'origin/laptop-results'], world['repo']) == first, 'unchanged: no new commit'
+    # live pictures of a wave: several jobs, one commit; the final later overwrites the same path
+    with open(png, 'wb') as handle:
+        handle.write(b'\x89PNG t2')
+    png2 = os.path.join(world['runs'], 'b30b-h1-seed2.png')
+    with open(png2, 'wb') as handle:
+        handle.write(b'\x89PNG b')
+    pushed, copied = gitbus.publish_jobs(host, {'b30a-h1-seed1': [png], 'b30b-h1-seed2': [png2]}, 'live')
+    assert (pushed, copied) == (True, 2)
+    assert _git(['rev-list', '--count', 'origin/laptop-results'], world['repo']) == '1'
+    assert subprocess.run(['git', 'show', 'origin/laptop-results:results/b30a-h1-seed1/b30a-h1-seed1.png'],
+                          cwd=world['repo'], capture_output=True, check=True).stdout == b'\x89PNG t2'
+    assert 'results/b30b-h1-seed2/b30b-h1-seed2.png' in tree()
+    # and the site build reads the rewritten feed: its anchor commit is gone, so the feed is read whole
+    result, _ = _build(world, push=False)
+    assert result['arms'] == 3
+    result, _ = _build(world, push=False)
+    assert result['built'] is False

@@ -430,8 +430,11 @@ class Driver(object):
         self.window = window
         self.ensure_workers = ensure_workers
         # This box's results feed (`results_feed.Publisher`), or None to publish nothing: an arm at its
-        # cap, a pass's merged files and a finished eval spec are pushed the moment they are final.
+        # cap, a pass's merged files and a finished eval spec are pushed the moment they are final, and
+        # every live arm's picture with the status every `REPUBLISH_SECONDS`, so the site shows an arm
+        # while it trains whichever box it is on.
         self.results = results
+        self._last_live = None          # None: the first report publishes, whatever the clock reads
         self.workers = []
         self.killpg = killpg
         # For the time estimates (`tools/eta.py`): when the pass or eval in flight started, so its
@@ -548,6 +551,10 @@ class Driver(object):
         if self.reporter is not None:
             self.reporter.publish(self)
             self._last_report = self.clock()
+        if self.results is not None and (self._last_live is None
+                                         or self.clock() - self._last_live >= laptop_status.REPUBLISH_SECONDS):
+            self._last_live = self.clock()
+            self.results.publish_live(results_feed.live_files([spec['policy'] for spec, _ in self.live], self._runs_dir()))
 
     def _tick(self):
         """Called once per wait poll: republishes every `REPUBLISH_SECONDS` so percentages move, honours
@@ -1175,7 +1182,8 @@ def build_parser():
                         help='do not publish what is running to the laptop-status branch')
     parser.add_argument('--no-results', action='store_true',
                         help='do not publish finished arms and passes to this box\'s results branch '
-                             '(SNEK_RESULTS_BRANCH, default laptop-results)')
+                             '(SNEK_RESULTS_BRANCH, default laptop-results), nor the live arms\' pictures '
+                             'every ten minutes')
     parser.add_argument('--reopen-window', action='store_true',
                         help='ask the running scheduler for a fresh chart window, then exit')
     parser.add_argument('--republish', action='store_true',

@@ -14,8 +14,9 @@ deliberate. If a rule you need is missing from `snek3/CLAUDE.md`, it may be in `
 describing snek2's version of the same thing; carry it across rather than editing snek2.
 
 **The GitHub-Pages chart viewer is the `site` branch, and the desktop builds it.** Each box's scheduler
-publishes every finished arm and pass to its own results branch (`results`, `laptop-results`;
-`snek3/tools/results_feed.py`), and the desktop daemon rebuilds the site from both feeds plus its own
+publishes every finished arm and pass, and every live arm's picture every ten minutes, to its own results
+branch (`results`, `laptop-results`; `snek3/tools/results_feed.py`, one snapshot commit rewritten per
+publish), and the desktop daemon rebuilds the site from both feeds plus its own
 live charts on every network cycle (`snek3/tools/site_build.py`), pushing one snapshot commit to `site`
 — so the page is current within ten minutes of a wave closing on either box, and
 `ssh the-claw-den 'Snek/snek3/desktop/trigger'` rebuilds it now. There is no local build of the site

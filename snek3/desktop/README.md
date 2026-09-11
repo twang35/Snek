@@ -17,7 +17,7 @@ and the daemon cannot be broken by a change to the trainer or the scheduler. The
 |---|---|---|
 | `ops` | **laptop** | `snek3/desktop/queue/pending/*.json` specs, `snek3/desktop/config/runtime.json` |
 | `ops-status` | **desktop** | `status.json` — heartbeat, running jobs, ledger, `at_a_glance` |
-| `results` | **desktop's scheduler** (`tools/results_feed.py`) | `results/<job-id>/*`: a finished arm's `.md`, `.png`, `_evals.json`; a finished pass's merged files and pictures. snek3 jobs only: snek2's were deleted 2026-09-05 (they are on master under `snek2/runs/`) |
+| `results` | **desktop's scheduler** (`tools/results_feed.py`) | `results/<job-id>/*`: a finished arm's `.md`, `.png`, `_evals.json`; a finished pass's merged files and pictures; and every live arm's `.png` and `.md` every ten minutes, into the same `results/<policy>/` its finals later overwrite. snek3 jobs only: snek2's were deleted 2026-09-05 (they are on master under `snek2/runs/`). **One parentless commit, rewritten each publish** (since 2026-09-10; the history had reached 372 MB and nothing read it) |
 | `laptop-results` | **laptop's scheduler** (the same module) | the same, for the laptop's work |
 | `site` | **desktop daemon** (`tools/site_build.py`, every network cycle) | the GitHub Pages viewer, built from both feeds and the box's live charts; one snapshot commit, rewritten each build |
 | `laptop-status` | **laptop** (`tools/laptop_status.py`, from its scheduler) | the laptop's `status.json`, same `at_a_glance` shape; the daemon reads it each network cycle and publishes it inside its own as `at_a_glance.laptop_running`, `laptop_queued`, `laptop_iso` |
@@ -245,7 +245,8 @@ that budget and `SNEK_CHART_WINDOW_MAX_PX` caps the width, in the scheduler's en
 **The Pages viewer is the `site` branch, and this box builds it.** On every network cycle (`git_seconds`,
 600) the daemon runs `tools.site_build` on the env python: it fetches `results`, `laptop-results` and
 `ops-status`, flattens both feeds into `~/snek-bus/site-build/` (incrementally, by `git diff` since the
-commit last flattened), copies this box's own `desktop/runs/` files over them where newer, builds the
+commit last flattened, or whole when that commit is gone -- the feeds are snapshots rewritten each
+publish), copies this box's own `desktop/runs/` files over them where newer, builds the
 manifest and the charts into the `~/snek-bus/site` worktree, amends the branch's one commit and pushes
 `--force-with-lease`. A build with nothing moved is skipped; a trigger forces one, so
 `ssh the-claw-den 'Snek/snek3/desktop/trigger'` is the "rebuild now" button. By hand, the same writer:

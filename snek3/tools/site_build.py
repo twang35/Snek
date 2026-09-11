@@ -8,7 +8,7 @@ on the box is the same writer with the same worktree and lease. Pages serves bra
 
 | step | what |
 |---|---|
-| feeds | `git fetch` `results`, `laptop-results` and `ops-status`; each feed's tree is flattened into the build directory -- `results/<job-id>/<file>` becomes `<file>` -- incrementally, by `git diff --name-status` since the commit last flattened (`.feeds.json` beside the files), so a file deleted from a feed leaves the site too. Only arms' files (`b<n><letters>-...`): the p0-p2 copies of b3-b6 and the smoke and sweep jobs are not |
+| feeds | `git fetch` `results`, `laptop-results` and `ops-status`; each feed's tree is flattened into the build directory -- `results/<job-id>/<file>` becomes `<file>` -- incrementally, by `git diff --name-status` since the commit last flattened (`.feeds.json` beside the files; the feeds are snapshots rewritten each publish, so when that commit is gone the feed is read whole), so a file deleted from a feed leaves the site too. Only arms' files (`b<n><letters>-...`): the p0-p2 copies of b3-b6 and the smoke and sweep jobs are not. Both feeds carry their live arms' pictures every ten minutes as well as the finals, so a laptop arm is on the page while it trains |
 | this box | every file in `SNEK_RUNS_DIR` newer than the build directory's copy is copied over it: the box's own live pictures and measurements win over the feeds' |
 | status | `origin/ops-status:status.json` lands at `.live/desktop/status.json`, so the manifest knows which pass is running or queued |
 | site | `viewer_manifest.build(build_dir)` and `publish_pages.publish(...)` into the `site` worktree: `index.html`, `manifest.js`, `charts/*.png`, `.nojekyll` |
