@@ -13,10 +13,10 @@ are in git history before 2026-09-10.
 
 ## Open
 
-- **b28's `hof30k` pass** decides whether the 100M hold moved the top: a row at ≥99.83 /30,000 is an
-  `hof-promote` candidate, otherwise b28 reads "wider plateau, same top" and the 100M cap stands.
-- **b29 / b30 / b31**, one knob each off b27's `hist8` at 100M: optimiser anneal, horizon to 1.0, `mse`. Which
-  of the three moves the 30k top past 99.8, and whether `mse` still adds density on this base.
+- **A clean test of the PPO paper's optimiser schedule**: b29 confounded lr/clip → 0 with removing the
+  horizon anneal. The unconfounded arm keeps γ/λ → 0.999 and adds lr/clip → 0 on top.
+- **b30 / b31**, one knob each off b27's `hist8` at 100M: horizon to 1.0 (stage B level, passes pending), `mse`
+  (queued). Whether either moves the 30k top past 99.8; b28 says more steps will not.
 - **Should `SNEK_OBS_HISTORY=8` become the default.** b27 says yes; nothing has run against it yet.
 - **Next sweeps on the `hist8` base**: a `hist16` cell, and step penalties above 0.01 (0.02, 0.05) —
   b26's curve never turned.
@@ -27,10 +27,10 @@ are in git history before 2026-09-10.
 
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
-| [b31](#b31--mse-value-loss-on-the-hist8-base) | `SNEK_PPO_VALUE_LOSS` mse | pen01 + hist8 | 1 × 8 | 100M | queued | — |
-| [b30](#b30--the-horizon-annealed-to-10) | γ and λ finals 1.0, not 0.999 | pen01 + hist8 | 1 × 8 | 100M | queued | — |
-| [b29](#b29--lr-and-clip-annealed-to-zero) | lr 2.5e-4 → 0 and clip 0.2 → 0.001 over the whole cap; horizon fixed | pen01 + hist8 | 1 × 8 | 100M | training | — |
-| [b28](#b28--the-hist8-config-held-for-100m-more) | 100M more hold | pen01 + hist8, anneal over 25% | 1 × 8 | 200M | — | 97.5% density and 4x the near-record rows; first 30k rows level with the HOF, not above. **Passes still running** |
+| [b31](#b31--mse-value-loss-on-the-hist8-base) | `SNEK_PPO_VALUE_LOSS` mse | pen01 + hist8 | 1 × 8 | 100M | — | — |
+| [b30](#b30--the-horizon-annealed-to-10) | γ and λ finals 1.0, not 0.999 | pen01 + hist8 | 1 × 8 | 100M | falsified so far | stage B level with `hist8` (95.3 vs 95.4%), no collapse; passes pending |
+| [b29](#b29--lr-and-clip-annealed-to-zero) | lr 2.5e-4 → 0 and clip 0.2 → 0.001 over the whole cap; horizon fixed | pen01 + hist8 | 1 × 8 | 100M | falsified | worse in every window: 83.1% density, nothing through the 99.6 /5k gate; confounded with the missing horizon anneal |
+| [b28](#b28--the-hist8-config-held-for-100m-more) | 100M more hold | pen01 + hist8, anneal over 25% | 1 × 8 | 200M | — | 97.5% density; 152 rows at 99.8 /30k against 9, top 99.82 — the plateau widens, the top does not move |
 | [b27](#b27--move-history-depth) | `SNEK_OBS_HISTORY` 0 / 4 / 8 | pen01 | 3 × 8 | 100M | falsified | **the largest lever found**: 49 → 94-95% density; `b27t`/`b27k` 99.81 /30k, the record |
 | [b26](#b26--step-penalty) | `SNEK_STEP_PENALTY` 0 / 1e-4 / 1e-3 / 0.01 | horizon anneal, obs26 | 4 × 4 | 50M | held | 0.01 nearly doubles density (25.5 → 46.3%); smaller values do nothing |
 | [b25](#b25--the-ladder-top-at-200m) | cap and seeds | ladder top | 1 × 8 | 200M | held | longer cap paid everywhere: 77.5% density, `b25a` 99.60 /30k |
@@ -108,7 +108,7 @@ the reference used, says whether that step still exists on top of move history.
 | varies | `SNEK_PPO_DISCOUNT_FINAL` and `SNEK_PPO_GAE_LAMBDA_FINAL` 1.0 instead of 0.999; entropy 0.01 → 0.001, lr and clip fixed as before |
 | cells × seeds | 1 × 8 (seeds 1-8, `b30a`-`b30h`) |
 | control | b27's `hist8` arms, seeds 17-24 |
-| predicted | registered at queue time 2026-09-10 by the agent, not the user: some seeds collapse after 50M as b10's fixed γ 1.0 cell did (44% of evals below 50), the survivors level with b27 `hist8` at the top |
+| predicted | registered at queue time 2026-09-10 by the agent, not the user: some seeds collapse after 50M as b10's fixed γ 1.0 cell did (44% of evals below 50), the survivors level with b27 `hist8` at the top — **falsified so far**: no seed has an eval below 50, stage B 95.3% against 95.4; passes pending |
 
 **Why.** The horizon anneal ends at 0.999 because b10 ran γ 1.0 from step 0 and it collapsed half
 the time while holding the record (`b10ck` 99.65). Reaching 1.0 only after 50M of training under a
@@ -124,12 +124,19 @@ competent.
 | varies | the anneal moves from the horizon to the optimiser: `SNEK_PPO_LEARNING_RATE_FINAL` 0 and `SNEK_PPO_CLIP_FINAL` 0.001 ramp from step 0 to the cap (`SNEK_PPO_ANNEAL_FRACTION` 1.0); γ 0.99, λ 0.95 and entropy 0.01 held fixed, no `_FINAL` |
 | cells × seeds | 1 × 8 (seeds 1-8, `b29a`-`b29h`) |
 | control | b27's `hist8` arms, seeds 17-24 |
-| predicted | registered at queue time 2026-09-10 by the agent, not the user: a frozen endgame — density at or above b27 `hist8` over the last 20M with fewer drawdowns, a lower top because γ 0.99 never sees the long horizon that put b27's rows at 99.8 |
+| predicted | registered at queue time 2026-09-10 by the agent, not the user: a frozen endgame — density at or above b27 `hist8` over the last 20M with fewer drawdowns, a lower top because γ 0.99 never sees the long horizon that put b27's rows at 99.8 — **falsified** on density (83.1% against 95.4, behind in every 25M window, nothing through the 99.6 /5k gate); the lower top held |
 
 **Why.** The PPO paper's Atari schedule anneals lr and clip to zero together, and b17 found that
 holding the annealed clip floor for the last 10M was worth +6-7 pp. b24-b28 anneal the horizon
 instead and leave the optimiser static. This is the other schedule on the same base, and the clip
 floor is 0.001 rather than 0 because the trainer refuses a clip of exactly 0.
+
+**Learned.** Worse everywhere: 25M-window density 68.6 / 73.7 / 89.2 / 95.0% against 82.9 / 95.4 / 99.5 /
+99.8, all eight seeds below the reference's eight, best30 99.39 against 99.79, and `hof5000` passed none of
+3,749 rows through the 99.6 gate so `hof30k` ran nothing. The deficit is already there at 0-25M, where lr
+has fallen only a quarter, which points at the fixed γ 0.99 / λ 0.95 rather than the optimiser decay: the
+arm removed the horizon anneal as well as adding its own, so the paper's schedule is not cleanly tested.
+A clean test keeps γ/λ → 0.999 and adds lr/clip → 0 on top.
 
 ## b28 — the `hist8` config held for 100M more
 
@@ -146,11 +153,12 @@ The question is whether the ceiling is the config or the cap: does holding the c
 another 100M raise the top, or only widen the plateau under it? The same anneal length keeps the first
 100M window-for-window comparable with b27.
 
-**Learned so far** (stage B and `hof5000` closed, `hof30k` running 2026-09-10). The first 100M
-matches b27's `hist8` (94.9% against 95.4), so the extra hold is what reads 97.5% density and 7,718
-rows through the 99.6 /5,000 gate — 4.2x b27's — with 38 at 99.9 and every arm holding a 99.9 best.
-The first two 30k arms read 99.79, level with the record pair's 99.81 and inside one standard error.
-Provisional verdict: the hold multiplies near-record checkpoints without raising the top.
+**Learned.** The first 100M matches b27's `hist8` (94.9% against 95.4), so the extra hold is what reads
+97.5% density, 7,718 rows through the 99.6 /5,000 gate (4.2x) and 152 rows at 99.8 /30,000 against 9. The
+top did not move: `b28k` @162856960 at 29,946 /30,000 (99.82) is one game above the record pair, z ≈ 0.3,
+and nothing reached the 99.83 that would separate. Verdict: holding converged values widens the plateau
+by an order of magnitude and does not raise it; the 100M cap is enough for this config, and the next
+lever is a knob. Nothing promoted.
 
 ## b27 — move history depth
 

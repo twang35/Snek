@@ -17,6 +17,23 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### Holding a converged config for 100M more widens the record plateau by an order of magnitude and does not raise the top; annealing lr and clip to zero on a fixed short horizon is worse in every window
+
+b28 (8 seeds, b27's `hist8` config at 200M with the same 50M anneal, then 150M at the final values): the first 100M
+reads window for window as b27 (94.9% against 95.4% stage-B density), the extra hold reads 99.8% density, and at
+30,000 episodes on seed 7 the batch puts **152 rows at ≥99.8 against b27 `hist8`'s 9** — but the top is `b28k`
+@162856960 at 29,946 /30,000 (99.82), one game above the Hall of Fame pair (29,943-29,944), z ≈ 0.3. Steps
+multiply the near-record checkpoints; they do not move the ceiling, so the 100M cap is enough for this config
+and the next gain has to come from a knob.
+
+b29 (8 seeds, the same base at 100M with lr 2.5e-4 → 0 and clip 0.2 → 0.001 over the whole cap and γ 0.99 / λ
+0.95 / entropy 0.01 fixed): 83.1% density against 95.4 with complete separation of the seeds, behind in every
+25M window (68.6 / 73.7 / 89.2 / 95.0 against 82.9 / 95.4 / 99.5 / 99.8), best30 99.39 against 99.79, and
+nothing through the 99.6 /5,000 gate. **Confounded**: the arm also dropped the horizon anneal, and the deficit is
+already present at 0-25M where lr has fallen only a quarter — so this establishes that the *horizon anneal is
+load-bearing on this base* more than it says anything about the optimiser schedule, which still wants an
+unconfounded arm (γ/λ → 0.999 kept, lr/clip → 0 added). Measured 2026-09-11; readings in `results.md`.
+
 ### Two bits per past move in the observation — `SNEK_OBS_HISTORY` 4 or 8 — roughly doubles stage-B density (93.6 / 95.4% against 49.2) and lifts the confirmed 30,000-episode top from 99.65 to 99.8; the plan predicted no effect and was wrong
 
 b27 (`plans/obs-history.md`, section 4): b26's `pen01` base at 100M, 8 seeds a cell, `SNEK_OBS_HISTORY` 0 / 4 / 8 — the
