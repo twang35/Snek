@@ -22,6 +22,64 @@ whose published artifacts are history, and the daemon's ledger, whose keys are t
 waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
 
 
+<!-- progress_update: batch b29 -->
+## Batch b29 — the `knob` sweep, 1 values x 8 seeds, 100M, closed 2026-09-11
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b27q-hist8-seed17, b27r-hist8-seed18, b27s-hist8-seed19, b27t-hist8-seed20, b27u-hist8-seed21, b27v-hist8-seed22, b27w-hist8-seed23, b27x-hist8-seed24`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| knob | rows | ≥98%/500 | per-seed share | ≥99 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| lrclip0 | 20,880 | 83.1% | 80.8 86.6 86.5 79.3 85.8 79.7 79.7 86.1 | 6126 | 100.0 | 99.39 (99.2-99.6) | 95.1 | 0.0% | 0.8% | 73.8% |
+| **fixed** (reference) | 22,192 | 95.4% | 95.7 94.3 95.6 95.6 95.5 95.6 95.1 95.7 | 15168 | 100.0 | 99.79 (99.7-99.9) | 95.5 | 0.0% | 0.68% | 85.4% |
+
+<!-- reading -->
+b28's `hist8` config at 100M with the anneal moved from the horizon to the optimiser: lr 2.5e-4 → 0 and clip 0.2 → 0.001 over the whole cap, and γ 0.99, λ 0.95, entropy 0.01 held fixed; the reference is b27's `hist8` cell, the same cap. **It is worse in every window, not only at the end**: 25M-window density 68.6 / 73.7 / 89.2 / 95.0% against b27 `hist8`'s 82.9 / 95.4 / 99.5 / 99.8, whole-run 83.1% (79.3-86.6) against 95.4 with the eight seeds cleanly below the reference's eight, stage-A ≥98 share 73.8 against 85.4, best30 99.39 against 99.79. Onset is unchanged (4-8M). The passes confirm the top is lower: `hof5000` put 3,749 rows in and **none through the 99.6 gate** (best 99.54, `b29f` @13860864 — before the schedule had moved), so `hof30k` had nothing to run. The prediction — a frozen, denser endgame — is falsified on density and held only on the lower top. **The read is confounded by design**: the arm removes the horizon anneal (γ and λ stay at 0.99 / 0.95 for 100M) at the same time as it adds the optimiser anneal, and the 0-25M deficit, where lr has fallen only a quarter, points at the horizon rather than the decay. A clean test of the paper's schedule would keep γ/λ → 0.999 and add lr/clip → 0 on top.
+<!-- /reading -->
+
+### Every arm
+
+| arm | knob | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b29a-lrclip0-seed1` | lrclip0 | 2573 | 80.8% | 602 | 100.0 | 99.3 @89.0M | 95.0 | 0.0% |
+| `b29b-lrclip0-seed2` | lrclip0 | 2591 | 86.6% | 843 | 100.0 | 99.4 @66.3M | 94.2 | 0.0% |
+| `b29c-lrclip0-seed3` | lrclip0 | 2674 | 86.5% | 872 | 100.0 | 99.4 @94.1M | 96.7 | 0.0% |
+| `b29d-lrclip0-seed4` | lrclip0 | 2552 | 79.3% | 538 | 100.0 | 99.2 @75.5M | 93.6 | 0.24% |
+| `b29e-lrclip0-seed5` | lrclip0 | 2620 | 85.8% | 1049 | 100.0 | 99.5 @99.2M | 93.4 | 0.0% |
+| `b29f-lrclip0-seed6` | lrclip0 | 2606 | 79.7% | 612 | 100.0 | 99.6 @14.0M | 95.2 | 0.0% |
+| `b29g-lrclip0-seed7` | lrclip0 | 2592 | 79.7% | 673 | 100.0 | 99.2 @71.5M | 95.9 | 0.0% |
+| `b29h-lrclip0-seed8` | lrclip0 | 2672 | 86.1% | 937 | 100.0 | 99.5 @88.8M | 96.6 | 0.0% |
+
+<!-- /progress_update: batch b29 -->
+
+<!-- progress_update: batch b28 -->
+## Batch b28 — the `knob` sweep, 1 values x 8 seeds, 200M, closed 2026-09-11
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b27q-hist8-seed17, b27r-hist8-seed18, b27s-hist8-seed19, b27t-hist8-seed20, b27u-hist8-seed21, b27v-hist8-seed22, b27w-hist8-seed23, b27x-hist8-seed24`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| knob | rows | ≥98%/500 | per-seed share | ≥99 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| **0.5** (reference) | 22,192 | 95.4% | 95.7 94.3 95.6 95.6 95.5 95.6 95.1 95.7 | 15168 | 100.0 | 99.79 (99.7-99.9) | 95.5 | 0.0% | 0.68% | 85.4% |
+| hist8a25 | 46,471 | 97.5% | 97.1 97.7 98.4 96.7 97.1 98.5 96.4 97.8 | 36550 | 100.0 | 99.88 (99.8-99.9) | 97.9 | 0.0% | 0.19% | 91.2% |
+
+<!-- reading -->
+b27's `hist8` config run to 200M with `SNEK_PPO_ANNEAL_FRACTION` 0.25, so the anneal spans the same first 50M as b27 and the last 150M run at the final values; the reference row is b27's `hist8` cell at 100M. Window for window the first 100M is the same run (0-100M 94.9% density against 95.4), so the whole-run 97.5% is the extra hold reading 99.8% density, 0.19% of evals below 80 against 0.68, best30 99.88 against 99.79. **Every pass is in (closed 2026-09-11).** `hof5000`: 7,718 rows through the 99.6 gate against b27 `hist8`'s 1,836, 606 at ≥99.8 against 85, 38 at 99.9 against 5. `hof30k` on seed 7 at stop target 99.8: 4,599 rows ≥99.6, 1,702 ≥99.7, 152 at ≥99.8 against b27 `hist8`'s 937 / 278 / 9; top `b28k` @162856960 at 29,946 /30,000 (99.82) and `b28m` @131497984 at 29,945, one and two games above the Hall of Fame pair's 29,943-29,944, z ≈ 0.3. **Verdict: the hold widens the plateau by an order of magnitude — seventeen times the 30k rows at 99.8 — and does not raise the top.** No row reaches the 99.83 that would separate from the record at z ≥ 1, so nothing is promoted; the 100M cap is enough for this config and the next lever has to be a knob, not more steps.
+<!-- /reading -->
+
+### Every arm
+
+| arm | knob | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b28i-hist8a25-seed9` | hist8a25 | 5839 | 97.1% | 4676 | 100.0 | 99.9 @60.7M | 98.3 | 0.0% |
+| `b28j-hist8a25-seed10` | hist8a25 | 5769 | 97.7% | 4563 | 100.0 | 99.9 @185.4M | 97.8 | 0.0% |
+| `b28k-hist8a25-seed11` | hist8a25 | 5825 | 98.4% | 4779 | 100.0 | 99.9 @143.2M | 97.9 | 0.0% |
+| `b28l-hist8a25-seed12` | hist8a25 | 5799 | 96.7% | 4257 | 100.0 | 99.9 @139.9M | 98.4 | 0.0% |
+| `b28m-hist8a25-seed13` | hist8a25 | 5754 | 97.1% | 4507 | 100.0 | 99.8 @131.1M | 96.6 | 0.0% |
+| `b28n-hist8a25-seed14` | hist8a25 | 5835 | 98.5% | 4813 | 100.0 | 99.9 @184.9M | 98.0 | 0.0% |
+| `b28o-hist8a25-seed15` | hist8a25 | 5803 | 96.4% | 4352 | 100.0 | 99.8 @138.3M | 98.2 | 0.0% |
+| `b28p-hist8a25-seed16` | hist8a25 | 5847 | 97.8% | 4603 | 100.0 | 99.9 @196.1M | 98.0 | 0.0% |
+
+<!-- /progress_update: batch b28 -->
+
 <!-- progress_update: batch b27 -->
 ## Batch b27 — the `obs_history` sweep, 3 values x 8 seeds, 100M, closed 2026-09-09
 
