@@ -1,0 +1,18 @@
+{
+ "arms": [
+  "b30a-gl1-seed1",
+  "b30b-gl1-seed2",
+  "b30c-gl1-seed3",
+  "b30d-gl1-seed4",
+  "b30e-gl1-seed5",
+  "b30f-gl1-seed6",
+  "b30g-gl1-seed7",
+  "b30h-gl1-seed8"
+ ],
+ "batch": "b30",
+ "box": "desktop",
+ "claimed_iso": "2026-09-10T23:50:15",
+ "claimed_ts": 1789109415.3199878,
+ "kind": "wave",
+ "wave": 1
+}
