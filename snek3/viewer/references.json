@@ -1,239 +1,269 @@
 {
-  "_comment": "Per batch: the arms from an earlier batch that are its control cell, so the viewer shows them beside the batch's own arms. `after` is the knob token of the batch's own group the reference slots in behind (its knob value's place in the sweep); without it the reference goes at the end. Edit when a batch is queued (queue-batch skill, step 1c). `value` is the reference cell's value of the batch's knob, as the batch's specs spell it; tools/progress_update.py slots the reference row into the batch table by it. `knob: \"name\"` says the batch has no single knob (b19's switches): each arm's name token is its cell.",
-  "b8": {
-    "arms": [
-      "b4a-fc200x100ep8-seed1",
-      "b4b-fc200x100ep8-seed2",
-      "b4c-fc200x100ep8-seed3",
-      "b4d-fc200x100ep8-seed4",
-      "b4e-fc200x100ep8-seed5",
-      "b4f-fc200x100ep8-seed6",
-      "b4g-fc200x100ep8-seed7",
-      "b4h-fc200x100ep8-seed8"
-    ],
-    "label": "control: b4, fc (200,100) x 8 epochs, at 100M"
-  },
-  "b9": {
-    "arms": [
-      "b7aa-fc320-seed1",
-      "b7ab-fc320-seed2",
-      "b7ac-fc320-seed3",
-      "b7ad-fc320-seed4"
-    ],
-    "label": "reference: b7 fc (320,) cell, lambda 0.98",
-    "after": "lam97",
-    "value": "0.98"
-  },
-  "b10": {
-    "arms": [
-      "b7aa-fc320-seed1",
-      "b7ab-fc320-seed2",
-      "b7ac-fc320-seed3",
-      "b7ad-fc320-seed4"
-    ],
-    "label": "reference: b7 fc (320,) cell, gamma 0.99",
-    "after": "g98",
-    "value": "0.99"
-  },
-  "b11": {
-    "arms": [
-      "b9bw-lam99-seed1",
-      "b9bx-lam99-seed2",
-      "b9by-lam99-seed3",
-      "b9bz-lam99-seed4"
-    ],
-    "label": "reference: b9 lambda 0.99 cell, lr 3e-4",
-    "after": "lr2.5e4",
-    "value": "3e-4"
-  },
-  "b12": {
-    "arms": [
-      "b9bw-lam99-seed1",
-      "b9bx-lam99-seed2",
-      "b9by-lam99-seed3",
-      "b9bz-lam99-seed4"
-    ],
-    "label": "reference: b9 lambda 0.99 cell, 4 epochs",
-    "after": "ep3",
-    "value": "4"
-  },
-  "b13": {
-    "arms": [
-      "b9bw-lam99-seed1",
-      "b9bx-lam99-seed2",
-      "b9by-lam99-seed3",
-      "b9bz-lam99-seed4"
-    ],
-    "label": "reference: b9 lambda 0.99 cell, minibatch 256",
-    "after": "mb192",
-    "value": "256"
-  },
-  "b14": {
-    "arms": [
-      "b9bw-lam99-seed1",
-      "b9bx-lam99-seed2",
-      "b9by-lam99-seed3",
-      "b9bz-lam99-seed4"
-    ],
-    "label": "reference: b9 lambda 0.99 cell, rollout 128",
-    "after": "roll64",
-    "value": "128"
-  },
-  "b15": {
-    "arms": [
-      "b7aa-fc320-seed1",
-      "b7ab-fc320-seed2",
-      "b7ac-fc320-seed3",
-      "b7ad-fc320-seed4"
-    ],
-    "label": "reference: b7 fc (320,) cell, lambda 0.98, entropy 0.01 fixed -- the base b15-b21 were generated from",
-    "after": "ent005",
-    "value": "0.01"
-  },
-  "b16": {
-    "arms": [
-      "b7aa-fc320-seed1",
-      "b7ab-fc320-seed2",
-      "b7ac-fc320-seed3",
-      "b7ad-fc320-seed4"
-    ],
-    "label": "reference: b7 fc (320,) cell, lambda 0.98, target_KL off (0) -- the base b15-b21 were generated from",
-    "value": "0"
-  },
-  "b17": {
-    "arms": [
-      "b7aa-fc320-seed1",
-      "b7ab-fc320-seed2",
-      "b7ac-fc320-seed3",
-      "b7ad-fc320-seed4"
-    ],
-    "label": "reference: b7 fc (320,) cell, lambda 0.98, clip 0.2, no anneal -- the base b15-b21 were generated from",
-    "after": "clip015",
-    "value": "0.2"
-  },
-  "b18": {
-    "arms": [
-      "b7aa-fc320-seed1",
-      "b7ab-fc320-seed2",
-      "b7ac-fc320-seed3",
-      "b7ad-fc320-seed4"
-    ],
-    "label": "reference: b7 fc (320,) cell, lambda 0.98, grad-norm clip 0.5 -- the base b15-b21 were generated from",
-    "after": "gc025",
-    "value": "0.5"
-  },
-  "b19": {
-    "arms": [
-      "b7aa-fc320-seed1",
-      "b7ab-fc320-seed2",
-      "b7ac-fc320-seed3",
-      "b7ad-fc320-seed4"
-    ],
-    "label": "reference: b7 fc (320,) cell, lambda 0.98, all switches at the base: adv-norm on, huber, Adam eps 1e-7, vf 0.5 -- the base b15-b21 were generated from",
-    "value": "base",
-    "knob": "name"
-  },
-  "b20": {
-    "arms": [
-      "b7aa-fc320-seed1",
-      "b7ab-fc320-seed2",
-      "b7ac-fc320-seed3",
-      "b7ad-fc320-seed4"
-    ],
-    "label": "reference: b7 fc (320,) cell, lambda 0.98, 128 lanes -- the base b15-b21 were generated from",
-    "after": "lanes64",
-    "value": "128"
-  },
-  "b21": {
-    "arms": [
-      "b7aa-fc320-seed1",
-      "b7ab-fc320-seed2",
-      "b7ac-fc320-seed3",
-      "b7ad-fc320-seed4"
-    ],
-    "label": "reference: b7 fc (320,) cell, lambda 0.98, shaping 0.1, gate 75 -- the base b15-b21 were generated from",
-    "after": "shape005",
-    "value": "0.1"
-  },
-  "b22": {
-    "arms": [
-      "b9bw-lam99-seed1",
-      "b9bx-lam99-seed2",
-      "b9by-lam99-seed3",
-      "b9bz-lam99-seed4"
-    ],
-    "label": "reference: b9 lambda 0.99 cell (gamma 0.99, rollout 128) -- the base of the corner-grid ladder",
-    "knob": "name",
-    "value": "base"
-  },
-  "b23": {
-    "arms": [
-      "b22e-g999roll512-seed1",
-      "b22f-g999roll512-seed2",
-      "b22g-g999roll512-seed3",
-      "b22h-g999roll512-seed4"
-    ],
-    "label": "reference: b22's g999roll512 cell, the rung below (gamma 0.999, lambda 0.99, rollout 512, huber, no anneal)",
-    "knob": "name",
-    "value": "base"
-  },
-  "b24": {
-    "arms": [
-      "b23e-g999roll512msehold-seed1",
-      "b23f-g999roll512msehold-seed2",
-      "b23g-g999roll512msehold-seed3",
-      "b23h-g999roll512msehold-seed4"
-    ],
-    "label": "reference: b23's g999roll512msehold cell at 50M (gamma 0.999, lambda 0.99, T 512, mse, clip 0.2->0.001 held from 80%) -- the ladder's top rung, which b25 runs at 200M",
-    "knob": "name",
-    "value": "base"
-  },
-  "b25": {
-    "arms": [
-      "b23e-g999roll512msehold-seed1",
-      "b23f-g999roll512msehold-seed2",
-      "b23g-g999roll512msehold-seed3",
-      "b23h-g999roll512msehold-seed4"
-    ],
-    "label": "reference: b23's g999roll512msehold cell at 50M -- the same config b25 runs at 200M and 8 seeds",
-    "knob": "name",
-    "value": "base"
-  },
-  "b26": {
-    "arms": [
-      "b24a-hzanneal50-seed1",
-      "b24b-hzanneal50-seed2",
-      "b24c-hzanneal50-seed3",
-      "b24d-hzanneal50-seed4"
-    ],
-    "label": "reference: b24's hzanneal50 cell -- the same config with no step penalty, but the 30-value observation era and a 200M cap, so a loose reference only; b26's own pen0 cell is the control for the 26-value observation",
-    "after": "pen0",
-    "value": "0"
-  },
-  "b27": {
-    "arms": [
-      "b26a-pen01-seed1",
-      "b26b-pen01-seed2",
-      "b26c-pen01-seed3",
-      "b26d-pen01-seed4"
-    ],
-    "label": "reference: b26's pen01 cell (step penalty 0.01, no history) at 50M and 4 seeds -- the same base b27 runs at 100M with 8 seeds; b27's own hist0 cell is the like-for-like control",
-    "after": "hist0",
-    "value": "0"
-  },
-  "b28": {
-    "arms": [
-      "b27q-hist8-seed17",
-      "b27r-hist8-seed18",
-      "b27s-hist8-seed19",
-      "b27t-hist8-seed20",
-      "b27u-hist8-seed21",
-      "b27v-hist8-seed22",
-      "b27w-hist8-seed23",
-      "b27x-hist8-seed24"
-    ],
-    "label": "reference: b27's hist8 cell at 100M with the anneal reaching its final values at 50% -- b28 runs the same hist8 config at 200M with the anneal final at 25%",
-    "after": "hist8a25",
-    "value": "0.5"
-  }
+ "_comment": "Per batch: the arms from an earlier batch that are its control cell, so the viewer shows them beside the batch's own arms. `after` is the knob token of the batch's own group the reference slots in behind (its knob value's place in the sweep); without it the reference goes at the end. Edit when a batch is queued (queue-batch skill, step 1c). `value` is the reference cell's value of the batch's knob, as the batch's specs spell it; tools/progress_update.py slots the reference row into the batch table by it. `knob: \"name\"` says the batch has no single knob (b19's switches): each arm's name token is its cell.",
+ "b8": {
+  "arms": [
+   "b4a-fc200x100ep8-seed1",
+   "b4b-fc200x100ep8-seed2",
+   "b4c-fc200x100ep8-seed3",
+   "b4d-fc200x100ep8-seed4",
+   "b4e-fc200x100ep8-seed5",
+   "b4f-fc200x100ep8-seed6",
+   "b4g-fc200x100ep8-seed7",
+   "b4h-fc200x100ep8-seed8"
+  ],
+  "label": "control: b4, fc (200,100) x 8 epochs, at 100M"
+ },
+ "b9": {
+  "arms": [
+   "b7aa-fc320-seed1",
+   "b7ab-fc320-seed2",
+   "b7ac-fc320-seed3",
+   "b7ad-fc320-seed4"
+  ],
+  "label": "reference: b7 fc (320,) cell, lambda 0.98",
+  "after": "lam97",
+  "value": "0.98"
+ },
+ "b10": {
+  "arms": [
+   "b7aa-fc320-seed1",
+   "b7ab-fc320-seed2",
+   "b7ac-fc320-seed3",
+   "b7ad-fc320-seed4"
+  ],
+  "label": "reference: b7 fc (320,) cell, gamma 0.99",
+  "after": "g98",
+  "value": "0.99"
+ },
+ "b11": {
+  "arms": [
+   "b9bw-lam99-seed1",
+   "b9bx-lam99-seed2",
+   "b9by-lam99-seed3",
+   "b9bz-lam99-seed4"
+  ],
+  "label": "reference: b9 lambda 0.99 cell, lr 3e-4",
+  "after": "lr2.5e4",
+  "value": "3e-4"
+ },
+ "b12": {
+  "arms": [
+   "b9bw-lam99-seed1",
+   "b9bx-lam99-seed2",
+   "b9by-lam99-seed3",
+   "b9bz-lam99-seed4"
+  ],
+  "label": "reference: b9 lambda 0.99 cell, 4 epochs",
+  "after": "ep3",
+  "value": "4"
+ },
+ "b13": {
+  "arms": [
+   "b9bw-lam99-seed1",
+   "b9bx-lam99-seed2",
+   "b9by-lam99-seed3",
+   "b9bz-lam99-seed4"
+  ],
+  "label": "reference: b9 lambda 0.99 cell, minibatch 256",
+  "after": "mb192",
+  "value": "256"
+ },
+ "b14": {
+  "arms": [
+   "b9bw-lam99-seed1",
+   "b9bx-lam99-seed2",
+   "b9by-lam99-seed3",
+   "b9bz-lam99-seed4"
+  ],
+  "label": "reference: b9 lambda 0.99 cell, rollout 128",
+  "after": "roll64",
+  "value": "128"
+ },
+ "b15": {
+  "arms": [
+   "b7aa-fc320-seed1",
+   "b7ab-fc320-seed2",
+   "b7ac-fc320-seed3",
+   "b7ad-fc320-seed4"
+  ],
+  "label": "reference: b7 fc (320,) cell, lambda 0.98, entropy 0.01 fixed -- the base b15-b21 were generated from",
+  "after": "ent005",
+  "value": "0.01"
+ },
+ "b16": {
+  "arms": [
+   "b7aa-fc320-seed1",
+   "b7ab-fc320-seed2",
+   "b7ac-fc320-seed3",
+   "b7ad-fc320-seed4"
+  ],
+  "label": "reference: b7 fc (320,) cell, lambda 0.98, target_KL off (0) -- the base b15-b21 were generated from",
+  "value": "0"
+ },
+ "b17": {
+  "arms": [
+   "b7aa-fc320-seed1",
+   "b7ab-fc320-seed2",
+   "b7ac-fc320-seed3",
+   "b7ad-fc320-seed4"
+  ],
+  "label": "reference: b7 fc (320,) cell, lambda 0.98, clip 0.2, no anneal -- the base b15-b21 were generated from",
+  "after": "clip015",
+  "value": "0.2"
+ },
+ "b18": {
+  "arms": [
+   "b7aa-fc320-seed1",
+   "b7ab-fc320-seed2",
+   "b7ac-fc320-seed3",
+   "b7ad-fc320-seed4"
+  ],
+  "label": "reference: b7 fc (320,) cell, lambda 0.98, grad-norm clip 0.5 -- the base b15-b21 were generated from",
+  "after": "gc025",
+  "value": "0.5"
+ },
+ "b19": {
+  "arms": [
+   "b7aa-fc320-seed1",
+   "b7ab-fc320-seed2",
+   "b7ac-fc320-seed3",
+   "b7ad-fc320-seed4"
+  ],
+  "label": "reference: b7 fc (320,) cell, lambda 0.98, all switches at the base: adv-norm on, huber, Adam eps 1e-7, vf 0.5 -- the base b15-b21 were generated from",
+  "value": "base",
+  "knob": "name"
+ },
+ "b20": {
+  "arms": [
+   "b7aa-fc320-seed1",
+   "b7ab-fc320-seed2",
+   "b7ac-fc320-seed3",
+   "b7ad-fc320-seed4"
+  ],
+  "label": "reference: b7 fc (320,) cell, lambda 0.98, 128 lanes -- the base b15-b21 were generated from",
+  "after": "lanes64",
+  "value": "128"
+ },
+ "b21": {
+  "arms": [
+   "b7aa-fc320-seed1",
+   "b7ab-fc320-seed2",
+   "b7ac-fc320-seed3",
+   "b7ad-fc320-seed4"
+  ],
+  "label": "reference: b7 fc (320,) cell, lambda 0.98, shaping 0.1, gate 75 -- the base b15-b21 were generated from",
+  "after": "shape005",
+  "value": "0.1"
+ },
+ "b22": {
+  "arms": [
+   "b9bw-lam99-seed1",
+   "b9bx-lam99-seed2",
+   "b9by-lam99-seed3",
+   "b9bz-lam99-seed4"
+  ],
+  "label": "reference: b9 lambda 0.99 cell (gamma 0.99, rollout 128) -- the base of the corner-grid ladder",
+  "knob": "name",
+  "value": "base"
+ },
+ "b23": {
+  "arms": [
+   "b22e-g999roll512-seed1",
+   "b22f-g999roll512-seed2",
+   "b22g-g999roll512-seed3",
+   "b22h-g999roll512-seed4"
+  ],
+  "label": "reference: b22's g999roll512 cell, the rung below (gamma 0.999, lambda 0.99, rollout 512, huber, no anneal)",
+  "knob": "name",
+  "value": "base"
+ },
+ "b24": {
+  "arms": [
+   "b23e-g999roll512msehold-seed1",
+   "b23f-g999roll512msehold-seed2",
+   "b23g-g999roll512msehold-seed3",
+   "b23h-g999roll512msehold-seed4"
+  ],
+  "label": "reference: b23's g999roll512msehold cell at 50M (gamma 0.999, lambda 0.99, T 512, mse, clip 0.2->0.001 held from 80%) -- the ladder's top rung, which b25 runs at 200M",
+  "knob": "name",
+  "value": "base"
+ },
+ "b25": {
+  "arms": [
+   "b23e-g999roll512msehold-seed1",
+   "b23f-g999roll512msehold-seed2",
+   "b23g-g999roll512msehold-seed3",
+   "b23h-g999roll512msehold-seed4"
+  ],
+  "label": "reference: b23's g999roll512msehold cell at 50M -- the same config b25 runs at 200M and 8 seeds",
+  "knob": "name",
+  "value": "base"
+ },
+ "b26": {
+  "arms": [
+   "b24a-hzanneal50-seed1",
+   "b24b-hzanneal50-seed2",
+   "b24c-hzanneal50-seed3",
+   "b24d-hzanneal50-seed4"
+  ],
+  "label": "reference: b24's hzanneal50 cell -- the same config with no step penalty, but the 30-value observation era and a 200M cap, so a loose reference only; b26's own pen0 cell is the control for the 26-value observation",
+  "after": "pen0",
+  "value": "0"
+ },
+ "b27": {
+  "arms": [
+   "b26a-pen01-seed1",
+   "b26b-pen01-seed2",
+   "b26c-pen01-seed3",
+   "b26d-pen01-seed4"
+  ],
+  "label": "reference: b26's pen01 cell (step penalty 0.01, no history) at 50M and 4 seeds -- the same base b27 runs at 100M with 8 seeds; b27's own hist0 cell is the like-for-like control",
+  "after": "hist0",
+  "value": "0"
+ },
+ "b28": {
+  "arms": [
+   "b27q-hist8-seed17",
+   "b27r-hist8-seed18",
+   "b27s-hist8-seed19",
+   "b27t-hist8-seed20",
+   "b27u-hist8-seed21",
+   "b27v-hist8-seed22",
+   "b27w-hist8-seed23",
+   "b27x-hist8-seed24"
+  ],
+  "label": "reference: b27's hist8 cell at 100M with the anneal reaching its final values at 50% -- b28 runs the same hist8 config at 200M with the anneal final at 25%",
+  "after": "hist8a25",
+  "value": "0.5"
+ },
+ "b29": {
+  "arms": [
+   "b27q-hist8-seed17",
+   "b27r-hist8-seed18",
+   "b27s-hist8-seed19",
+   "b27t-hist8-seed20",
+   "b27u-hist8-seed21",
+   "b27v-hist8-seed22",
+   "b27w-hist8-seed23",
+   "b27x-hist8-seed24"
+  ],
+  "label": "reference: b27's hist8 cell at 100M (gamma/lambda/entropy annealed to 0.999/0.999/0.001 by 50M, lr and clip fixed) -- b29 fixes those three and anneals lr 2.5e-4->0 and clip 0.2->0.001 over the whole 100M",
+  "after": "lrclip0",
+  "value": "fixed"
+ },
+ "b30": {
+  "arms": [
+   "b27q-hist8-seed17",
+   "b27r-hist8-seed18",
+   "b27s-hist8-seed19",
+   "b27t-hist8-seed20",
+   "b27u-hist8-seed21",
+   "b27v-hist8-seed22",
+   "b27w-hist8-seed23",
+   "b27x-hist8-seed24"
+  ],
+  "label": "reference: b27's hist8 cell at 100M with gamma and lambda annealed to 0.999 -- b30 anneals them to 1.0 over the same 50M",
+  "after": "gl1",
+  "value": "0.999"
+ }
 }
