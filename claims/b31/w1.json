@@ -1,0 +1,18 @@
+{
+ "arms": [
+  "b31a-mse-seed1",
+  "b31b-mse-seed2",
+  "b31c-mse-seed3",
+  "b31d-mse-seed4",
+  "b31e-mse-seed5",
+  "b31f-mse-seed6",
+  "b31g-mse-seed7",
+  "b31h-mse-seed8"
+ ],
+ "batch": "b31",
+ "box": "desktop",
+ "claimed_iso": "2026-09-11T14:58:08",
+ "claimed_ts": 1789163888.8538837,
+ "kind": "wave",
+ "wave": 1
+}
