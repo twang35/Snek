@@ -1,8 +1,10 @@
 # Runs — every batch's config, why it ran, and what it taught
 
 **One entry per batch, newest at the top.** Each entry is the config in human terms (what varies, off
-which base, how many seeds, how long), why the batch was worth running, and what was learned — a
-hundred words each, at most. What is *running right now*, on which box, with what ETA, is
+which base, how many seeds, how long), the prediction registered before it ran and whether it **held**
+or was **falsified**, why the batch was worth running, and what was learned — a hundred words each,
+at most. The prediction row is there because a third of these batches overturned their own spec, and
+that is the fact worth seeing at a glance. What is *running right now*, on which box, with what ETA, is
 `status.json` (`git fetch origin ops-status && git show origin/ops-status:status.json`) and the
 [live page](https://twang35.github.io/Snek/), not this file. Per-arm numbers are
 [`results.md`](results.md), conclusions with their evidence are [`findings.md`](findings.md), the
@@ -21,35 +23,35 @@ are in git history before 2026-09-10.
 
 ## At a glance
 
-| batch | varies | base | cells × seeds | cap | result in one line |
-|---|---|---|---:|---:|---|
-| [b28](#b28--the-hist8-config-held-for-100m-more) | 100M more hold | pen01 + hist8, anneal over 25% | 1 × 8 | 200M | 97.5% density and 4x the near-record rows; first 30k rows level with the HOF, not above. **Passes still running** |
-| [b27](#b27--move-history-depth) | `SNEK_OBS_HISTORY` 0 / 4 / 8 | pen01 | 3 × 8 | 100M | **the largest lever found**: 49 → 94-95% density; `b27t`/`b27k` 99.81 /30k, the record |
-| [b26](#b26--step-penalty) | `SNEK_STEP_PENALTY` 0 / 1e-4 / 1e-3 / 0.01 | horizon anneal, obs26 | 4 × 4 | 50M | 0.01 nearly doubles density (25.5 → 46.3%); smaller values do nothing |
-| [b25](#b25--the-ladder-top-at-200m) | cap and seeds | ladder top | 1 × 8 | 200M | longer cap paid everywhere: 77.5% density, `b25a` 99.60 /30k |
-| [b24](#b24--the-horizon-anneal-at-200m) | a different road to γ 0.999 / λ 0.999 | horizon anneal | 1 × 8 | 200M | same peak as b25 (99.5 /30k), lower density (60.5%) and stability |
-| [b23](#b23--corner-grid-ladder-rungs-3-4) | + `mse` value loss; + clip hold | b22 rung 2 | 2 × 4 | 50M | `mse` is the largest single step measured: 32.7 → 61.6%, collapses gone |
-| [b22](#b22--corner-grid-ladder-rungs-1-2) | + γ 0.999; + rollout 512 | λ 0.99 | 2 × 4 | 50M | γ 0.999 adds density and drawdown; rollout 512 on top trades one for the other |
-| [b21](#b21--chase-safe-shaping) | shaping dose 0-0.2, gate 0 / 60 / 85 | PPO reference | 6 × 4 | 50M | no-op for PPO; shaping off is the most stable cell |
-| [b20](#b20--collect-lanes) | `SNEK_COLLECT_ENVS` 32-512 | PPO reference | 4 × 4 | 50M | a throughput knob; 512 lanes the smoothest endgame |
-| [b19](#b19--the-switches) | adv norm off, `mse`, Adam ε, vf coef | PPO reference | 6 × 4 | 50M | `mse` most stable and +5 pp; the rest within noise |
-| [b18](#b18--gradient-norm-clip) | grad clip 0-5.0 | PPO reference | 6 × 4 | 50M | no-op; collapses are policy-level, and the stability column's noise is ~4 pp |
-| [b17](#b17--clip-and-the-anneals) | clip 0.05-0.4, clip/lr anneals, hold | PPO reference | 16 × 4 | 50M | static clip flat; holding the annealed floor for the last 10M is +6-7 pp; `b17cl` 99.50 /30k |
-| [b16](#b16--target-kl) | `target_kl` 0.003-0.05 | PPO reference | 10 × 4 | 50M | no-op at 4 epochs |
-| [b15](#b15--entropy-coefficient) | entropy 0-0.03, four anneals | PPO reference | 10 × 4 | 50M | density and stability trade monotonically; anneals average their endpoints |
-| [b14](#b14--rollout-horizon) | rollout 32-1024 | λ 0.99 | 6 × 4 | 50M | density peaks at 512 (+11 pp), stability improves through 1024 |
-| [b13](#b13--minibatch) | minibatch 32-2048 | λ 0.99 | 8 × 4 | 50M | plateau at 256-512; 128 is 8 pp short |
-| [b12](#b12--epochs) | epochs 1-16 | λ 0.99 | 10 × 4 | 50M | 3-4 is the top; the collapse cliff is at 12-16, not 8 |
-| [b11](#b11--learning-rate) | lr 4e-5 to 2e-3 | λ 0.99 | 8 × 4 | 50M | plateau 1e-4 to 5e-4, cliffs at both ends; stability rises with lr |
-| [b10](#b10--discount-γ) | γ 0.70-1.00 | PPO reference | 16 × 4 | 50M | monotone to 0.999; γ 1.00 collapses half the time and held the record (`b10ck` 99.65) |
-| [b9](#b9--gae-λ) | λ 0-1.00 | PPO reference | 16 × 4 | 50M | 0.99 doubles density over the 0.98 default, plateau above; λ 0.99 became the default |
-| [b8](#b8--the-stability-knobs-on-b4s-config) | entropy 0.003, entropy anneal, `target_kl` 0.02, λ 0.95 | b4's config | 4 × 4 | 100M | every knob cut the drawdown, none beat the control on density |
-| [b7](#b7--network-shape) | 8 `fc` layouts | PPO reference | 8 × 4 | 50M | `fc (320,)` wins; b3's ranking inverted; `sef` ranks backwards |
-| [b4](#b4--fc-200100--8-epochs) | b3's two best knobs stacked | PPO reference | 1 × 8 | 200M | the weakest 8-seed batch: shape and epochs interact negatively |
-| [b5, b6](#b5-b6--fc-320--8-epochs-and-fc-200100--4-epochs) | `fc 320` + 8 epochs; `fc (200,100)` + 4 epochs | PPO reference | 1 × 8 each | ~220-270M | a 500-episode lead that 5,000 erased; `b5h` and `b6b` the first HOF entries |
-| [b3](#b3--the-ppo-tuning-sweep) | 15 one-knob arms | PPO reference | 15 × 1 | 10M | no winner at n=1; PPO's record density is 11.6x DQN's |
-| [b2](#b2--snek2s-record-config-on-the-torch-stack) | snek2 b29's five knobs | DQN defaults | 1 × 4 | 3M steps | the phase-3 gate met; a snek3 step is four game moves |
-| [b1](#b1--the-ddqn-baseline) | nothing | DQN defaults | 1 × 4 | 3M steps | no checkpoint at 95/100; the wrong config to gate on |
+| batch | varies | base | cells × seeds | cap | prediction | result in one line |
+|---|---|---|---:|---:|---|---|
+| [b28](#b28--the-hist8-config-held-for-100m-more) | 100M more hold | pen01 + hist8, anneal over 25% | 1 × 8 | 200M | — | 97.5% density and 4x the near-record rows; first 30k rows level with the HOF, not above. **Passes still running** |
+| [b27](#b27--move-history-depth) | `SNEK_OBS_HISTORY` 0 / 4 / 8 | pen01 | 3 × 8 | 100M | falsified | **the largest lever found**: 49 → 94-95% density; `b27t`/`b27k` 99.81 /30k, the record |
+| [b26](#b26--step-penalty) | `SNEK_STEP_PENALTY` 0 / 1e-4 / 1e-3 / 0.01 | horizon anneal, obs26 | 4 × 4 | 50M | held | 0.01 nearly doubles density (25.5 → 46.3%); smaller values do nothing |
+| [b25](#b25--the-ladder-top-at-200m) | cap and seeds | ladder top | 1 × 8 | 200M | held | longer cap paid everywhere: 77.5% density, `b25a` 99.60 /30k |
+| [b24](#b24--the-horizon-anneal-at-200m) | a different road to γ 0.999 / λ 0.999 | horizon anneal | 1 × 8 | 200M | falsified in part | same peak as b25 (99.5 /30k), lower density (60.5%) and stability |
+| [b23](#b23--corner-grid-ladder-rungs-3-4) | + `mse` value loss; + clip hold | b22 rung 2 | 2 × 4 | 50M | falsified in part | `mse` is the largest single step measured: 32.7 → 61.6%, collapses gone |
+| [b22](#b22--corner-grid-ladder-rungs-1-2) | + γ 0.999; + rollout 512 | λ 0.99 | 2 × 4 | 50M | falsified | γ 0.999 adds density and drawdown; rollout 512 on top trades one for the other |
+| [b21](#b21--chase-safe-shaping) | shaping dose 0-0.2, gate 0 / 60 / 85 | PPO reference | 6 × 4 | 50M | falsified | no-op for PPO; shaping off is the most stable cell |
+| [b20](#b20--collect-lanes) | `SNEK_COLLECT_ENVS` 32-512 | PPO reference | 4 × 4 | 50M | falsified | a throughput knob; 512 lanes the smoothest endgame |
+| [b19](#b19--the-switches) | adv norm off, `mse`, Adam ε, vf coef | PPO reference | 6 × 4 | 50M | falsified in part | `mse` most stable and +5 pp; the rest within noise |
+| [b18](#b18--gradient-norm-clip) | grad clip 0-5.0 | PPO reference | 6 × 4 | 50M | held | no-op; collapses are policy-level, and the stability column's noise is ~4 pp |
+| [b17](#b17--clip-and-the-anneals) | clip 0.05-0.4, clip/lr anneals, hold | PPO reference | 16 × 4 | 50M | falsified in part | static clip flat; holding the annealed floor for the last 10M is +6-7 pp; `b17cl` 99.50 /30k |
+| [b16](#b16--target-kl) | `target_kl` 0.003-0.05 | PPO reference | 10 × 4 | 50M | held | no-op at 4 epochs |
+| [b15](#b15--entropy-coefficient) | entropy 0-0.03, four anneals | PPO reference | 10 × 4 | 50M | held | density and stability trade monotonically; anneals average their endpoints |
+| [b14](#b14--rollout-horizon) | rollout 32-1024 | λ 0.99 | 6 × 4 | 50M | falsified | density peaks at 512 (+11 pp), stability improves through 1024 |
+| [b13](#b13--minibatch) | minibatch 32-2048 | λ 0.99 | 8 × 4 | 50M | falsified | plateau at 256-512; 128 is 8 pp short |
+| [b12](#b12--epochs) | epochs 1-16 | λ 0.99 | 10 × 4 | 50M | falsified in part | 3-4 is the top; the collapse cliff is at 12-16, not 8 |
+| [b11](#b11--learning-rate) | lr 4e-5 to 2e-3 | λ 0.99 | 8 × 4 | 50M | falsified in part | plateau 1e-4 to 5e-4, cliffs at both ends; stability rises with lr |
+| [b10](#b10--discount-γ) | γ 0.70-1.00 | PPO reference | 16 × 4 | 50M | falsified in part | monotone to 0.999; γ 1.00 collapses half the time and held the record (`b10ck` 99.65) |
+| [b9](#b9--gae-λ) | λ 0-1.00 | PPO reference | 16 × 4 | 50M | falsified | 0.99 doubles density over the 0.98 default, plateau above; λ 0.99 became the default |
+| [b8](#b8--the-stability-knobs-on-b4s-config) | entropy 0.003, entropy anneal, `target_kl` 0.02, λ 0.95 | b4's config | 4 × 4 | 100M | falsified | every knob cut the drawdown, none beat the control on density |
+| [b7](#b7--network-shape) | 8 `fc` layouts | PPO reference | 8 × 4 | 50M | falsified | `fc (320,)` wins; b3's ranking inverted; `sef` ranks backwards |
+| [b4](#b4--fc-200100--8-epochs) | b3's two best knobs stacked | PPO reference | 1 × 8 | 200M | falsified | the weakest 8-seed batch: shape and epochs interact negatively |
+| [b5, b6](#b5-b6--fc-320--8-epochs-and-fc-200100--4-epochs) | `fc 320` + 8 epochs; `fc (200,100)` + 4 epochs | PPO reference | 1 × 8 each | ~220-270M | — | a 500-episode lead that 5,000 erased; `b5h` and `b6b` the first HOF entries |
+| [b3](#b3--the-ppo-tuning-sweep) | 15 one-knob arms | PPO reference | 15 × 1 | 10M | falsified | no winner at n=1; PPO's record density is 11.6x DQN's |
+| [b2](#b2--snek2s-record-config-on-the-torch-stack) | snek2 b29's five knobs | DQN defaults | 1 × 4 | 3M steps | held | the phase-3 gate met; a snek3 step is four game moves |
+| [b1](#b1--the-ddqn-baseline) | nothing | DQN defaults | 1 × 4 | 3M steps | falsified | no checkpoint at 95/100; the wrong config to gate on |
 
 ## The bases
 
@@ -86,6 +88,7 @@ at complete separation (Mann-Whitney p=0.029). Details in [`protocol.md`](protoc
 | varies | the cap: 200M, with `SNEK_PPO_ANNEAL_FRACTION` 0.25 so every anneal spans the same first 50M as b27 and the last 150M run at the final values |
 | cells × seeds | 1 × 8 (seeds 9-16, `b28i`-`b28p`) |
 | control | b27's `hist8` arms, seeds 17-24 |
+| predicted | none registered — the question was open — — |
 
 **Why.** b27's `hist8` rows at 30,000 episodes sat at 99.8 with the anneal still finishing at 100M.
 The question is whether the ceiling is the config or the cap: does holding the converged values for
@@ -106,6 +109,7 @@ Provisional verdict: the hold multiplies near-record checkpoints without raising
 | varies | `SNEK_OBS_HISTORY` 0 / 4 / 8 — two bits per past move, `[turned left, turned right]`, read off the body ([`../plans/obs-history.md`](../plans/obs-history.md)) |
 | cells × seeds | 3 × 8, 100M |
 | control | `hist0`, the batch's own |
+| predicted | no effect on the perfect rate (the best checkpoints starve in loops history cannot break) — **falsified** |
 
 **Why.** The user's question: does the policy need to see its recent path? The plan's phase-1
 investigation found the best checkpoints die by *starving* in a closed loop while the food sits
@@ -128,6 +132,7 @@ gate, level on the peaks. Mechanism — what the bits do to the starvation orbit
 | varies | `SNEK_STEP_PENALTY` 0 / 0.0001 / 0.001 / 0.01, a per-step reward cost |
 | cells × seeds | 4 × 4, 50M |
 | control | `pen0`, the batch's own; b24's 200M arms are a loose reference only |
+| predicted | 0.01 large enough to be felt, the two smaller values within noise — held |
 
 **Why.** The death-trace finding: the best checkpoints fail by orbiting reachable food, and a per-step
 cost is the only reward term that charges for a lap that does not eat. Three decades of penalty to
@@ -148,6 +153,7 @@ not turned, so 0.02 and 0.05 are open.
 | varies | the cap and seed count: 200M × 8 against b23's 50M × 4 |
 | cells × seeds | 1 × 8 |
 | control | b23's `g999roll512msehold` cell |
+| predicted | fewer evals below 80 than b24, and a ≥99.3 /30k checkpoint — held |
 
 **Why.** The first champion attempt on the corner grid's best rung. Every one-knob sweep had read at
 50M and 4 seeds; the sweep design's last step was always "the best cell at 200M+, 8 seeds, deep
@@ -168,6 +174,7 @@ rest no longer load. Not promoted; awaits a fresh 30,000 under the old era.
 | varies | nothing within the batch; it is a second 200M × 8 config beside b25 |
 | cells × seeds | 1 × 8 |
 | control | b23's `g999roll512msehold` cell, and b25 as the same-cap comparison |
+| predicted | earlier onset than b25, then a denser but less stable second half — **falsified in part** — less stable held, denser did not |
 
 **Why.** A different road to the same horizon: instead of starting at γ 0.999 / λ 0.99 (the ladder
 top), anneal γ 0.99 → 0.999 and λ 0.95 → 0.999 over the first half so the critic learns short before
@@ -188,6 +195,7 @@ the anneal is the config b26-b28 built on, because the user's step-penalty quest
 | varies | rung 3 adds the `mse` value loss; rung 4 adds the clip anneal 0.2 → 0.001 over 80% of the cap, held for the last 10M |
 | cells × seeds | 2 × 4, 50M |
 | control | b22's `g999roll512` cell |
+| predicted | `mse` adds density and the hold adds b17's late density lift on top — **falsified in part** — `mse` held, the hold's lift did not repeat |
 
 **Why.** The sweep's levers stacked one at a time: `mse` was b19's most stable cell and the hold was
 b17's density lift, both measured on b7's λ 0.98 base. The ladder says whether they still help on the
@@ -208,6 +216,7 @@ b17's hold lift does not repeat on a base that already has few late collapses.
 | varies | rung 1 adds γ 0.999; rung 2 adds rollout 512 on top |
 | cells × seeds | 2 × 4, 50M |
 | control | b9's λ 0.99 cell |
+| predicted | γ 0.999 + rollout 512 the densest cell measured so far — **falsified** |
 
 **Why.** b9 found the λ plateau at γ 0.99 and b10 found γ 0.999 at λ 0.98 — each one knob off the
 same cell, never run together. b14's rollout 512 was the other lever on the λ 0.99 side. The ladder
@@ -228,6 +237,7 @@ depth 99.1 /30k.
 | varies | `SNEK_CHASE_SAFE_SHAPING` 0 / 0.05 / 0.2 at gate 75; gate 0 / 60 / 85 at dose 0.1 |
 | cells × seeds | 6 × 4, 50M |
 | control | `b7aa`-`b7ad` |
+| predicted | late onset with shaping off; gate 85 worse than 75 — **falsified** |
 
 **Why.** The one reward knob every other batch held fixed, and snek2's record lever (batches 28-29:
 the gate mattered more than the dose). Shaping off had never reached 95/100 in DQN's 3M steps; for
@@ -247,6 +257,7 @@ adopted.
 | varies | `SNEK_COLLECT_ENVS` 32 / 64 / 256 / 512 at rollout 128 |
 | cells × seeds | 4 × 4, 50M |
 | control | `b7aa`-`b7ad` |
+| predicted | 32 lanes worse than rollout 32, because episode diversity is lower — **falsified** |
 
 **Why.** The other half of the update batch: lanes × rollout is transitions per update, so 256 lanes
 at T 128 is the same batch as 128 lanes at T 256 from twice the episodes at half the depth. Read
@@ -267,6 +278,7 @@ rollout's gain was depth**. 128 stays for speed.
 | varies | advantage normalisation off; `mse` value loss instead of huber; Adam ε 1e-5 and 1e-8; vf coef 0.1 and 1.0 |
 | cells × seeds | 6 × 4, 50M |
 | control | `b7aa`-`b7ad` |
+| predicted | both switches add collapses; Adam ε and vf coef inert — **falsified in part** — the switches removed collapses, the rest held |
 
 **Why.** Four knobs with two or three sensible values each and no curve to map, gathered into one
 batch as a check that no default was silently costing something. Both switches were predicted to
@@ -288,6 +300,7 @@ base since b23.
 | varies | `SNEK_PPO_GRADIENT_CLIPPING` 0 (off) / 0.1 / 0.25 / 1.0 / 2.0 / 5.0 |
 | cells × seeds | 6 × 4, 50M |
 | control | `b7aa`-`b7ad` at 0.5 |
+| predicted | off is the worst arm if collapses come from huge gradients, nothing changes if they are policy-level — held — the nothing-changes branch |
 
 **Why.** Never swept, and a direct test of the tail-update hypothesis: b4's worst updates had
 approx-KL 146x the median. If collapses come from rare huge gradients, clipping off should make them
@@ -308,6 +321,7 @@ stability reading inside the noise.
 | varies | static clip 0.05 / 0.1 / 0.15 / 0.3 / 0.4; clip annealed to 0.02, 0.005, 0.001, 0.1, from 0.1 and from 0.4; lr annealed to 0 and to 3e-5; both anneals; clip anneals to 0.02 and 0.001 over 80% of the cap **then held** for the last 10M (`SNEK_PPO_ANNEAL_FRACTION`, written for this batch) |
 | cells × seeds | 16 × 4, 50M |
 | control | `b7aa`-`b7ad` at clip 0.2 |
+| predicted | the anneals win on collapse share; a tighter static clip means fewer collapses — **falsified in part** — anneals held, a tighter static clip had *more* collapses |
 
 **Why.** The trust region has been PPO's headline knob since the paper, and the Atari recipe anneals
 both clip and lr to zero. Prediction: the anneals win on collapse share; the question is what they
@@ -329,6 +343,7 @@ read 99.50 /30,000 and is in the HOF.
 | varies | `SNEK_PPO_TARGET_KL` 0.003 / 0.005 / 0.008 / 0.01 / 0.013 / 0.015 / 0.02 / 0.03 / 0.04 / 0.05 |
 | cells × seeds | 10 × 4, 50M |
 | control | `b7aa`-`b7ad` at 0 (off) |
+| predicted | a small effect at most, 0.01 if any — held |
 
 **Why.** Early-stops the epoch loop when the policy has moved too far. From b4's approx-KL
 distribution, 0.02 fires on ~1% of updates, 0.005 on ~25%. If collapses come from the tail of large
@@ -349,6 +364,7 @@ caught b15-b21's base mix-up (below).
 | varies | `SNEK_PPO_ENTROPY_COEF` 0 / 0.001 / 0.003 / 0.005 / 0.02 / 0.03; anneals 0.1 → 0.001, 0.03 → 0.001, 0.01 → 0.001, 0.01 → 0 |
 | cells × seeds | 10 × 4, 50M |
 | control | `b7aa`-`b7ad` at 0.01 |
+| predicted | fewest collapses at 0.001; the default moves if that costs no density — held — and the condition for moving the default failed |
 
 **Why.** b3 at n=1 had the share of evals below 80 running 2.9% at 0.003, 12.2% at 0.01, 45.6% at
 0.03 — the one stability signal monotone in both directions — and b8 had run 0.003 and the anneal on
@@ -374,6 +390,7 @@ kept b18-b21 at 0.98 so b15-b21 stay one comparable set.
 | varies | `SNEK_PPO_ROLLOUT` 32 / 64 / 192 / 256 / 512 / 1024 at 128 lanes |
 | cells × seeds | 6 × 4, 50M |
 | control | `b9bw`-`b9bz` at 128 |
+| predicted | optimum 128-256; 1024 too few update rounds by 50M — **falsified** — 512 is the peak and 1024 arrives |
 
 **Why.** T sets transitions per update (128 × T) and how far GAE can see before it bootstraps; 32
 truncates a 50-step horizon. b3's rollout 64 had lost 2.5 pp at n=1. Note T 1024 writes 8x fewer
@@ -392,6 +409,7 @@ gain does not survive γ 0.999, and b20 showed the gain was depth rather than ba
 | varies | `SNEK_PPO_MINIBATCH` 32 / 64 / 128 / 192 / 384 / 512 / 1024 / 2048 |
 | cells × seeds | 8 × 4, 50M |
 | control | `b9bw`-`b9bz` at 256 |
+| predicted | 128 the likeliest alternative default — **falsified** — 128 is 8 pp short |
 
 **Why.** Moves gradient noise and gradient steps per epoch at once (512 steps per epoch at 32, 8 at
 2048), read beside b12 to separate step count from data reuse. 128 was the predicted alternative
@@ -410,6 +428,7 @@ base; 512 was the only cell that might ride along, and it did in the horizon ann
 | varies | `SNEK_PPO_EPOCHS` 1 / 2 / 3 / 5 / 6 / 7 / 8 / 10 / 12 / 16 |
 | cells × seeds | 10 × 4, 50M |
 | control | `b9bw`-`b9bz` at 4 |
+| predicted | 3-4 the top; 8 shows b4's collapse pattern — **falsified in part** — 8 did not collapse |
 
 **Why.** The axis that had moved most: gradient steps per transition was b3's one monotone knob, and
 at n=8 8 epochs lost to 4 at both network shapes (b4 vs b6, b5 vs b7). Prediction: 6 is where b4's
@@ -428,6 +447,7 @@ count's — and breaks at 12-16 (42% of evals below 80 at 16). Base stays at 4.
 | varies | `SNEK_PPO_LEARNING_RATE` 4e-5 / 1e-4 / 1.5e-4 / 2.5e-4 / 5e-4 / 8e-4 / 1e-3 / 2e-3 |
 | cells × seeds | 8 × 4, 50M |
 | control | `b9bw`-`b9bz` at 3e-4 |
+| predicted | a plateau around 3e-4; 8e-4 and 1e-3 collapse visibly — **falsified in part** — they were the most stable cells |
 
 **Why.** b3 had said a low lr did not buy stability (1e-4 had *more* evals below 80) and that 3e-3
 diverged; this locates both ends at four seeds. Prediction: 8e-4 and 1e-3 collapse visibly.
@@ -446,6 +466,7 @@ anneal; 3e-4 stays the default. `b11ag` @33243136 read 99.4 /30k.
 | varies | `SNEK_DISCOUNT` 0.70 / 0.80 / 0.85 / 0.90-0.98 by 0.01 / 0.995 / 0.9975 / 0.999 / 1.00 |
 | cells × seeds | 16 × 4, 50M |
 | control | `b7aa`-`b7ad` at 0.99 |
+| predicted | optimum 0.99-0.995; γ 1.00 the latest onset and unstable — **falsified in part** — monotone to 0.999; the γ 1.00 half held |
 
 **Why.** b3 at n=1 had called γ 0.995 the stability candidate and 0.9975 was snek2's record DQN γ.
 γ also sets the shaping discount, so the dense reward moves with it, correctly. The low end asks how
@@ -466,6 +487,7 @@ record until b27.
 | varies | `SNEK_PPO_GAE_LAMBDA` 0 / 0.5 / 0.8 / 0.85 / 0.90-0.97 by 0.01 / 0.99 / 0.995 / 0.999 / 1.00 |
 | cells × seeds | 16 × 4, 50M |
 | control | `b7aa`-`b7ad` at 0.98 |
+| predicted | a broad flat top at 0.95-0.99; λ 1.0 the worst arm — **falsified** |
 
 **Why.** The first batch of the one-knob sweep ([`../plans/hyperparam-sweep.md`](../plans/hyperparam-sweep.md)):
 every PPO knob at four seeds off b7's winning cell, with `b7aa`-`b7ad` as a free control at the same
@@ -486,6 +508,7 @@ depth. b3's "λ 1.0 loses" is inverted.
 | varies | entropy 0.003; entropy 0.01 → 0.001 annealed over the cap; `target_kl` 0.02; λ 0.95 |
 | cells × seeds | 4 × 4, 100M |
 | control | b4 itself, truncated to 100M |
+| predicted | at least one stability knob fixes b4's collapse and lifts it — **falsified** — every knob cut the drawdown, none lifted density |
 
 **Why.** "What fixes b4's collapse." Four candidates that each had a stability signal: entropy 0.003
 from b3, the anneal and `target_kl` because neither had ever been exercised (b4 ran 8 epochs in all
@@ -506,6 +529,7 @@ epochs and shape were the lever, not these.
 | varies | `SNEK_FC_LAYERS` (320,) / (200,100) / (100,200,100) / (100,100) / (200,100,50) / (160,160) / (300,100) / (400,200) |
 | cells × seeds | 8 × 4, 50M |
 | control | `fc (320,)` is the reference cell |
+| predicted | b3's order: `fc (300,100)` first, `fc 320` last of the three — **falsified** — inverted |
 
 **Why.** The network-shape test the docs had called for since b3: one knob, matched epochs, matched
 budget. b3 at one seed had put `fc (300,100)` first and `fc 320` last of those three, and b4-b6 had
@@ -526,6 +550,7 @@ weights still convert. Became the base for b9-b21.
 | varies | b3's two best single knobs stacked: `fc (200,100)` and 8 epochs |
 | cells × seeds | 1 × 8, 200M |
 | control | b5 and b6, which each carry one of the two knobs |
+| predicted | b3's two best knobs stack to the best 8-seed arm — **falsified** — the weakest |
 
 **Why.** b3 had ranked epochs 8 and `fc (200,100)` first and second at n=1; the natural next arm was
 both together at eight seeds and length. Also completes the 2×2 with b5 and b6.
@@ -544,6 +569,7 @@ at 5,000, none at 99. b3's epochs ranking retired.
 | varies | b5: 8 epochs at `fc (320,)`; b6: `fc (200,100)` at 4 epochs |
 | cells × seeds | 1 × 8 each; cap 400M, stopped at 255-271M (b5) and 215-231M (b6) |
 | control | each other, imperfectly |
+| predicted | none registered; b6's 500-episode lead was read as real — — (the lead vanished at 5,000) |
 
 **Why.** b3's two leads — the epoch count and the two-layer net — each run at eight seeds and length
 to see whether either held. Meant as a network-shape comparison, which it was not: the two differ in
@@ -563,6 +589,7 @@ b5 longer bought nothing; b6 longer paid modestly. `b5h` @9027584 (98.96 /30k) a
 | varies | one knob per arm: lr 1e-4 / 5e-4 / 1e-3 / 3e-3; γ 0.995 / 0.9975; λ 0.95 / 1.0; entropy 0.003 / 0.03; `fc` 200 / 500 / (200,100) / (300,100); rollout 64; minibatch 1024; epochs 8 |
 | cells × seeds | 15 × 1 (seed 1), 10M; `b3b`-`b3d` stopped at 3M |
 | control | `b3a`, the reference |
+| predicted | from the gate arm: PPO behind DQN at matched budget, and the lr too low — **falsified**, both |
 
 **Why.** The first PPO batch after the gate arm: find out which knobs move anything before spending
 seeds. A tuning pass, not a gate — nothing is seed-matched, so no row supports a between-config claim
@@ -583,6 +610,7 @@ n=1.
 | varies | the five knobs of snek2's batch 29: IS weights off, target update 1000, γ 0.9975, food-distance reward 0, chase-safe shaping 0.1 at gate 75 |
 | cells × seeds | 1 × 4, 3M counted steps |
 | control | b1, and snek2's b29 / b41 / b47 seed for seed |
+| predicted | the phase-3 gate met on snek2's record config — held |
 
 **Why.** The phase-3 gate of the port, re-run on the configuration snek2 actually set records with,
 after b1 gated on the wrong one. Five knobs differ, not the two b1's write-up suggested — found by
@@ -602,6 +630,7 @@ at matched work b2d *matches* b47c. Every cross-era step comparison since reads 
 | varies | nothing |
 | cells × seeds | 1 × 4, 3M counted steps |
 | control | snek2's baseline-class runs |
+| predicted | the phase-3 gate met at snek3's defaults — **falsified** |
 
 **Why.** The port's phase-3 gate: does the torch stack learn at all, at snek3's own defaults, before
 anything is tuned.
