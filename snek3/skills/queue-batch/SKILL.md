@@ -12,7 +12,7 @@ first** unless it carries `"box": "desktop"` or `"box": "laptop"`. A batch may t
 wave by wave; the pass ids (`b21-stageb-w2`) are numbered across both.
 
 **Pushing to `ops` starts real work, on either machine, so it needs the user's approval for *that*
-job.** Approval of an earlier job does not carry over. Draft the specs, show them, then push.
+job.** Approval of an earlier job does not carry over. Draft the specs, show them, give the batch its `runs.md` entry (step 1d), then push.
 
 ## 1. Write the specs in an `ops` worktree
 
@@ -84,6 +84,18 @@ Every one-knob batch is read against an earlier cell, and the GitHub-Pages viewe
 end of the batch's own arms, marked with a gold edge, **only if it is listed**. Add the batch to
 `snek3/viewer/references.json` (arm names plus a one-line label saying what the cell is and which knob
 value it holds) in the same change as the specs. A batch with no entry shows only itself.
+
+## 1d. Give the batch its `docs/runs.md` entry, in the same change
+
+`runs.md` is the batch catalogue, and a batch is in it from the moment it is queued, not from when it
+closes. Before the push, add above the newest entry a `## b<n> — <what it is>` section in the same
+shape as the others: the config table (`base`, `varies`, `cells × seeds`, `control`, `predicted`) and a
+**Why** paragraph of at most 100 words; and a row for it at the top of `At a glance`. The `predicted`
+row carries the spec's registered prediction; if the user registered none, write the agent's own and say
+so in the row. **Nothing about box, state or ETA** — `status.json` owns that. Add a line to `## Open` if the
+batch opens a question. Commit with the `references.json` change under the docs authorization
+(Markdown and the viewer file only), so the queue, the viewer and the catalogue agree on one commit.
+(Added 2026-09-10 at the user's request: b29 and b30 were queued without entries.)
 
 ## 2. Push, trigger, and make sure a laptop scheduler is up
 
