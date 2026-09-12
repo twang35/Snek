@@ -1,0 +1,18 @@
+{
+ "arms": [
+  "b32a-warm-b28k-162857k-seed1",
+  "b32b-warm-b28m-131498k-seed2",
+  "b32c-warm-b28k-162693k-seed3",
+  "b32d-warm-b28k-162955k-seed4",
+  "b32e-warm-b28m-134578k-seed5",
+  "b32f-warm-b28m-138314k-seed6",
+  "b32g-warm-b28n-185926k-seed7",
+  "b32h-warm-b28o-136479k-seed8"
+ ],
+ "batch": "b32",
+ "box": "desktop",
+ "claimed_iso": "2026-09-12T01:25:27",
+ "claimed_ts": 1789201527.7156863,
+ "kind": "wave",
+ "wave": 1
+}
