@@ -36,7 +36,7 @@ unconfounded arm (γ/λ → 0.999 kept, lr/clip → 0 added). Measured 2026-09-1
 
 ### Two bits per past move in the observation — `SNEK_OBS_HISTORY` 4 or 8 — roughly doubles stage-B density (93.6 / 95.4% against 49.2) and lifts the confirmed 30,000-episode top from 99.65 to 99.8; the plan predicted no effect and was wrong
 
-b27 (`plans/obs-history.md`, section 4): b26's `pen01` base at 100M, 8 seeds a cell, `SNEK_OBS_HISTORY` 0 / 4 / 8 — the
+b27 (`plans/archive/obs-history.md`, section 4): b26's `pen01` base at 100M, 8 seeds a cell, `SNEK_OBS_HISTORY` 0 / 4 / 8 — the
 policy's last N turns read off its own body as a left/right bit pair each (`env/observations.py` `move_history_obs`,
 `vectorized/vec_env.py` `move_history_bits`), 26 + 2N values.
 
@@ -103,7 +103,7 @@ which says the peak at 200M is set by the horizon reached and the plateau by how
 **Measured 2026-09-07 on the two top HOF entries, 30,000 fresh episodes each at seed 11**, every
 episode's action and food sequence kept so each failure replays exactly (`tools/death_trace.py`,
 `tools/death_analyze.py`; pictures `charts/deaths/`). The plan this answers is
-`plans/obs-history.md`, whose phase 1 registered two predictions — the user's "they starve" against
+`plans/archive/obs-history.md`, whose phase 1 registered two predictions — the user's "they starve" against
 the draft's "they collide" — and **the user's is right, by a wide margin**.
 
 | checkpoint | perfect | failures | **starved** | collision, food-driven | collision, forced |
@@ -143,7 +143,7 @@ completely. One forced collision in 60,000 games. **Deaths from path planning ar
 (b17cl) and 3 pp (b10ck) above perfect games at the same board fill — real but small, and the
 mechanism above does not run through it. Four moves of history cannot break a loop of period 8-98:
 the augmented observation repeats with the same period. So the move-history feature is the wrong
-lever for this failure, and `plans/obs-history.md` closes on that.
+lever for this failure, and `plans/archive/obs-history.md` closes on that.
 
 **What this points at instead**, for a new plan: the reward makes the loop rational — starving costs
 −0.5 against −5 for a death and no per-step cost, so under any uncertainty about the approach, orbiting
@@ -155,7 +155,7 @@ sealed-food count no worse.
 ### The corner-grid ladder: γ 0.999 on λ 0.99 adds density and drawdown, rollout 512 trades one for the other, and the `mse` value loss on top nearly doubles density and removes the collapses
 
 **Measured 2026-09-06 on b22 (desktop) and b23 (laptop), 2 cells x 4 seeds each at 50M** — a ladder on b9's λ 0.99 cell,
-each rung one lever on the rung below (`plans/sweep-analysis.md`; pictures in `docs/sweep.md`'s tooling):
+each rung one lever on the rung below (`plans/archive/sweep-analysis.md`; pictures in `docs/sweep.md`'s tooling):
 
 | rung | cell | ≥98%/500 density (per seed) | best30 | evals < 50 | evals < 80 | hof30k rows / ≥99 / best |
 |---|---|---|---:|---:|---:|---|

@@ -55,7 +55,7 @@ The copy was verified from `hallOfFame/` at 500 episodes on seed 11: 496/500.
 
 ## ‡ The record: `b27t` @85065728 and `b27k` @77889536, 99.8% over 30,000 episodes — 2026-09-09
 
-**The first entries with move history, and the first pair from two different arms.** b27 (`plans/obs-history.md`) put
+**The first entries with move history, and the first pair from two different arms.** b27 (`plans/archive/obs-history.md`) put
 the policy's last N turns into the observation as a left/right bit pair each, on b26's `pen01` base (b24's λ/γ anneal
 plus a 0.01 step penalty) at 100M, 8 seeds a cell, N = 0 / 4 / 8. The depth-8 arm seed 20 and the depth-4 arm seed 11
 are the entries; the plan had predicted no effect on the perfect rate (`docs/findings.md`). The protocol found both end

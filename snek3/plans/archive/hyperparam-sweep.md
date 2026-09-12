@@ -1,9 +1,11 @@
 # The PPO hyperparameter sweep — one knob per batch, four seeds per value
 
+**Closed 2026-09-11: b9-b21 all ran and were read (`docs/sweep.md`, `plans/archive/sweep-analysis.md`); b22 became the corner-grid ladder rather than a factorial. Archived as the design of record; `../hyperparam-sweep.json` stays live because `tools/sweep_analysis.py` reads it.**
+
 **Written 2026-09-01, revised the same day after review.** This is the design for batches **b9–b21**:
 one knob per batch, every value at four seeds, all on one frozen base, all at one horizon, all judged
 on the same pre-registered numbers. The machine-readable half is
-[`hyperparam-sweep.json`](hyperparam-sweep.json); `tools/sweep_specs.py` expands one batch of it into
+[`hyperparam-sweep.json`](../hyperparam-sweep.json); `tools/sweep_specs.py` expands one batch of it into
 desktop specs and writes the laptop smoke script for the batch's never-exercised values.
 
 **The goal is not a record.** It is to know what each knob *does* on this task — the shape of its
@@ -55,7 +57,7 @@ is ~150 h of waves plus ~16 h of hof passes, against the ~162 h planned in secti
 
 ## 1. What this project has learned about sweeps, and what it forces here
 
-Three findings shape every rule below. Each is in [`../docs/findings.md`](../docs/findings.md).
+Three findings shape every rule below. Each is in [`../docs/findings.md`](../../docs/findings.md).
 
 | finding | consequence |
 |---|---|

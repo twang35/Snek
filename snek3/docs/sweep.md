@@ -1,6 +1,6 @@
 # The sweep, read as pictures — b9 to b21
 
-**Built 2026-09-06, from every closed arm of the one-knob sweep** (`plans/hyperparam-sweep.md`): 13 batches,
+**Built 2026-09-06, from every closed arm of the one-knob sweep** (`plans/archive/hyperparam-sweep.md`): 13 batches,
 116 cells, 464 arms at 50M, each with its stage B, `hof5000` and `hof30k` passes. `results.md` has each batch's
 table and `findings.md` its verdict; this file is the **pictures** — each knob's curve, each knob's traces, and
 the sweep-wide view of which knobs are levers — plus the first reading of the training diagnostics (value loss,
@@ -9,7 +9,7 @@ explained variance, approx KL, clip fraction, entropy) that every stage-A row ha
 **The same numbers, interactively**: `viewer/sweep.html` beside the chart viewer — pick a batch, hover any mark
 for its arm, click a cell for its four seeds, click a seed for the arm's chart. It reads `viewer/sweep.js`, which
 `PYTHONPATH=. python -m tools.sweep_analysis reduce` writes from `runs/` in ~20 s (the figures here come from the
-same file, so the page and this report cannot disagree). The design is `plans/sweep-analysis.md`.
+same file, so the page and this report cannot disagree). The design is `plans/archive/sweep-analysis.md`.
 
 **How to read every figure here.** A cell is four seeds: the four dots, and the line through their medians. The
 batch's reference cell is hollow orange at its own x, and the orange band across a panel is the reference's own

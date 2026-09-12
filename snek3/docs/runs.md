@@ -165,7 +165,7 @@ lever is a knob. Nothing promoted.
 | | |
 |---|---|
 | base | pen01 (horizon anneal + step penalty 0.01, 26-value observation) |
-| varies | `SNEK_OBS_HISTORY` 0 / 4 / 8 — two bits per past move, `[turned left, turned right]`, read off the body ([`../plans/obs-history.md`](../plans/obs-history.md)) |
+| varies | `SNEK_OBS_HISTORY` 0 / 4 / 8 — two bits per past move, `[turned left, turned right]`, read off the body ([`../plans/archive/obs-history.md`](../plans/archive/obs-history.md)) |
 | cells × seeds | 3 × 8, 100M |
 | control | `hist0`, the batch's own |
 | predicted | no effect on the perfect rate (the best checkpoints starve in loops history cannot break) — **falsified** |
@@ -548,7 +548,7 @@ record until b27.
 | control | `b7aa`-`b7ad` at 0.98 |
 | predicted | a broad flat top at 0.95-0.99; λ 1.0 the worst arm — **falsified** |
 
-**Why.** The first batch of the one-knob sweep ([`../plans/hyperparam-sweep.md`](../plans/hyperparam-sweep.md)):
+**Why.** The first batch of the one-knob sweep ([`../plans/archive/hyperparam-sweep.md`](../plans/archive/hyperparam-sweep.md)):
 every PPO knob at four seeds off b7's winning cell, with `b7aa`-`b7ad` as a free control at the same
 cap. Prediction: a broad flat top at 0.95-0.99; λ 1.0 the worst arm (b3 said so at n=1).
 

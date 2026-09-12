@@ -1,5 +1,7 @@
 # Short-term memory: showing the policy its last four moves
 
+**Closed 2026-09-11: b27 measured the feature and it won (`docs/findings.md`, `docs/results.md`); the default moved to depth 8 and the record pair is in the HOF. §6's open questions are research follow-ups, not work this plan owes.**
+
 **Written 2026-09-07, revised the same day after review. Phase 1 ran the same day and found the
 feature addresses a failure the best checkpoints do not have (see "Phase 1 result"). Built anyway the
 same evening, at the user's request, to measure it: section 4 is as built, and batch b27 runs it.** The question asked was: give
@@ -181,8 +183,8 @@ every future batch carries them.
 
 Both HOF leaders, 30,000 episodes each, every failure replayed (`tools/death_trace.py`,
 `tools/death_analyze.py`, `tools/death_sheet.py`; the contact sheets are
-[`../charts/deaths/b17cl-30k-s11-failures.png`](../charts/deaths/b17cl-30k-s11-failures.png) and
-[`../charts/deaths/b10ck-30k-s11-failures.png`](../charts/deaths/b10ck-30k-s11-failures.png)).
+[`../charts/deaths/b17cl-30k-s11-failures.png`](../../charts/deaths/b17cl-30k-s11-failures.png) and
+[`../charts/deaths/b10ck-30k-s11-failures.png`](../../charts/deaths/b10ck-30k-s11-failures.png)).
 
 | | b17cl | b10ck |
 |---|---:|---:|

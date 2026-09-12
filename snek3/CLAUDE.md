@@ -113,7 +113,7 @@ is absent, not null with a number to check. What follows stage B is not a stage:
 takes every row at ≥99.2/500 to 5,000 episodes, and `hof30k` takes every hof5000 row at ≥99.6/5,000 (99.2 until 2026-09-08; `eta.HOF30K_THRESHOLD`) to
 30,000 on seed 7, a seed no selecting pass used — each a separately labelled file beside the
 stage-B one, never in place of it. **Those two passes stop a checkpoint early once its target (99.6,
-99.8) is arithmetically out of reach** (2026-09-09, `plans/early-stop.md`, `docs/protocol.md`): the row
+99.8) is arithmetically out of reach** (2026-09-09, `plans/archive/early-stop.md`, `docs/protocol.md`): the row
 says so (`abandoned`, `episodes_planned`), nothing selects it, and every pooled statistic is over full
 rows. Stage B never stops. **Every batch gets all three automatically**: the
 desktop daemon and `tools/scheduler.py` both run `tools.closeout <arms> --pass hof5000` then

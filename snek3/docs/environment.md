@@ -68,7 +68,7 @@ era marker (`obs26-20260907-hist4`) and so in every sidecar; the entry points th
 set the knob from it before importing the env (`tools/sidecar_env.py`), and a wave's shared eval
 workers get the wave's depth from the scheduler, one depth per wave. Default 0: nothing changes for an
 arm that does not set it. Built 2026-09-07 for b27, against phase 1's prediction that it will not
-matter (`plans/obs-history.md`). New blocks go on the end, never in the middle — the order is
+matter (`plans/archive/obs-history.md`). New blocks go on the end, never in the middle — the order is
 chronological rather than logical and that is deliberate.
 
 **Era `obs26-20260907` (2026-09-07) removed two blocks from the 30-value `b09c616` layout**: "does
