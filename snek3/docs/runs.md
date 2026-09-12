@@ -15,6 +15,9 @@ are in git history before 2026-09-10.
 
 - **A clean test of the PPO paper's optimiser schedule**: b29 confounded lr/clip → 0 with removing the
   horizon anneal. The unconfounded arm keeps γ/λ → 0.999 and adds lr/clip → 0 on top.
+- **Warm starts.** b32 is the first batch to start from a checkpoint (`SNEK_INIT_FROM`, step 0). If its
+  arms hold the 99.8 plateau from their first eval, any knob can be tried *on the converged policy* at
+  100M instead of 200M from scratch, and a collapse there is a verdict on the knob rather than on the seed.
 - **b30 / b31**, one knob each off b27's `hist8` at 100M: horizon to 1.0 (stage B level, passes pending), `mse`
   (queued). Whether either moves the 30k top past 99.8; b28 says more steps will not.
 - **Should `SNEK_OBS_HISTORY=8` become the default.** b27 says yes; nothing has run against it yet.
@@ -27,6 +30,7 @@ are in git history before 2026-09-10.
 
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
+| [b32](#b32--b28s-best-checkpoints-annealed-on-to-a-horizon-of-10) | warm start from b28's eight best /30k checkpoints; γ and λ 0.999 → 1.0 over 50M, held 50M | b28's converged values | 1 × 8 | 100M | — | — |
 | [b31](#b31--mse-value-loss-on-the-hist8-base) | `SNEK_PPO_VALUE_LOSS` mse | pen01 + hist8 | 1 × 8 | 100M | — | — |
 | [b30](#b30--the-horizon-annealed-to-10) | γ and λ finals 1.0, not 0.999 | pen01 + hist8 | 1 × 8 | 100M | falsified so far | stage B level with `hist8` (95.3 vs 95.4%), no collapse; passes pending |
 | [b29](#b29--lr-and-clip-annealed-to-zero) | lr 2.5e-4 → 0 and clip 0.2 → 0.001 over the whole cap; horizon fixed | pen01 + hist8 | 1 × 8 | 100M | falsified | worse in every window: 83.1% density, nothing through the 99.6 /5k gate; confounded with the missing horizon anneal |
@@ -84,6 +88,22 @@ evals below 50% and 80%), then best30. `hof5000` re-measures the top rows at 5,0
 at complete separation (Mann-Whitney p=0.029). Details in [`protocol.md`](protocol.md).
 
 ---
+
+## b32 — b28's best checkpoints annealed on to a horizon of 1.0
+
+| | |
+|---|---|
+| base | b28's `hist8` arms at their converged values: γ 0.999, λ 0.999, entropy 0.001, lr 2.5e-4, clip 0.2 |
+| varies | the start. Each arm is warm-started (`SNEK_INIT_FROM`) from one of b28's eight best /30k checkpoints — its actor, plus the source arm's critic and optimiser — and anneals γ and λ 0.999 → 1.0 over its first 50M, then holds 1.0 for 50M (`SNEK_PPO_ANNEAL_FRACTION` 0.5 of 100M; the step starts at 0) |
+| cells × seeds | 1 × 8 (`b32a`-`b32h`, seeds 1-8; sources `b28k` @162.86M / 162.69M / 162.96M, `b28m` @131.50M / 134.58M / 138.31M, `b28n` @185.93M, `b28o` @136.48M — 29,940-29,946 /30,000 each) |
+| control | b28's own arms, the plateau these start on (99.79-99.82 /30k); b30, the same 1.0 finals reached from scratch |
+| predicted | registered at queue time 2026-09-11 by the agent, not the user: every arm's first stage-A evals read ≥ 98 (the warm start holds), no arm collapses, stage-B density at or above b28's 97.5% — and the 30k top stays within noise of 99.82, nothing at 99.83 or above |
+
+**Why.** b28 said holding converged values widens the plateau and does not raise it, and b30 asks
+whether the last 0.001 of horizon raises it from scratch. This asks the same of the best policies
+already found, at a tenth of the cost per answer: 100M from a 99.8 start rather than 200M from zero,
+with the critic and optimiser carried over so the one change is the horizon. Eight starts in the same
+plateau also say how much of a 30k rank is the checkpoint and how much is the seed.
 
 ## b31 — `mse` value loss on the `hist8` base
 

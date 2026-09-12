@@ -280,5 +280,20 @@
     "label": "reference: b27's hist8 cell at 100M with the huber value loss -- b31 is the same config and ramp with mse",
     "after": "mse",
     "value": "huber"
+  },
+  "b32": {
+    "arms": [
+      "b28i-hist8a25-seed9",
+      "b28j-hist8a25-seed10",
+      "b28k-hist8a25-seed11",
+      "b28l-hist8a25-seed12",
+      "b28m-hist8a25-seed13",
+      "b28n-hist8a25-seed14",
+      "b28o-hist8a25-seed15",
+      "b28p-hist8a25-seed16"
+    ],
+    "label": "reference: b28's hist8 arms at 200M, gamma and lambda held at 0.999 from 50M -- the checkpoints b32 warm-starts from and anneals on to 1.0",
+    "after": "warm",
+    "value": "0.999"
   }
 }
