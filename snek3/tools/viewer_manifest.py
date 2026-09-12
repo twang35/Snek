@@ -43,6 +43,7 @@ import re
 
 from env import constants
 from tools import live_runs
+from tools import results
 
 MANIFEST_PATH = os.path.join(constants.ROOT, 'viewer', 'manifest.js')
 # Which earlier arms are a batch's control cell, so the page can show them beside the batch's own.
@@ -229,7 +230,7 @@ def _read(path):
     if not os.path.exists(path):
         return None
     with open(path) as handle:
-        return json.load(handle)
+        return results.expand(json.load(handle))
 
 
 def arm_record(policy, runs_dir, desktop=None, laptop_live=frozenset(), arm_boxes=None, names=None):

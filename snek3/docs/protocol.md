@@ -33,7 +33,7 @@ neighbours and no `min_achievable` to read out of the payload before pooling any
 true of snek2's files, which have four gate eras.
 
 **The two deep passes stop a checkpoint early, on arithmetic only (2026-09-09,
-[`plans/early-stop.md`](../plans/early-stop.md)).** `hof5000` retires a checkpoint once it can no longer
+[`plans/archive/early-stop.md`](../plans/archive/early-stop.md)).** `hof5000` retires a checkpoint once it can no longer
 read 99.6 (the `hof30k` cut, so nothing it could have promoted is lost) and `hof30k` once it can no
 longer read 99.8; stage B never stops, because density98 counts the rows a stop would retire. The rule
 is "even a perfect remainder cannot reach the target", so a checkpoint that would have reached it is
@@ -43,6 +43,19 @@ false on a full one. **Readers pool full rows only** -- the stage-B chart's pool
 the viewer's and the sweep page's means -- and the site shows the counts at the gates (`>=99.6 /5000`,
 `>=99.8 /30k`) where it showed means. The file header carries `stop_target`, and a merge refuses shards
 stopped under different targets. Modelled on b27 and b28: 88 h of passes become about 50 h.
+
+**What a row stores, since 2026-09-11 ([`plans/runs-archive-compaction.md`](../plans/runs-archive-compaction.md)).**
+A pass row carries its summary fields (`step`, `episodes`, `episodes_planned`, `abandoned`, `perfect_games`,
+`perfect_percent`, `perfect_ci95`, `avg/median/min/max_score`, `avg_reward`, `seconds`, `stage_a_percent`) and the
+per-episode scores as a histogram, `score_counts` (`{"95": 4915, "58": 8, ...}`), which is exact for every
+order-independent statistic and ~1/50th of the `episode_scores` array it replaced; `tools/eval_plan.py`
+`score_counts_of` reads either. Where a checkpoint's failures die is read straight off it. A stage-A file stores
+its rows as columns (`tools/results.py` `stage_a_payload`; `results.read` hands rows back), a third of the row
+form. **Every file says when it ran**: a stage-A `summary` carries `started` (the arm's first launch, kept across
+restarts), `finished` (its last eval) and `wall_seconds`; a shard file and the merged pass file carry the same
+three, the merge spanning the first shard's start to the last shard's write. `prune_runs histogram` and
+`prune_runs columns` convert files written before the change, and refuse a file whose stored summary
+disagrees with its own scores.
 `--no-stop` on `tools.closeout` measures every checkpoint to full length.
 
 ### What each stage costs

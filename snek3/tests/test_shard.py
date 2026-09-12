@@ -46,8 +46,8 @@ def test_the_rows_are_full_length(tmp_path, policy):
     rows = shard.measure_slice(policy, [1000, 2000], 6, str(tmp_path / 'out.json'))
     for row in rows:
         assert row['episodes'] == 6
-        assert len(row['episode_scores']) == 6
-        assert None not in row['episode_scores']
+        assert sum(row['score_counts'].values()) == 6
+        assert 'episode_scores' not in row
         # The win flags are derived from the scores rather than stored beside them (2026-09-01);
         # `episode_perfect` and `episode_rewards` were 70% of every result file.
         assert 'episode_perfect' not in row and 'episode_rewards' not in row

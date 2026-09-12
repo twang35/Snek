@@ -204,3 +204,16 @@ def test_the_stage_b_section_flags_its_own_maximum_as_selected(tmp_path):
     assert 'best **99.0%** @2,000' in text
     assert 'selected high' in text
     assert '**1** row(s) at >=98%' in text
+
+
+def test_the_history_carries_when_the_arm_started_and_last_wrote(tmp_path):
+    path = str(tmp_path / 'runs' / 'a_evals.json')
+    rows = evals([(step * 1000, 50.0, 90.0) for step in range(1, 5)])
+    first = run_report.save_history(path, rows, started='2026-09-11T10:00:00')
+    assert first['started'] == '2026-09-11T10:00:00' and first['finished'] >= first['started']
+    assert first['wall_seconds'] == run_report.results.seconds_between(first['started'], first['finished'])
+    # A restart carries the first launch forward through `load_summary`.
+    assert run_report.load_summary(path)['started'] == '2026-09-11T10:00:00'
+    again = run_report.save_history(path, rows, started=run_report.load_summary(path).get('started'))
+    assert again['started'] == '2026-09-11T10:00:00'
+    assert run_report.load_summary(str(tmp_path / 'nope.json')) == {}

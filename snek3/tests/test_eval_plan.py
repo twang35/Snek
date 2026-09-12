@@ -5,6 +5,7 @@ so the things that can still go wrong are arithmetic: an interval that runs past
 recomputed from summaries rather than from episodes.
 """
 
+import numpy as np
 import pytest
 
 from tools import eval_plan
@@ -109,7 +110,7 @@ def test_a_stopped_row_is_the_banked_episodes_and_says_what_was_planned():
     row = eval_plan.build_row(7, sample)
     assert row['abandoned'] is True
     assert (row['episodes'], row['episodes_planned'], row['perfect_games']) == (5, 500, 2)
-    assert row['perfect_percent'] == 40.0 and len(row['episode_scores']) == 5
+    assert row['perfect_percent'] == 40.0 and sum(row['score_counts'].values()) == 5
     assert 'stopped at 5/500' in eval_plan.one_line(row)
     assert 'stopped' not in eval_plan.one_line(eval_plan.build_row(1, held([95] * 10)))
 
@@ -124,10 +125,32 @@ def test_only_the_scores_are_stored_per_episode():
     writes a row only when its full sample completes, so no partial row ever existed to top up.
     """
     row = eval_plan.build_row(3000, held([95, 40, 95, 0]))
-    assert row['episode_scores'] == [95, 40, 95, 0]
+    # Since 2026-09-11 the scores themselves are a histogram, not a list (`plans/runs-archive-compaction.md`).
+    assert row['score_counts'] == {'0': 1, '40': 1, '95': 2}
+    assert 'episode_scores' not in row
     assert 'episode_perfect' not in row
     assert 'episode_rewards' not in row
     assert not hasattr(eval_plan, 'held_from_row'), 'dead code, and it justified 0.96 GB of arrays'
+
+
+def test_the_histogram_is_exact_for_every_summary_the_array_justified():
+    """The array was kept because "a median does not pool"; a histogram gives the same median, mean,
+    min, max and perfect count as the list did, so nothing the argument protected is lost."""
+    scores = [95, 40, 95, 0, 95, 58, 95, 95]
+    row = eval_plan.build_row(3000, held(scores))
+    rebuilt = eval_plan.scores_of(row)
+    assert sorted(rebuilt) == sorted(scores)
+    assert row['median_score'] == float(np.median(rebuilt))
+    assert row['avg_score'] == round(float(np.mean(rebuilt)), 2)
+    assert (row['min_score'], row['max_score']) == (min(rebuilt), max(rebuilt))
+    assert row['perfect_games'] == sum(eval_plan.perfect_flags(row))
+
+
+def test_a_row_with_the_old_scores_array_reads_the_same_histogram():
+    legacy = {'episode_scores': [95, 40, 95, 0], 'episodes': 4, 'perfect_games': 2}
+    assert eval_plan.score_counts_of(legacy) == {'0': 1, '40': 1, '95': 2}
+    assert eval_plan.scores_of(legacy) == [0, 40, 95, 95]
+    assert eval_plan.perfect_flags(legacy) == [True, False, True, False]
 
 
 def test_the_win_flags_are_recoverable_from_the_scores():
@@ -138,7 +161,8 @@ def test_the_win_flags_are_recoverable_from_the_scores():
     """
     original = held([95, 40, 95, 0])
     row = eval_plan.build_row(3000, original)
-    assert eval_plan.perfect_flags(row) == original['perfect']
+    # As a multiset: the histogram keeps the counts, not the order.
+    assert sorted(eval_plan.perfect_flags(row)) == sorted(original['perfect'])
     assert sum(eval_plan.perfect_flags(row)) == row['perfect_games']
 
 
@@ -146,7 +170,9 @@ def test_a_row_written_before_the_change_still_reads_the_same():
     # Files on disk keep the array for as long as they are not rewritten, so the reader takes either.
     row = eval_plan.build_row(3000, held([95, 40, 95, 0]))
     legacy = dict(row, episode_perfect=[1, 0, 1, 0])
-    assert eval_plan.perfect_flags(legacy) == eval_plan.perfect_flags(row)
+    # The stored array keeps its order; the histogram form answers as a multiset.
+    assert sorted(eval_plan.perfect_flags(legacy)) == sorted(eval_plan.perfect_flags(row))
+    assert sum(eval_plan.perfect_flags(legacy)) == sum(eval_plan.perfect_flags(row)) == 2
 
 
 def test_the_averages_the_dropped_rewards_supported_are_still_there():

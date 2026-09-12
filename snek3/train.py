@@ -292,6 +292,8 @@ class Trainer(object):
         self.device = device
         self.policy_dir = os.path.join(constants.POLICY_DIR, policy)
         self.history_path = run_report.history_path(constants.RUNS_DIR, policy)
+        # The arm's first launch, kept across restarts so the file's `wall_seconds` spans the whole arm.
+        self.started = run_report.load_summary(self.history_path).get('started') or run_report.results.iso_now()
         self.report_path = os.path.join(constants.RUNS_DIR, policy + '.md')
         self.graph_path = progress_chart.chart_path(policy)
 
@@ -581,7 +583,8 @@ class Trainer(object):
         row = build_eval_row(step, measured, trailing, fields.get('steps_per_second'),
                              reported, fields.get('transitions'))
         run_report.merge_eval_row(self.eval_rows, row)
-        summary = run_report.save_history(self.history_path, self.eval_rows, self.resume_steps)
+        summary = run_report.save_history(self.history_path, self.eval_rows, self.resume_steps,
+                                          started=self.started)
         self._log(row, summary, keep)
 
     def _settle_checkpoint(self, step, avg_score, trailing):

@@ -70,13 +70,18 @@ def measure_slice(policy_dir, steps, episodes, out_path, policy=None, width=None
     arch = restore.policy_arch(policy_dir)
     stage_a = stage_a or {}
 
-    existing = {row['step']: row for row in results.rows_of(results.read(out_path))} if resume else {}
+    previous = (results.read(out_path) or {}) if resume else {}
+    existing = {row['step']: row for row in results.rows_of(previous)}
     todo = [step for step in steps if step not in existing]
+    # `started` survives a resume (the file's own, if it has one); `finished` is the last write.
     header = {'policy': results.run_name(policy), 'arch': arch, 'episodes': episodes,
-              'seed': seed, 'stop_target': stop_target, 'config': config.describe()}
+              'seed': seed, 'stop_target': stop_target, 'config': config.describe(),
+              'started': previous.get('started') or results.iso_now()}
 
     def flush():
         payload = dict(header)
+        payload['finished'] = results.iso_now()
+        payload['wall_seconds'] = results.seconds_between(payload['started'], payload['finished'])
         payload['rows'] = [existing[step] for step in sorted(existing)]
         results.write(out_path, payload)
 

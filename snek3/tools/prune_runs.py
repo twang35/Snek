@@ -3,6 +3,8 @@
     PYTHONPATH=. python -m tools.prune_runs shards                     # what it would delete
     PYTHONPATH=. python -m tools.prune_runs shards --apply
     PYTHONPATH=. python -m tools.prune_runs arrays --apply
+    PYTHONPATH=. python -m tools.prune_runs histogram --apply --include-tracked   # episode_scores -> score_counts
+    PYTHONPATH=. python -m tools.prune_runs columns --apply --include-tracked     # stage-A rows -> columns
     PYTHONPATH=. python -m tools.prune_runs checkpoints b6a-... --keep-above 97.5 --apply
 
 **Dry run is the default and `--apply` is the only thing that deletes.** Every subcommand prints
@@ -14,6 +16,8 @@ Three things accumulate, in ascending order of how much thought deleting them ne
 |---|---|---|
 | `shards` | a pass's `-sNofM.json` files, once its merged file provably covers every row | nothing — exact duplicates |
 | `arrays` | `episode_perfect` and `episode_rewards` from stored rows | nothing — one is derivable, the other has no reader (`tools/eval_plan.py`) |
+| `histogram` | the `episode_scores` array from every pass row, replaced by its `score_counts` histogram (2026-09-11) | the order of episodes within a row, which nothing reads. Every summary field is checked against the histogram first and a file with one disagreement is left alone |
+| `columns` | a stage-A `_evals.json`'s list of row dicts, rewritten as columns (`results.stage_a_payload`) | nothing — the round trip is checked before the write. A live arm's file is skipped: its trainer is the single writer |
 | `checkpoints` | `ckpt-*.pt` whose stage-B row is below a threshold | the ability to re-measure or re-watch **that** checkpoint. Its measurement stays in `runs/` |
 
 **`checkpoints` is the only one that loses anything, and it is also the one worth the most** — an arm
@@ -24,14 +28,18 @@ threshold than the one you keep, so keep a margin below the record region rather
 """
 
 import argparse
+import datetime
 import glob
 import json
 import os
 import re
 import subprocess
 
+import numpy as np
+
 from env import constants
-from tools import checkpoints, live_runs, results
+from env.observations import is_perfect_score
+from tools import checkpoints, eval_plan, live_runs, results
 
 DEAD_ARRAYS = ('episode_perfect', 'episode_rewards')
 SHARD_SUFFIX = re.compile(r'-s(\d+)of(\d+)\.json$')
@@ -181,6 +189,159 @@ def prune_arrays(apply=False, include_tracked=False):
     return freed
 
 
+# ---------------------------------------------------------------- histogram
+
+def _histogram_rows(payload):
+    """`payload` with every row's `episode_scores` replaced by `score_counts` (and the dead arrays gone).
+
+    Mutates and returns `(payload, mismatches)`: a row whose stored `episodes`, `perfect_games` or
+    `median_score` disagrees with its own histogram counts as a mismatch, and the caller leaves such
+    a file untouched -- the check is what makes the conversion lossless by construction rather than by
+    assumption.
+    """
+    mismatches = 0
+    for row in results.rows_of(payload):
+        for key in DEAD_ARRAYS:
+            row.pop(key, None)
+        scores = row.pop('episode_scores', None)
+        if scores is None:
+            continue
+        counts = eval_plan.score_counts(scores)
+        perfect = sum(n for score, n in counts.items() if is_perfect_score(int(score)))
+        expected_median = round(float(np.median(scores)), 1) if scores else None
+        if (sum(counts.values()) != row.get('episodes')
+                or perfect != row.get('perfect_games')
+                or ('median_score' in row and row['median_score'] != expected_median)):
+            mismatches += 1
+        row['score_counts'] = counts
+    return payload, mismatches
+
+
+def prune_histogram(apply=False, include_tracked=False):
+    """Rewrites every pass file whose rows still carry `episode_scores`. Returns the bytes freed."""
+    freed = skipped = 0
+    tracked = set() if include_tracked else tracked_paths()
+    for path in sorted(glob.glob(_runs('*_checkpoint_evals*.json'))):
+        if path.endswith('.partial.json'):
+            continue
+        if in_flight(path):
+            print('  KEEP  {0:<64} (a shard of a pass that has not merged)'.format(
+                os.path.basename(path)))
+            continue
+        payload = results.read(path)
+        rows = results.rows_of(payload)
+        if not any('episode_scores' in row for row in rows):
+            continue
+        before = os.path.getsize(path)
+        converted, mismatches = _histogram_rows(payload)
+        after_text = len(json.dumps(converted))
+        if mismatches:
+            print('  KEEP  {0:<64} ({1} row(s) whose summary disagrees with its scores)'.format(
+                os.path.basename(path), mismatches))
+            continue
+        if os.path.realpath(path) in tracked:
+            skipped += before - after_text
+            continue
+        if apply:
+            results.write(path, converted)
+            after = os.path.getsize(path)
+        else:
+            after = after_text
+        freed += before - after
+        print('  {0}  {1:<64} {2} -> {3}'.format(
+            'REWROTE' if apply else '  would', os.path.basename(path), _mb(before), _mb(after)))
+    print('histogram: {0} {1}{2}'.format(
+        'freed' if apply else 'would free', _mb(freed),
+        '; skipped {0} of droppable bytes in git-tracked files '
+        '(--include-tracked takes them too)'.format(_mb(skipped)) if skipped else ''))
+    return freed
+
+
+# ------------------------------------------------------------------ columns
+
+def _without_nones(rows):
+    return [{key: value for key, value in row.items() if value is not None} for row in rows]
+
+
+def _stamp_from_disk(policy, path, raw):
+    """Fills a stage-A summary's `started` / `finished` / `wall_seconds` from what the disk knows -- the
+    arm's `arch.json` mtime and the file's own -- for a file written before the stamps existed (2026-09-11).
+    Only when the checkpoint directory is on this box, and only into a summary with no `started`.
+    Returns whether anything was filled."""
+    summary = raw.get('summary')
+    if not isinstance(summary, dict) or summary.get('started'):
+        return False
+    arch = os.path.join(constants.POLICY_DIR, policy, 'arch.json')
+    if not os.path.exists(arch):
+        return False
+    started = datetime.datetime.fromtimestamp(os.stat(arch).st_mtime).isoformat(timespec='seconds')
+    finished = datetime.datetime.fromtimestamp(os.stat(path).st_mtime).isoformat(timespec='seconds')
+    if finished < started:
+        return False
+    summary.update({'started': started, 'finished': finished,
+                    'wall_seconds': results.seconds_between(started, finished), 'stamps_from': 'disk mtimes'})
+    return True
+
+
+def prune_columns(apply=False, include_tracked=False):
+    """Rewrites every stage-A `_evals.json` still stored as a list of rows in the column form.
+
+    A live arm's file is left alone (the trainer rewrites it on every eval and is its single writer),
+    and a file is written only if `from_columns(to_columns(rows))` gives the rows back. Returns the
+    bytes freed.
+    """
+    freed = skipped = 0
+    tracked = set() if include_tracked else tracked_paths()
+    live = {policy for policy, _ in live_runs.live(constants.RUNS_DIR, prune=False)}
+    for path in sorted(glob.glob(_runs('*_evals.json'))):
+        name = os.path.basename(path)
+        if '_checkpoint_evals' in name or name.endswith('.partial.json'):
+            continue
+        policy = name[:-len('_evals.json')]
+        if policy in live:
+            print('  KEEP  {0:<64} (the arm is live; its trainer owns the file)'.format(name))
+            continue
+        with open(path) as handle:
+            raw = json.load(handle)
+        if isinstance(raw, dict) and 'columns' in raw:
+            if _stamp_from_disk(policy, path, raw):
+                if apply:
+                    results.write(path, raw)
+                print('  {0}  {1:<64} (started/finished from arch.json and the file\'s own mtime)'.format(
+                    'STAMPED' if apply else '  would', name))
+            continue
+        if not isinstance(raw, dict) or 'evals' not in raw:
+            continue
+        rows = raw.get('evals') or []
+        _stamp_from_disk(policy, path, raw)
+        converted = results.stage_a_payload(raw.get('summary') or {}, rows, raw.get('resumes') or [])
+        if results.from_columns(converted['columns']) != _without_nones(rows):
+            print('  KEEP  {0:<64} (the column round trip does not give the rows back)'.format(name))
+            continue
+        # Anything else the file carried rides along; the rows themselves are the columns now.
+        for key, value in raw.items():
+            if key not in converted and key != 'evals':
+                converted[key] = value
+        before = os.path.getsize(path)
+        after_text = len(json.dumps(converted))
+        if os.path.realpath(path) in tracked:
+            skipped += before - after_text
+            continue
+        if apply:
+            results.write(path, converted)
+            after = os.path.getsize(path)
+        else:
+            after = after_text
+        freed += before - after
+        print('  {0}  {1:<64} {2} -> {3}'.format(
+            'REWROTE' if apply else '  would', name, _mb(before), _mb(after)))
+    print('columns: {0} {1}{2}'.format(
+        'freed' if apply else 'would free', _mb(freed),
+        '; skipped {0} of droppable bytes in git-tracked files '
+        '(--include-tracked takes them too)'.format(_mb(skipped)) if skipped else ''))
+    return freed
+
+
 # ------------------------------------------------------------- checkpoints
 
 def checkpoint_plan(policy, keep_above, label=None):
@@ -246,6 +407,14 @@ def main(argv=None):
                             help='the two dead per-episode arrays in stored rows')
     arrays.add_argument('--include-tracked', action='store_true',
                         help='rewrite git-tracked files too; see tracked_paths() on the trade')
+    histogram = sub.add_parser('histogram', parents=[common],
+                               help='episode_scores arrays in pass rows, replaced by score_counts')
+    histogram.add_argument('--include-tracked', action='store_true',
+                           help='rewrite git-tracked files too; see tracked_paths() on the trade')
+    columns = sub.add_parser('columns', parents=[common],
+                             help='stage-A _evals.json files stored as row lists, rewritten as columns')
+    columns.add_argument('--include-tracked', action='store_true',
+                         help='rewrite git-tracked files too; see tracked_paths() on the trade')
     checkpoints = sub.add_parser('checkpoints', parents=[common],
                                  help='a closed arm\'s unwanted checkpoints')
     checkpoints.add_argument('policies', nargs='+')
@@ -260,6 +429,10 @@ def main(argv=None):
         prune_shards(apply=args.apply)
     elif args.what == 'arrays':
         prune_arrays(apply=args.apply, include_tracked=args.include_tracked)
+    elif args.what == 'histogram':
+        prune_histogram(apply=args.apply, include_tracked=args.include_tracked)
+    elif args.what == 'columns':
+        prune_columns(apply=args.apply, include_tracked=args.include_tracked)
     else:
         prune_checkpoints(args.policies, args.keep_above, label=args.label, apply=args.apply)
     return 0

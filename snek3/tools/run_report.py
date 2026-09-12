@@ -13,6 +13,8 @@ makes "is this arm dead" one consistent definition instead of a judgement made a
 import json
 import os
 
+from tools import results
+
 # The share of an arm's evals at or above this perfect rate is `strong_eval_fraction`.
 STRONG_EVAL_THRESHOLD = 80.0
 
@@ -42,15 +44,23 @@ def load_history(path):
     instead of starting a new one at the current step. A corrupt history is reported and treated as
     empty rather than raising: losing a graph is bad, losing a training run to a graph is worse.
     """
-    if not os.path.exists(path):
-        return [], []
     try:
-        with open(path) as handle:
-            saved = json.load(handle)
+        saved = results.read(path)
     except (ValueError, OSError) as error:
         print('could not read {0} ({1}); starting a fresh graph'.format(path, error))
         return [], []
+    if saved is None:
+        return [], []
     return saved.get('evals', []), saved.get('resumes', [])
+
+
+def load_summary(path):
+    """The stored `summary` of a history file, or `{}` when there is none or it cannot be read."""
+    try:
+        saved = results.read(path)
+    except (ValueError, OSError):
+        return {}
+    return dict((saved or {}).get('summary') or {})
 
 
 def strong_eval_fraction(perfect, threshold=STRONG_EVAL_THRESHOLD):
@@ -160,13 +170,23 @@ def merge_eval_row(eval_rows, row):
     return eval_rows
 
 
-def save_history(path, eval_rows, resume_steps=()):
-    """Writes the eval series plus its summary, atomically. Returns the summary."""
+def save_history(path, eval_rows, resume_steps=(), started=None):
+    """Writes the eval series plus its summary, atomically. Returns the summary.
+
+    The rows are stored as columns (`results.stage_a_payload`; 2026-09-11) and read back as rows by
+    `load_history`. `started` is the arm's first launch as an `iso_now` stamp -- the trainer carries it
+    across restarts from `load_summary` -- and the summary records it with `finished` (this write) and
+    `wall_seconds`, so how long an arm took is on its file.
+    """
     summary = build_summary(eval_rows)
+    now = results.iso_now()
+    summary['started'] = started or now
+    summary['finished'] = now
+    summary['wall_seconds'] = results.seconds_between(summary['started'], now)
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     staging = path + '.partial'
     with open(staging, 'w') as handle:
-        json.dump({'summary': summary, 'evals': eval_rows, 'resumes': list(resume_steps)}, handle)
+        json.dump(results.stage_a_payload(summary, eval_rows, resume_steps), handle)
     os.replace(staging, path)
     return summary
 

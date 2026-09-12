@@ -1,7 +1,13 @@
 # Compacting the `runs/` archive: what each file carries, who reads it, and five ways to shrink it
 
-**Status: proposal 2026-09-11, for review.** Nothing built. The versions in §4 are alternatives, not
-steps; the recommendation is §5.
+**Status: B and D built 2026-09-11**, the day after the proposal, as the user chose in review: the histogram
+(`eval_plan.build_row` writes `score_counts`; `score_counts_of` / `scores_of` / `perfect_flags` read either form),
+the columnar stage-A file (`results.stage_a_payload` / `expand`; every reader goes through `results.read` or
+`results.expand`), `started` / `finished` / `wall_seconds` stamps on stage-A summaries, shard files and merged pass
+files (§6), and the two converters `prune_runs histogram` and `prune_runs columns`, each refusing a file whose
+stored summary disagrees with its scores or whose column round trip is not exact. Histogram keyed by score as a
+dict. Migration run on both boxes' `runs/`; `snek2/runs` untouched. C and E not built. The rest of this file is
+the proposal as reviewed.
 
 ## 1. What is asked
 

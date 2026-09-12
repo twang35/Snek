@@ -10,8 +10,14 @@ and half of comparing two of its rows was working out whether they were comparab
 `episodes_planned` as asked, and every pooling reader takes full rows only. `abandoned` is on every
 row, false on a full one, so a reader never has to guess.
 
-**`episode_scores` is stored, not just the summaries, and that is not redundancy:** the summaries
-pool but **the median does not**, so a row rebuilt from two summaries carries a quietly wrong median.
+**The per-episode scores are stored as a histogram, `score_counts` (`{score: n}`), since 2026-09-11.**
+Until then the row carried the `episode_scores` array, on the grounds that the summaries pool but
+the median does not; a histogram is exact for every order-independent statistic -- median, mean,
+min, max, percentiles and the perfect count -- so nothing that argument protected is lost, and it
+is ~1/50th of the array's bytes (a 5,000-episode row: 4,915 x "95" is one entry). What is lost is
+the order of the episodes within a row, which had no reader: resumption is by step and a row is
+written only when its sample completes. `plans/runs-archive-compaction.md` has the measurements;
+`prune_runs histogram` converts a file written before the change, and `score_counts_of` reads either.
 
 **‡ The other two arrays were dropped 2026-09-01, and they were 70% of every result file.** A row
 used to carry `episode_perfect` and `episode_rewards` beside the scores, on the stated grounds that
@@ -88,10 +94,35 @@ def build_row(step, held, stage_a_percent=None):
         # throughput. Strong policies play longer episodes and measure slower, so a fixed estimate
         # is wrong in both directions.
         'seconds': round(held['seconds'], 1),
-        # The one array kept, because a median does not pool. See the module docstring for the two
-        # that went and the measurement behind it.
-        'episode_scores': [int(score) for score in scores],
+        # The per-episode scores as a histogram (2026-09-11; the module docstring has the reasoning).
+        'score_counts': score_counts(scores),
     }
+
+
+def score_counts(scores):
+    """`{score: n}` over `scores`, keys as strings in ascending score order (JSON keys are strings)."""
+    counts = {}
+    for score in scores:
+        key = str(int(score))
+        counts[key] = counts.get(key, 0) + 1
+    return {key: counts[key] for key in sorted(counts, key=int)}
+
+
+def score_counts_of(row):
+    """The row's score histogram: `score_counts` on a row written since 2026-09-11, else built from the
+    `episode_scores` array a row written before it still carries. An old file and a new one answer the same."""
+    stored = row.get('score_counts')
+    if stored is not None:
+        return {str(key): int(value) for key, value in stored.items()}
+    return score_counts(row.get('episode_scores') or [])
+
+
+def scores_of(row):
+    """Every episode's score, ascending -- the order within the row is not stored, and nothing read it."""
+    scores = []
+    for key, count in sorted(score_counts_of(row).items(), key=lambda item: int(item[0])):
+        scores.extend([int(key)] * count)
+    return scores
 
 
 def perfect_flags(row):
@@ -99,14 +130,17 @@ def perfect_flags(row):
 
     Replaces the `episode_perfect` array. `env.observations.is_perfect_score` is the single
     definition of a win (`invariants.md` #1) and the vectorised env decides the flag with it, so the
-    flags are a function of `episode_scores` and storing them was storing the same fact twice. Rows
-    written before 2026-09-01 still carry the array; this reads either, so an old file and a new one
-    answer the same.
+    flags are a function of the scores and storing them was storing the same fact twice. Rows written
+    before 2026-09-01 still carry the array, rows before 2026-09-11 the `episode_scores` list, rows since
+    the `score_counts` histogram; this reads any of them. From a histogram the flags come back sorted
+    by score (order was not kept), so compare them as a multiset.
     """
     stored = row.get('episode_perfect')
     if stored is not None:
         return [bool(flag) for flag in stored]
-    return [bool(is_perfect_score(score)) for score in row['episode_scores']]
+    if row.get('episode_scores') is not None:
+        return [bool(is_perfect_score(score)) for score in row['episode_scores']]
+    return [bool(is_perfect_score(score)) for score in scores_of(row)]
 
 
 def one_line(row, label=''):

@@ -48,6 +48,7 @@ import statistics
 
 from env import constants
 from tools import live_runs
+from tools import results
 
 RECENT_ROWS = 10
 # The box-wide fallback rate reads this many of the most recently touched arms.
@@ -119,7 +120,7 @@ def _rows(policy, runs_dir=None):
     rows = []
     try:
         with open(path) as handle:
-            loaded = json.load(handle)
+            loaded = results.expand(json.load(handle))
         for row in loaded.get('evals') or []:
             if isinstance(row, dict) and row.get('steps_per_second') and row.get('step') is not None:
                 rows.append((int(row['step']), float(row['steps_per_second'])))
@@ -255,7 +256,7 @@ def selected_checkpoints(kind, policy, runs_dir=None):
         return None
     try:
         with open(path) as handle:
-            loaded = json.load(handle)
+            loaded = results.expand(json.load(handle))
         rows = loaded.get('evals' if label is None else 'rows') or []
     except (OSError, ValueError, AttributeError):
         return None

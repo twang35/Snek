@@ -19,12 +19,95 @@ backlog with 16 of them idle. Here there is no central row bookkeeping to overta
 appends to its own file and `merge` runs once, after.
 """
 
+import datetime
 import glob
 import json
 import os
 import re
 
 from env import constants
+
+# Stage-A files are stored as columns since 2026-09-11 (`plans/runs-archive-compaction.md`, version D):
+# `{'format': COLUMNS_FORMAT, 'summary', 'resumes', 'columns': {name: [value per row]}}` instead of a
+# list of row dicts. Every reader goes through `read`, which hands back the row form either way, so the
+# on-disk shape is this module's business alone. Measured on a 200M arm: 3.3 MB -> 1.06 MB, lossless.
+COLUMNS_FORMAT = 'columns-1'
+
+
+def iso_now():
+    """The wall clock as an ISO-8601 string to the second, local time -- the stamp every result file carries."""
+    return datetime.datetime.now().isoformat(timespec='seconds')
+
+
+def seconds_between(started, finished):
+    """`finished - started` in whole seconds for two `iso_now` stamps, or None if either is missing or odd."""
+    try:
+        delta = datetime.datetime.fromisoformat(finished) - datetime.datetime.fromisoformat(started)
+    except (TypeError, ValueError):
+        return None
+    return int(round(delta.total_seconds()))
+
+
+def to_columns(rows):
+    """Rows as `{column: [value per row]}`, in first-seen key order.
+
+    A dict-valued field one level deep (a PPO row's `ppo` block) flattens to `ppo.<key>` columns; a row
+    without the field reads as None in every one of them. Lossless with `from_columns` except for a
+    field explicitly stored as None, which comes back absent -- every reader uses `.get`, and a
+    top-level key must not contain a dot.
+    """
+    names, seen = [], set()
+    for row in rows:
+        for key, value in row.items():
+            if isinstance(value, dict):
+                for sub in value:
+                    name = '{0}.{1}'.format(key, sub)
+                    if name not in seen:
+                        seen.add(name)
+                        names.append(name)
+            elif key not in seen:
+                seen.add(key)
+                names.append(key)
+    columns = {}
+    for name in names:
+        parent, dot, sub = name.partition('.')
+        if dot:
+            columns[name] = [row[parent].get(sub) if isinstance(row.get(parent), dict) else None
+                             for row in rows]
+        else:
+            columns[name] = [row.get(name) for row in rows]
+    return columns
+
+
+def from_columns(columns):
+    """The inverse of `to_columns`: a list of row dicts, `parent.sub` columns regrouped into a dict."""
+    length = max((len(values) for values in columns.values()), default=0)
+    rows = [{} for _ in range(length)]
+    for name, values in columns.items():
+        parent, dot, sub = name.partition('.')
+        for index, value in enumerate(values):
+            if value is None:
+                continue
+            if dot:
+                rows[index].setdefault(parent, {})[sub] = value
+            else:
+                rows[index][name] = value
+    return rows
+
+
+def stage_a_payload(summary, rows, resumes=()):
+    """The on-disk shape of a stage-A file: its summary, resume steps and the eval rows as columns."""
+    return {'format': COLUMNS_FORMAT, 'summary': summary, 'resumes': list(resumes),
+            'columns': to_columns(rows)}
+
+
+def expand(payload):
+    """A payload with its stage-A rows under `evals` as row dicts, whichever shape the file stored."""
+    if isinstance(payload, dict) and 'columns' in payload and 'evals' not in payload:
+        payload = dict(payload)
+        payload['evals'] = from_columns(payload.pop('columns'))
+    return payload
+
 
 def run_name(policy):
     """The name a policy's result files are keyed by — its directory's basename.
@@ -82,7 +165,7 @@ def read(path):
     if not os.path.exists(path):
         return None
     with open(path) as handle:
-        return json.load(handle)
+        return expand(json.load(handle))
 
 
 def write(path, payload):
@@ -118,9 +201,9 @@ def merge(policy, label=None, delete_shards=False):
     """
     by_step = {}
     targets, any_stopped = set(), False
-    for path in shard_paths(policy, label):
-        payload = read(path)
-        targets.add((payload or {}).get('stop_target'))
+    payloads = [read(path) or {} for path in shard_paths(policy, label)]
+    for payload in payloads:
+        targets.add(payload.get('stop_target'))
         for row in rows_of(payload):
             any_stopped = any_stopped or bool(row.get('abandoned'))
             existing = by_step.get(row['step'])
@@ -135,9 +218,15 @@ def merge(policy, label=None, delete_shards=False):
 
     header = {}
     paths = shard_paths(policy, label)
-    if paths:
-        first = read(paths[0]) or {}
-        header = {key: value for key, value in first.items() if key != 'rows'}
+    if payloads:
+        header = {key: value for key, value in payloads[0].items() if key != 'rows'}
+    # When the pass ran: the earliest shard start to the latest shard write (2026-09-11), so a batch's
+    # measuring time is on the file rather than in a scheduler log.
+    starts = [p['started'] for p in payloads if p.get('started')]
+    ends = [p['finished'] for p in payloads if p.get('finished')]
+    if starts and ends:
+        header.update({'started': min(starts), 'finished': max(ends),
+                       'wall_seconds': seconds_between(min(starts), max(ends))})
     header.update({'policy': run_name(policy), 'label': label, 'shards': len(paths),
                    'rows': rows})
     written = write(stage_b_path(policy, label), header)

@@ -260,3 +260,93 @@ def test_nothing_is_reported_as_skipped_when_no_tracked_file_has_arrays(runs_dir
     monkeypatch.setattr(prune_runs, 'tracked_paths', lambda: {os.path.realpath(path)})
     prune_runs.prune_arrays(apply=False)
     assert 'skipped' not in capsys.readouterr().out
+
+
+# --- histogram --------------------------------------------------------------------------------------
+
+def test_histogram_replaces_the_scores_array_and_keeps_every_count(runs_dir):
+    """The 2026-09-11 conversion: `episode_scores` -> `score_counts`, checked against the stored
+    summary before the array goes."""
+    path = write_pass('p', None, [row(1000, 480, arrays=False), row(2000, 500, arrays=False)])
+    before = os.path.getsize(path)
+    assert prune_runs.prune_histogram(apply=True, include_tracked=True) > 0
+    for stored in results.rows_of(results.read(path)):
+        assert 'episode_scores' not in stored
+        assert sum(stored['score_counts'].values()) == 500
+        assert sum(eval_plan.perfect_flags(stored)) == stored['perfect_games']
+    assert results.read(path)['rows'][0]['score_counts'] == {'40': 20, '95': 480}
+    assert os.path.getsize(path) < before / 5
+
+
+def test_histogram_leaves_a_file_alone_when_a_summary_disagrees_with_its_scores(runs_dir):
+    bad = row(1000, 480, arrays=False)
+    bad['perfect_games'] = 479   # the stored count contradicts the scores: not ours to resolve
+    path = write_pass('p', None, [bad])
+    assert prune_runs.prune_histogram(apply=True, include_tracked=True) == 0
+    assert 'episode_scores' in results.read(path)['rows'][0]
+
+
+def test_histogram_is_a_no_op_the_second_time_and_skips_tracked_files_by_default(runs_dir, monkeypatch):
+    path = write_pass('p', None, [row(1000, 480, arrays=False)])
+    monkeypatch.setattr(prune_runs, 'tracked_paths', lambda: {os.path.realpath(path)})
+    assert prune_runs.prune_histogram(apply=True) == 0
+    assert 'episode_scores' in results.read(path)['rows'][0]
+    assert prune_runs.prune_histogram(apply=True, include_tracked=True) > 0
+    assert prune_runs.prune_histogram(apply=True, include_tracked=True) == 0
+
+
+def test_histogram_leaves_the_shards_of_an_unmerged_pass_alone(runs_dir):
+    path = write_pass('p', None, [row(1000, 480, arrays=False)], shard=0, shards=2)
+    prune_runs.prune_histogram(apply=True, include_tracked=True)
+    assert 'episode_scores' in results.read(path)['rows'][0]
+
+
+# --- columns ----------------------------------------------------------------------------------------
+
+def _stage_a_rows(n):
+    return [{'step': i * 1000, 'avg_score': 90.0 + i, 'perfect_percent': 50.0, 'steps_per_second': 100.0,
+             'ppo': {'approx_kl': 0.01 * i, 'clip_fraction': 0.2}} for i in range(1, n + 1)]
+
+
+def test_columns_rewrites_a_row_list_as_columns_and_every_reader_gets_the_rows_back(runs_dir):
+    path = results.stage_a_path('arm')
+    rows = _stage_a_rows(50)
+    with open(path, 'w') as handle:
+        json.dump({'summary': {'step': 5000}, 'evals': rows, 'resumes': [3000]}, handle)
+    # Columns repeat each key once instead of once a row, so past a handful of rows the file shrinks.
+    assert prune_runs.prune_columns(apply=True, include_tracked=True) > 0
+    with open(path) as handle:
+        raw = json.load(handle)
+    assert raw['format'] == results.COLUMNS_FORMAT and 'evals' not in raw
+    assert raw['columns']['ppo.approx_kl'][:3] == [0.01, 0.02, 0.03] and len(raw['columns']['step']) == 50
+    loaded = results.read(path)
+    assert loaded['evals'] == rows and loaded['resumes'] == [3000] and loaded['summary'] == {'step': 5000}
+    assert prune_runs.prune_columns(apply=True, include_tracked=True) == 0
+
+
+def test_columns_skips_a_live_arm(runs_dir, monkeypatch):
+    path = results.stage_a_path('live-arm')
+    with open(path, 'w') as handle:
+        json.dump({'summary': {}, 'evals': _stage_a_rows(2), 'resumes': []}, handle)
+    monkeypatch.setattr(prune_runs.live_runs, 'live', lambda *a, **k: [('live-arm', {})])
+    assert prune_runs.prune_columns(apply=True, include_tracked=True) == 0
+    with open(path) as handle:
+        assert 'evals' in json.load(handle)
+
+
+def test_columns_stamps_an_old_file_from_the_arch_and_file_mtimes_when_the_arm_is_here(runs_dir):
+    make_arm('stamped', [1000])
+    arch = os.path.join(constants.POLICY_DIR, 'stamped', 'arch.json')
+    with open(arch, 'w') as handle:
+        handle.write('{}')
+    os.utime(arch, (1_700_000_000, 1_700_000_000))
+    path = results.stage_a_path('stamped')
+    with open(path, 'w') as handle:
+        json.dump({'summary': {'step': 1000}, 'evals': _stage_a_rows(3), 'resumes': []}, handle)
+    os.utime(path, (1_700_003_600, 1_700_003_600))
+    prune_runs.prune_columns(apply=True, include_tracked=True)
+    summary = results.read(path)['summary']
+    assert summary['wall_seconds'] == 3600 and summary['stamps_from'] == 'disk mtimes'
+    assert summary['finished'] > summary['started']
+    # A second pass leaves it alone: the stamp is there.
+    assert prune_runs.prune_columns(apply=True, include_tracked=True) == 0
