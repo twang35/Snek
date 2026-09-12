@@ -29,6 +29,16 @@ class CheckpointError(Exception):
     pass
 
 
+# The rolling resume state `train.py` writes beside the checkpoints: net, optimiser, step, schedules.
+# Named here rather than only in `train.py` so an algorithm warm-starting from another arm's directory
+# (`init_from`) finds it without importing the trainer.
+RESUME_FILENAME = 'resume.pt'
+
+
+def resume_path(policy_dir):
+    return os.path.join(policy_dir, RESUME_FILENAME)
+
+
 def path(policy_dir, step):
     return os.path.join(policy_dir, '{0}{1}{2}'.format(PREFIX, int(step), SUFFIX))
 

@@ -20,6 +20,8 @@ duplicated for a second algorithm is `train.py`. See [`../plans/archive/ppo.md`]
     algo.net                       the module a checkpoint holds
     algo.policy_fn                 greedy, for `engine.measure`
     algo.state_dict() / load_state_dict()   what `resume.pt` holds
+    algo.init_from(dir, step) -> str   a fresh arm's weights from another arm's `ckpt-<step>.pt`
+                                       (`SNEK_INIT_FROM`); the step stays 0
     algo.save_side_state(dir) / load_side_state(dir)   the replay buffer, which is not a tensor dict
     algo.describe()         -> str  the run's opening line, after "training to N steps, "
     algo.log_note(row)      -> str  the algorithm's column in a progress line
@@ -36,6 +38,7 @@ from dqn import collect
 from dqn import schedules
 from dqn.agent import DdqnAgent
 from dqn.replay import PrioritizedReplay
+from tools import checkpoints
 from vectorized.vec_env import VecSnake
 
 NAME = 'dqn'
@@ -288,6 +291,18 @@ class DqnAlgo(object):
         self.agent.load_state_dict(state['agent'])
         self.epsilon = float(state['epsilon'])
         self.collector.set_guided_fraction(float(state.get('guided_fraction', 0.0)))
+
+    def init_from(self, source_dir, step):
+        """The net from another arm's checkpoint, and the target copied from it, as at a fresh build.
+
+        The schedules, the buffer and the optimiser start fresh: a DQN checkpoint holds the one net,
+        and nothing else of a source arm is meaningful to a new one. See `ppo/algo.py` for the case
+        where more is.
+        """
+        checkpoint = checkpoints.path(source_dir, step)
+        checkpoints.load(checkpoint, self.agent.net, device=self.device)
+        self.agent.target.load_state_dict(self.agent.net.state_dict())
+        return 'net and target from {0}'.format(checkpoint)
 
     def save_side_state(self, policy_dir):
         """The replay buffer, which is a numpy archive rather than a tensor dict.

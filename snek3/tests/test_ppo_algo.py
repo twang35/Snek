@@ -577,3 +577,47 @@ def test_a_horizon_final_outside_its_interval_is_refused(knob, value, monkeypatc
     monkeypatch.setenv(knob, value)
     with pytest.raises(ValueError, match=knob):
         train.build_config()
+
+
+# --- a warm start lends the critic and the optimiser, not only the actor -----------------------------
+
+def _state(module):
+    return {k: v.detach().clone() for k, v in module.state_dict().items()}
+
+
+def _equal(a, b):
+    return a.keys() == b.keys() and all(torch.equal(a[k], b[k]) for k in a)
+
+
+def test_a_warm_start_takes_the_actor_from_the_checkpoint_and_the_critic_from_the_resume(tmp_path, monkeypatch):
+    """The checkpoint holds the actor alone, so the critic and Adam's moments come from `resume.pt`."""
+    source, _ = built(monkeypatch, seed=1)
+    source.advance()                       # so the optimiser has moments to lend
+    source_dir = str(tmp_path / 'src')
+    checkpoints.save(source_dir, 8, source.net)
+    torch.save({'step': 8, 'transitions': 8, 'algo': source.state_dict()},
+               checkpoints.resume_path(source_dir))
+
+    arm, _ = built(monkeypatch, seed=2)
+    assert not _equal(_state(arm.net), _state(source.net))
+    line = arm.init_from(source_dir, 8)
+    assert _equal(_state(arm.net), _state(source.net))
+    assert _equal(_state(arm.agent.critic), _state(source.agent.critic))
+    assert arm.agent.optimizer.state_dict()['state'] and \
+        arm.agent.optimizer.state_dict()['state'].keys() == source.agent.optimizer.state_dict()['state'].keys()
+    assert arm.agent.train_step == source.agent.train_step
+    assert arm.step == 0, 'the ramps span the new arm\'s own cap'
+    assert 'critic and optimiser from' in line
+
+
+def test_a_warm_start_without_a_resume_file_keeps_a_fresh_critic_and_says_so(tmp_path, monkeypatch):
+    source, _ = built(monkeypatch, seed=1)
+    source_dir = str(tmp_path / 'src')
+    checkpoints.save(source_dir, 8, source.net)
+
+    arm, _ = built(monkeypatch, seed=2)
+    fresh_critic = _state(arm.agent.critic)
+    line = arm.init_from(source_dir, 8)
+    assert _equal(_state(arm.net), _state(source.net))
+    assert _equal(_state(arm.agent.critic), fresh_critic)
+    assert 'fresh' in line

@@ -261,7 +261,7 @@ def test_a_control_arm_writes_no_fork_field():
 # next algorithm.
 SEAM = ('step_granularity', 'prefill', 'advance', 'fields', 'on_eval', 'net', 'policy_fn',
         'state_dict', 'load_state_dict', 'save_side_state', 'load_side_state', 'describe',
-        'log_note', 'log_extra')
+        'log_note', 'log_extra', 'init_from')
 
 MODULE_SEAM = ('NAME', 'build', 'build_config', 'reportable')
 
@@ -1297,3 +1297,70 @@ def test_a_fresh_eval_at_a_step_the_previous_life_left_queued_supersedes_it(tmp_
     assert names == ['10.req'] or names == [], 'the old .done is gone; the fresh request stands (or was drained)'
     if trainer.eval_rows:
         assert trainer.eval_rows[-1]['steps_per_second'] == 5.0, 'the fresh measurement, not the stale one'
+
+
+# --- a warm start: SNEK_INIT_FROM=<policy>@<step> -------------------------------------------------
+
+def _weights(net):
+    return {name: tensor.detach().clone() for name, tensor in net.state_dict().items()}
+
+
+def _same_weights(a, b):
+    return a.keys() == b.keys() and all(train.torch.equal(a[k], b[k]) for k in a)
+
+
+def test_a_warm_start_takes_the_checkpoints_weights_and_starts_at_step_zero(tmp_path, monkeypatch, capsys):
+    source = make_trainer(tmp_path, policy='src', monkeypatch=monkeypatch)
+    train.checkpoints.save(source.policy_dir, 30, source.algo.net)
+    wanted = _weights(source.algo.net)
+
+    arm = make_trainer(tmp_path, policy='dst', monkeypatch=monkeypatch, seed=11, init_from='src@30')
+    assert arm.step == 0
+    assert _same_weights(_weights(arm.algo.net), wanted)
+    # DQN's target starts as a copy of the net, as it does on a fresh build.
+    assert _same_weights(_weights(arm.algo.agent.target), wanted)
+    assert 'warm start from src @ 30' in capsys.readouterr().out
+
+
+def test_a_warm_started_arms_own_resume_wins_over_the_source(tmp_path, monkeypatch):
+    """A relaunch continues the arm; it does not start again from the source checkpoint."""
+    source = make_trainer(tmp_path, policy='src', monkeypatch=monkeypatch)
+    train.checkpoints.save(source.policy_dir, 30, source.algo.net)
+    arm = make_trainer(tmp_path, policy='dst', monkeypatch=monkeypatch, init_from='src@30')
+    with train.torch.no_grad():
+        for parameter in arm.algo.net.parameters():
+            parameter.add_(1.0)
+    arm.step = 7
+    arm._save_resume()
+    trained = _weights(arm.algo.net)
+
+    again = make_trainer(tmp_path, policy='dst', monkeypatch=monkeypatch, init_from='src@30')
+    assert again.step == 7
+    assert _same_weights(_weights(again.algo.net), trained)
+    assert not _same_weights(_weights(again.algo.net), _weights(source.algo.net))
+
+
+def test_a_warm_start_from_a_different_network_is_refused_before_anything_loads(tmp_path, monkeypatch):
+    source = make_trainer(tmp_path, policy='src', monkeypatch=monkeypatch, fc_layers=(64, 64))
+    train.checkpoints.save(source.policy_dir, 30, source.algo.net)
+    with pytest.raises(arch_tools.ArchMismatch):
+        make_trainer(tmp_path, policy='dst', monkeypatch=monkeypatch, init_from='src@30')
+
+
+def test_a_warm_start_from_a_missing_checkpoint_names_it(tmp_path, monkeypatch):
+    source = make_trainer(tmp_path, policy='src', monkeypatch=monkeypatch)
+    train.checkpoints.save(source.policy_dir, 30, source.algo.net)
+    with pytest.raises(train.checkpoints.CheckpointError):
+        make_trainer(tmp_path, policy='dst', monkeypatch=monkeypatch, init_from='src@40')
+
+
+@pytest.mark.parametrize('spec', ['src', 'src@', '@30', 'src@thirty'])
+def test_a_malformed_init_from_is_refused_by_shape(tmp_path, monkeypatch, spec):
+    with pytest.raises(ValueError):
+        make_trainer(tmp_path, policy='dst', monkeypatch=monkeypatch, init_from=spec)
+
+
+def test_init_from_is_absent_by_default_and_read_from_its_knob(monkeypatch):
+    assert train.build_config()['init_from'] is None
+    monkeypatch.setenv('SNEK_INIT_FROM', ' b28k-hist8a25-seed11@162856960 ')
+    assert train.build_config()['init_from'] == 'b28k-hist8a25-seed11@162856960'

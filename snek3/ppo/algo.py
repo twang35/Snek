@@ -40,11 +40,14 @@ came back.
 
 import os
 
+import torch
+
 from ppo import collect
 from ppo import rollout as rollout_module
 from ppo import schedules
 from ppo.agent import PpoAgent
 from vectorized.vec_env import VecSnake
+from tools import checkpoints
 
 NAME = 'ppo'
 
@@ -347,6 +350,35 @@ class PpoAlgo(object):
         # `self.step` separately and they agree; this one is kept so the ramp survives a resume even
         # if the two ever diverge.
         self.step = int(state.get('step', 0))
+
+    def init_from(self, source_dir, step):
+        """A fresh arm's weights from another arm's checkpoint (2026-09-11, batch b32).
+
+        **The actor from `ckpt-<step>.pt`; the critic and the optimiser from the source's `resume.pt`
+        when it has one.** A checkpoint holds the actor alone (see `net`), so a warm start has to find
+        its critic elsewhere, and a *fresh* critic is the wrong answer: its values are noise, the
+        normalised advantages of the first rollouts are noise, and the converged actor gets pushed
+        around by them at full clip before the critic catches up. The source arm's end-of-run critic
+        was fitted to the same arm a plateau apart, which is as close as anything on disk gets. Adam's
+        moments come with it for the same reason -- a reset optimiser's first bias-corrected step is a
+        full lr-sized kick on every weight. The rngs stay this arm's own, from its seed.
+
+        `self.step` stays 0, so every ramp spans this arm's own cap from its initial value. Returns
+        one line saying what was loaded, for the trainer's log.
+        """
+        checkpoint = checkpoints.path(source_dir, step)
+        checkpoints.load(checkpoint, self.agent.actor, device=self.device)
+        resume = checkpoints.resume_path(source_dir)
+        if not os.path.exists(resume):
+            return 'actor from {0}; critic and optimiser fresh (no resume.pt beside it)'.format(
+                checkpoint)
+        payload = torch.load(resume, map_location=self.device, weights_only=True)
+        agent = payload.get('algo', payload)['agent']
+        self.agent.critic.load_state_dict(agent['critic'])
+        self.agent.optimizer.load_state_dict(agent['optimizer'])
+        self.agent.train_step = int(agent.get('train_step', 0))
+        return 'actor from {0}; critic and optimiser from {1} (its step {2:,})'.format(
+            checkpoint, resume, int(payload.get('step', 0)))
 
     def save_side_state(self, policy_dir):
         """Nothing beside the weights: there is no replay buffer."""

@@ -102,7 +102,7 @@ EVAL_EPISODES = int(tuned('GRAPH_EVAL_EPISODES', 100, int))
 # checkpoint interval because it is ~20 MB against a checkpoint's ~190 KB and it only warm-starts the
 # next run, where a checkpoint is evidence.
 RESUME_INTERVAL = 10 * EVAL_INTERVAL
-RESUME_FILENAME = 'resume.pt'
+RESUME_FILENAME = checkpoints.RESUME_FILENAME
 
 # The trailing window the checkpoint gate and the chart read. Evals, not steps.
 TRAILING_WINDOW = 30
@@ -180,6 +180,11 @@ def build_config():
         'graph_eval_episodes': EVAL_EPISODES,
         'eval_interval': EVAL_INTERVAL,
         'min_checkpoint_score': constants.MIN_CHECKPOINT_SCORE,
+        # `<policy>@<step>`: a fresh arm starts from that checkpoint of that arm instead of from its
+        # initialiser, at step 0 (2026-09-11, batch b32: b28's best checkpoints annealed on to a
+        # horizon of 1.0). Absent is the normal case. Ignored once the arm has a `resume.pt` of its
+        # own, so a relaunch resumes rather than restarting from the source.
+        'init_from': str(tuned('INIT_FROM', '', str)).strip() or None,
     }
     # **The algorithm's own knobs, and its own validation, come from its module.** One flat dict
     # still, because `runs/<arm>.md` prints it as one table and every key is still its `SNEK_`
@@ -335,7 +340,8 @@ class Trainer(object):
         self.queue_depth = int(config['eval_queue_depth'])
         self.eval_workers = []
         self.skipped_checkpoints = 0
-        self._resume()
+        if not self._resume() and self.config['init_from']:
+            self._warm_start(self.config['init_from'])
 
     # ------------------------------------------------------------ setup and resume
 
@@ -367,7 +373,7 @@ class Trainer(object):
         """
         path = self._resume_path()
         if not os.path.exists(path):
-            return
+            return False
         payload = torch.load(path, map_location=self.device, weights_only=True)
         # **A pre-seam `resume.pt` has no `algo` block** — it holds `agent`, `epsilon` and
         # `guided_fraction` at the top level. Handing the payload itself to the algorithm in that case
@@ -395,6 +401,30 @@ class Trainer(object):
                 print('adopted {0} queued eval(s) from {1:,} to {2:,}'.format(
                     len(self.pending_evals), self.pending_evals[0], self.pending_evals[-1]),
                     flush=True)
+        return True
+
+    def _warm_start(self, spec):
+        """`SNEK_INIT_FROM=<policy>@<step>`: this arm's first weights are that checkpoint's.
+
+        Only on an arm with no `resume.pt` -- `__init__` asks `_resume` first -- so a relaunch of a
+        warm-started arm continues it rather than restarting from the source. The source is checked
+        against this arm's network the way an eval wave checks each policy against its one built net
+        (`assert_same_network`), and against the live env the way any restore is; the algorithm
+        decides what beyond `net` a checkpoint's directory can lend (`init_from`). The step stays 0:
+        every ramp then spans this arm's own cap, which is what makes "anneal from the converged
+        values over the next 50M" expressible as `SNEK_MAX_STEPS` and `SNEK_PPO_ANNEAL_FRACTION`
+        rather than as arithmetic on the source's step.
+        """
+        source, _, step = spec.rpartition('@')
+        if not source or not step.isdigit():
+            raise ValueError('SNEK_INIT_FROM={0!r} is not <policy>@<step>'.format(spec))
+        source_dir = restore.policy_dir(source)
+        source_arch = arch_tools.assert_restorable(source_dir, constants.OBS_LEN, constants.OBS_ERA,
+                                                   constants.NUM_ACTIONS)
+        arch_tools.assert_same_network(self.arch, source_arch, self.policy_dir, source_dir)
+        loaded = self.algo.init_from(source_dir, int(step))
+        print('warm start from {0} @ {1:,}: {2}. Step 0, so every ramp spans this arm\'s own '
+              'cap'.format(source, int(step), loaded), flush=True)
 
     # ------------------------------------------------------------ the loop
 
