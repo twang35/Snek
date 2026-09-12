@@ -44,7 +44,7 @@ rate down on top of the arithmetic; and the sample handed out is exactly the ban
 gate was left out of the port -- a stopped row is shorter than its neighbours and not poolable with
 them -- is answered by the readers: `stage_b_chart` and the viewer pool full rows only, and nothing
 selects a stopped row because every selector's cut is at or above the stop target (`closeout.PASSES`
-asserts that ordering). Without a target nothing here changes. `plans/early-stop.md`.
+asserts that ordering). Without a target nothing here changes. `plans/archive/early-stop.md`.
 """
 
 import time

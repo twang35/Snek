@@ -18,7 +18,7 @@ the page and the tables cannot disagree:
 | `hof30k_rows`, `hof30k_stopped`, `hof30k_mean`, `hof30k_best`, `hof30k_best_step`, `hof30k_998` | the `hof30k` pass (30,000 episodes, seed 7): rows, rows stopped early, mean over the full rows, max and where it is, count at >=99.8 |
 | `hof_99` | `hof5000` rows at >=99 /5,000 — the `hof30k` candidate cut until 2026-09-08 |
 
-A row stopped early (`abandoned`, `plans/early-stop.md`) is a short sample that is only ever below its
+A row stopped early (`abandoned`, `plans/archive/early-stop.md`) is a short sample that is only ever below its
 pass's target: it counts as a row and never in a mean, and it sits below every `>=` count by arithmetic.
 | `status` | `{a, b, h, k}`: one word per view, see `pass_state` — so the page can say whether a missing panel is a pass still to come or one that found nothing |
 | `status_box` | `{a, b, h, k}`: the box a running or queued view is on (`desktop`, `laptop`, or None when unknown or unclaimed), so the caption names the right box |

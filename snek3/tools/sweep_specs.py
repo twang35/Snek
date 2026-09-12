@@ -66,7 +66,7 @@ def build_specs(manifest, batch, cells):
             arm_id = '{0}{1}-{2}-seed{3}'.format(batch['batch'], letters[index], cell['slug'], seed)
             notes = ('Batch {b}: the {knob} sweep, one knob off the frozen base (b7\'s fc (320,) reference: '
                      'PPO defaults, b2 reward, 4 epochs), seeds 1-4 pinned to the arm letter, at b7\'s 50M cap '
-                     'so b7aa-b7ad are the control. Design: plans/hyperparam-sweep.md. '
+                     'so b7aa-b7ad are the control. Design: plans/archive/hyperparam-sweep.md. '
                      'This cell: {cell} -> {env}. Prediction: {pred}'
                      ).format(b=batch['batch'], knob=batch['knob'], cell=cell['slug'],
                               env=json.dumps(cell['env'], sort_keys=True), pred=cell.get('prediction', ''))

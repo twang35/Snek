@@ -117,7 +117,7 @@ def widest_region(rows, level=REGION_LEVEL):
 
 
 def full_rows(rows):
-    """The rows measured to full length. A row stopped early (`abandoned`, `plans/early-stop.md`) is a
+    """The rows measured to full length. A row stopped early (`abandoned`, `plans/archive/early-stop.md`) is a
     short, downward-biased sample that is only ever "below the target": it is drawn, counted as
     stopped, and left out of every pooled or threshold statistic here."""
     return [row for row in rows if not row.get('abandoned')]

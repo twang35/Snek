@@ -6,7 +6,7 @@
 
 One reducer, two consumers: `docs/sweep.md`'s figures and the local page `viewer/sweep.html` both read
 `sweep.json` / `sweep.js`, so the page and the report cannot disagree. The design is
-`plans/sweep-analysis.md`.
+`plans/archive/sweep-analysis.md`.
 
 What one arm reduces to:
 
@@ -297,7 +297,7 @@ def scalars(stage_a, stage_b, hof, h30):
         'cands99': sum(s >= 99 for s in scores) if scores else None,
         'best_row': max(scores) if scores else None,
     })
-    # A row stopped early (`abandoned`, `plans/early-stop.md`) counts as a row and toward no mean; it is
+    # A row stopped early (`abandoned`, `plans/archive/early-stop.md`) counts as a row and toward no mean; it is
     # below every `>=` cut by arithmetic. The page ranks on the counts at the gates, not the means (user, 2026-09-09).
     hof_rows = (hof or {}).get('rows') or []
     hof_scores = [r.get('perfect_percent', 0) for r in hof_rows]

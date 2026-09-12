@@ -1,4 +1,4 @@
-"""Phase 1 of plans/obs-history.md: how do the best checkpoints die, and was a zigzag involved?
+"""Phase 1 of plans/archive/obs-history.md: how do the best checkpoints die, and was a zigzag involved?
 
 Reads a `tools.death_trace` file. Perfect games give the matched-board-fill control; each failure is
 replayed exactly and classified:

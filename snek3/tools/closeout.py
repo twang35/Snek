@@ -60,7 +60,7 @@ REDRAW_SECONDS = 20
 # `desktop/daemon/launch.py` for why it must not), and `tools/scheduler.py` runs the same command.
 # `stageb` is the close-out's own defaults, so a command that names no pass is unchanged.
 #
-# `stop` is the early stop (`vectorized/engine.py`, `plans/early-stop.md`): a checkpoint is retired once
+# `stop` is the early stop (`vectorized/engine.py`, `plans/archive/early-stop.md`): a checkpoint is retired once
 # that perfect rate is arithmetically out of reach. hof5000 stops at the hof30k cut, so no row it could
 # have promoted is lost; hof30k stops at the record it exists to find; stage B has none, because
 # density98 counts the rows a stop would retire. `check_stops` holds each stop at or above the next

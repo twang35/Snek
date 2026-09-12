@@ -1,4 +1,4 @@
-"""Move history: two bits per past move, read off the body (plans/obs-history.md, built 2026-09-07).
+"""Move history: two bits per past move, read off the body (plans/archive/obs-history.md, built 2026-09-07).
 
 The block is gated by `SNEK_OBS_HISTORY` at import, so the layout and parity suites run a second time
 under the knob from a subprocess here; the value tests below need no knob because they call the

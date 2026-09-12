@@ -235,7 +235,7 @@ def test_banking_one_slot_twice_is_refused():
 
 def test_a_job_is_out_of_reach_by_arithmetic_and_not_one_failure_sooner():
     """Target 80% of 10 needs 8 perfect games, so the 3rd failure -- not the 2nd -- puts it out of
-    reach: with 2 failures banked the other 8 could still all be perfect. `plans/early-stop.md`."""
+    reach: with 2 failures banked the other 8 could still all be perfect. `plans/archive/early-stop.md`."""
     job = engine._Job('ckpt', lambda obs: obs, 10, stop_target=80.0)
     assert job.needed == 8
     job.record(0, 0, 0.0); job.record(1, 0, 0.0)

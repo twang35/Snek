@@ -111,7 +111,7 @@ def merge(policy, label=None, delete_shards=False):
     overlapped the slice it was replacing.
 
     **Shards measured under different `stop_target`s are refused when any row was stopped.** A stopped
-    row means something only against the target it was stopped under (`plans/early-stop.md`), and a
+    row means something only against the target it was stopped under (`plans/archive/early-stop.md`), and a
     merged file has one header, so one file cannot hold two targets' stopped rows. snek2's result files
     had four gate eras that every reader had to know about; here the merge refuses instead. Full rows
     are full under any target, so files with none stopped merge whatever their headers say.

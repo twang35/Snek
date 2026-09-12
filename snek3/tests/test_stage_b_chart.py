@@ -250,7 +250,7 @@ def test_the_points_and_the_rug_are_still_drawn():
 
 def test_summarise_pools_full_rows_only_and_counts_the_stopped_ones():
     """A stopped row (`abandoned`) is a short sample below its target: it is a row, and it is in no
-    pooled rate, threshold count or top list (`plans/early-stop.md`)."""
+    pooled rate, threshold count or top list (`plans/archive/early-stop.md`)."""
     stopped = dict(row(3000, 40, episodes=50), abandoned=True, episodes_planned=100)
     rows = [row(1000, 98), row(2000, 99), stopped]
     facts = stage_b_chart.summarise(rows)

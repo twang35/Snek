@@ -1,6 +1,6 @@
 """Play a checkpoint greedily and keep every episode's action and food sequence, so failures replay.
 
-Phase 1 of plans/obs-history.md. The measured policy is the argmax and the game is deterministic
+Phase 1 of plans/archive/obs-history.md. The measured policy is the argmax and the game is deterministic
 given its food sequence, so `(initial food, actions, food placed after each eat)` rebuilds any episode
 exactly — `replay()` below does it through `VecSnake.step(forced_food=...)`.
 

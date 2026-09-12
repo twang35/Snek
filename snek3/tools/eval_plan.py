@@ -6,7 +6,7 @@ that reached ≥97/100 at 500 episodes — so there is no screen/confirm split a
 snek2's files carried `selected_by`, `abandoned` and a nullable `min_achievable` for exactly those,
 and half of comparing two of its rows was working out whether they were comparable at all. Since
 2026-09-09 the deep passes stop a checkpoint once its target is arithmetically out of reach
-(`plans/early-stop.md`): such a row carries `abandoned: true`, `episodes` as banked and
+(`plans/archive/early-stop.md`): such a row carries `abandoned: true`, `episodes` as banked and
 `episodes_planned` as asked, and every pooling reader takes full rows only. `abandoned` is on every
 row, false on a full one, so a reader never has to guess.
 

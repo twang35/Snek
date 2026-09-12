@@ -80,7 +80,7 @@ BASE_OBS_LEN = 26
 # cells behind the head, so the block is a pure function of the board like every other one, with
 # nothing to reset, snapshot or keep in parity. A body shorter than the depth reads forward for the
 # moves it cannot show, which is also what the straight opening body reads. Design and the
-# investigation that preceded it: plans/obs-history.md; batch b27 is the first to run it.
+# investigation that preceded it: plans/archive/obs-history.md; batch b27 is the first to run it.
 OBS_HISTORY = _num('OBS_HISTORY', 0, int)
 if OBS_HISTORY < 0:
     raise ValueError('SNEK_OBS_HISTORY must be >= 0, got {0}'.format(OBS_HISTORY))

@@ -78,7 +78,7 @@ MIN_LEDGER_CHECKPOINTS = 50
 # and the move-history arms (b27) put ~7,500 rows a cell through the old cut (195 h on the laptop).
 HOF_THRESHOLD = 99.2
 HOF30K_THRESHOLD = 99.6
-# The early stops (user, 2026-09-09; `plans/early-stop.md`): a hof5000 checkpoint is retired once it can
+# The early stops (user, 2026-09-09; `plans/archive/early-stop.md`): a hof5000 checkpoint is retired once it can
 # no longer read 99.6 -- the hof30k cut, so nothing it could have been promoted for is lost -- and a
 # hof30k checkpoint once it can no longer read 99.8, the record the pass exists to find. Stage B has no
 # stop: density98 counts the rows a stop would retire. Modelled on b27 + b28's rows: 88 -> 60 h with

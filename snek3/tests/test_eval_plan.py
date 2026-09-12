@@ -102,7 +102,7 @@ def test_a_full_row_says_so_and_carries_no_other_comparability_caveats():
 
 
 def test_a_stopped_row_is_the_banked_episodes_and_says_what_was_planned():
-    """The engine hands out exactly the episodes it banked (`plans/early-stop.md`); the row's rate and
+    """The engine hands out exactly the episodes it banked (`plans/archive/early-stop.md`); the row's rate and
     interval are over those, and `episodes_planned` keeps the depth that was asked for."""
     sample = held([95, 95, 0, 0, 0], seconds=2.0)
     sample.update({'abandoned': True, 'episodes_planned': 500, 'stop_target': 99.6})

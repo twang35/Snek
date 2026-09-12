@@ -287,7 +287,7 @@ def test_a_hof_pass_is_labelled_so_it_never_overwrites_what_it_selected_from():
 
 def test_the_early_stops_are_the_users_and_stage_b_has_none():
     """2026-09-09: hof5000 stops at the hof30k cut, hof30k at the 99.8 record, stage B never --
-    density98 counts the rows a stop would retire (`plans/early-stop.md`)."""
+    density98 counts the rows a stop would retire (`plans/archive/early-stop.md`)."""
     from tools import eta
     assert (eta.HOF5000_STOP, eta.HOF30K_STOP) == (99.6, 99.8)
     assert closeout.PASSES['stageb']['stop'] is None
