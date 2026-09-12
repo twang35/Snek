@@ -1,0 +1,8 @@
+{
+  "project": "snek3",
+  "id": "deploy-20260912T000936Z",
+  "type": "deploy",
+  "label": "deploy requested from the laptop at master beb289b50",
+  "notes": "Named action queued by snek3/desktop/queue_action; the daemon runs it on the poll that sees it.",
+  "restart": true
+}
