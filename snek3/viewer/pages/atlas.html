@@ -120,6 +120,7 @@ td.score .reg{display:inline-block;font-size:10px;letter-spacing:.06em;border:1p
 .bars .lbl .dot{width:8px;height:8px;border-radius:50%;flex:none}
 .bars .lbl .nm{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bars .lbl .yr{font:500 11px/1 "IBM Plex Mono",ui-monospace,monospace;color:var(--ink-3);flex:none}
+.bars .lbl .fr{font:500 10px/1 "IBM Plex Mono",ui-monospace,monospace;color:var(--ink-3);border:1px solid var(--line);border-radius:3px;padding:2px 4px;flex:none}
 .bars .track{position:relative;height:22px;border-left:1px solid var(--line)}
 .bars .tick{position:absolute;top:0;bottom:0;width:0;border-left:1px solid var(--line-2)}
 .bars .bar{position:absolute;left:0;top:3px;height:16px;background:var(--accent);border-radius:0 4px 4px 0;min-width:2px;opacity:.85}
@@ -202,8 +203,12 @@ mark{background:none;color:var(--accent);font-weight:600}
     <span class="label" id="statHint" style="margin-left:8px"></span>
   </div>
   <div class="panel" id="panel-200M">
-    <div class="panel-head"><span class="label">Atari-57 · 200M frames (or more) · <span class="stat-word">median</span> human-normalised score, log scale</span><span class="label">100% = human</span></div>
+    <div class="panel-head"><span class="label">Atari-57 · 200M frames, the standard budget · <span class="stat-word">median</span> human-normalised score, log scale</span><span class="label">100% = human</span></div>
     <div class="bars" id="bars-200M"></div>
+  </div>
+  <div class="panel" id="panel-big">
+    <div class="panel-head"><span class="label">Atari-57 · beyond 200M frames: 1B to 90B, the budget on each bar · <span class="stat-word">median</span> human-normalised score, log scale</span><span class="label">100% = human</span></div>
+    <div class="bars" id="bars-big"></div>
   </div>
   <div class="panel" id="panel-100k">
     <div class="panel-head"><span class="label">Atari 100k · 26 games · 100k agent steps = 400k frames, 1/500th of the panel above · <span class="stat-word">median</span> human-normalised score, log scale</span><span class="label">100% = human</span></div>
@@ -214,7 +219,7 @@ mark{background:none;color:var(--accent);font-weight:600}
     <div class="bars" id="bars-10M"></div>
   </div>
   <div class="empty" id="scores-empty" hidden>No algorithm in the current selection has an Atari score.</div>
-  <p class="note">Three regimes, three panels: a 200M-frame agent, a 100k agent and a 40M-frame 20-game run are not on the same axis. Every number was checked against the paper table its source line names (2026-09-13); grey bars are the reference runs a paper measured alongside its own method, so a panel can be read within one protocol. Human starts, sticky actions and game counts differ between papers, so read differences under a factor of ~1.3 as noise: Rainbow is 223% in its own table, 153% with human starts and 147–150% under Dopamine's sticky actions. Median or mean is the toggle above; hover a bar for the other statistic and the source. Game-specific results (Montezuma's Revenge, Procgen) sit in the table's Atari column instead.</p>
+  <p class="note">Four panels: the standard 200M-frame budget, the runs that went far past it (1B to 90B frames, so MuZero at 20B sits above MuZero Reanalyse at 200M without being the better method at equal data), the 100k benchmark and a 40M-frame 20-game run are not on the same axis. Every number was checked against the paper table its source line names (2026-09-13); grey bars are the reference runs a paper measured alongside its own method, so a panel can be read within one protocol. Human starts, sticky actions and game counts differ between papers, so read differences under a factor of ~1.3 as noise: Rainbow is 223% in its own table, 153% with human starts and 147–150% under Dopamine's sticky actions. Median or mean is the toggle above; hover a bar for the other statistic and the source. Game-specific results (Montezuma's Revenge, Procgen) sit in the table's Atari column instead.</p>
 </div>
 
 <p class="note">Years are first public release (arXiv or blog), not conference year. LLM post-training methods (RLHF, DPO, GRPO and descendants) are deliberately excluded. 2026 entries come from the RLC 2026 pre-proceedings (RLJ vol. 7); their tiers reflect the novelty of the mechanism, not yet proven influence.</p>
@@ -238,7 +243,8 @@ const FAM = {
 };
 // year, name, family, domain (a string, or a list whose first entry is the primary), tier (1 core / 2 refinement), breakthrough, reference,
 // and optionally Atari: {med, mean} human-normalised %, reg "200M" (Atari-57, 200M frames, no-op starts unless starts:"human") or "100k"
-// (Atari 100k, 26 games) or "10M" (Zhou et al.'s 20-game, 10M-step discrete-SAC regime), approx when the number is unverified, src; or {text} for a
+// (Atari 100k, 26 games) or "10M" (Zhou et al.'s 20-game, 10M-step discrete-SAC regime); frames when the run used more than the regime's budget
+// ("20B": the scores view draws runs past 500M frames in their own panel, tagged); approx when the number is unverified, src; or {text} for a
 // game-specific or non-comparable result. A list of these gives one algorithm several results (e.g. a 200M and a 100k number).
 const D = [
 [2013,"DQN","value","Discrete (Atari)",1,"Pioneered deep RL from raw pixels; experience replay plus a target network stabilized Q-learning with a CNN.","Mnih et al. · DeepMind",{"med": 79, "mean": 228, "reg": "200M", "src": "Rainbow Table 2 (median) and IQN / QR-DQN Table 1 (mean); 68% with human starts"}],
@@ -257,7 +263,7 @@ const D = [
 [2016,"GAIL","im",["Continuous control","Goal-conditioned / robotics"],1,"Framed imitation as a GAN: the discriminator is the reward, the policy is the generator.","Ho & Ermon · NeurIPS"],
 [2016,"Option-Critic","hm","Discrete (Atari)",2,"End-to-end learning of options (temporally extended actions) and their termination.","Bacon et al. · AAAI 2017"],
 [2016,"ACER","pg",["Discrete (Atari)","Continuous control"],1,"Off-policy actor-critic with Retrace, truncated importance sampling with bias correction, and a trust-region step.","Wang et al. · ICLR 2017",{"text": "57 games; median human-normalised only as learning curves (Fig. 1), about prioritized-replay level; no number stated"}],
-[2016,"UNREAL","rep",["Pixel-based control","Discrete (Atari)"],1,"Auxiliary tasks (pixel control, reward prediction) improved representations and sample efficiency.","Jaderberg et al. · ICLR 2017",{"med": 250, "mean": 880, "reg": "200M", "starts": "human", "src": "UNREAL §4.2 (880% mean, 250% median), hyperparameters tuned per game, 250M frames; Ape-X's table reads 331 with no-op starts"}],
+[2016,"UNREAL","rep",["Pixel-based control","Discrete (Atari)"],1,"Auxiliary tasks (pixel control, reward prediction) improved representations and sample efficiency.","Jaderberg et al. · ICLR 2017",{"med": 250, "mean": 880, "reg": "200M", "frames": "250M", "starts": "human", "src": "UNREAL §4.2 (880% mean, 250% median), hyperparameters tuned per game, 250M frames; Ape-X's table reads 331 with no-op starts"}],
 [2016,"RL²","hm","Meta-learning",1,"A recurrent policy trained across a task distribution learns an RL algorithm in its hidden state.","Duan et al. · OpenAI"],
 [2017,"C51","dist","Discrete (Atari)",1,"Distributional RL: learn the full return distribution over 51 atoms instead of a mean Q-value.","Bellemare et al. · ICML",{"med": 178, "mean": 701, "reg": "200M", "src": "C51, QR-DQN and IQN Table 1; Rainbow's own re-run reads 164"}],
 [2017,"Noisy Nets","exp",["Discrete (Atari)","Continuous control"],1,"Learned parametric noise in the weights replaced ε-greedy with state-dependent exploration.","Fortunato et al. · ICLR 2018",{"med": 118, "reg": "200M", "src": "Rainbow Table 2, NoisyNet-DQN; 102 with human starts"}],
@@ -280,7 +286,7 @@ const D = [
 [2018,"SAC (auto-temperature)","ac","Continuous control",2,"Learned the entropy coefficient against a target entropy; the SAC everyone actually runs.","Haarnoja et al."],
 [2018,"TD3","ac",["Continuous control","Goal-conditioned / robotics"],1,"Applied twin critics, delayed actor updates and target smoothing to crush overestimation in continuous spaces.","Fujimoto et al. · ICML"],
 [2018,"IMPALA","sys",["Multi-task / generalist","Discrete (Atari)"],1,"Decoupled actors and learner at scale; V-trace corrected the resulting off-policy lag.","Espeholt et al. · ICML",{"med": 192, "mean": 958, "reg": "200M", "src": "IMPALA Table 4, deep net, one expert per game; one multi-task agent on all 57: 60 / 177"}],
-[2018,"Ape-X","sys",["Discrete (Atari)","Continuous control"],1,"Distributed PER with hundreds of actors feeding one learner; massive throughput gains.","Horgan et al. · ICLR",{"med": 434, "mean": 1695, "reg": "200M", "src": "Ape-X Table 1 (median; 358 with human starts), 22.8B frames; the mean is from R2D2's and MuZero's tables"}],
+[2018,"Ape-X","sys",["Discrete (Atari)","Continuous control"],1,"Distributed PER with hundreds of actors feeding one learner; massive throughput gains.","Horgan et al. · ICLR",{"med": 434, "mean": 1695, "reg": "200M", "frames": "22.8B", "src": "Ape-X Table 1 (median; 358 with human starts), 22.8B frames; the mean is from R2D2's and MuZero's tables"}],
 [2018,"D4PG","ac","Continuous control",2,"Distributed distributional DDPG with n-step returns; a combination of existing parts.","Barth-Maron et al. · ICLR"],
 [2018,"IQN","dist","Discrete (Atari)",1,"Implicit Quantile Networks sample quantile fractions as network inputs, enabling risk-sensitive policies.","Dabney et al. · ICML",{"med": 218, "mean": 1019, "reg": "200M", "src": "IQN Table 1, 5 seeds"}],
 [2018,"MPO","ac",["Continuous control","Discrete (Atari)"],1,"Maximum a-posteriori Policy Optimization: EM-style, hyperparameter-robust policy improvement.","Abdolmaleki et al. · ICLR",{"text": "no Atari result in the MPO papers (continuous control only); the Atari numbers are V-MPO's"}],
@@ -291,7 +297,7 @@ const D = [
 [2018,"QMIX","ma",["Multi-agent","Board & strategy games"],1,"Monotonic value factorization enabling centralized training with decentralized execution.","Rashid et al. · ICML"],
 [2018,"DIAYN","exp","Unsupervised skills",2,"Diversity Is All You Need: discover distinguishable skills without any reward.","Eysenbach et al. · ICLR 2019"],
 [2018,"Dactyl / ADR","pg","Goal-conditioned / robotics",2,"PPO plus automatic domain randomization transferred sim policies to a real hand solving a Rubik's cube.","OpenAI · 2018–2019"],
-[2018,"R2D2","value",["Discrete (Atari)","Partially observed"],1,"Recurrent replay at Ape-X scale with stored hidden states and burn-in; a large jump over Rainbow.","Kapturowski et al. · ICLR 2019",{"med": 1921, "mean": 4025, "reg": "200M", "src": "R2D2 Table 1, 3 seeds, 30 no-op starts; MuZero's table puts it at 37.5B frames; Agent57 re-tabulates 1936 / 4622"}],
+[2018,"R2D2","value",["Discrete (Atari)","Partially observed"],1,"Recurrent replay at Ape-X scale with stored hidden states and burn-in; a large jump over Rainbow.","Kapturowski et al. · ICLR 2019",{"med": 1921, "mean": 4025, "reg": "200M", "frames": "37.5B", "src": "R2D2 Table 1, 3 seeds, 30 no-op starts; MuZero's table puts it at 37.5B frames; Agent57 re-tabulates 1936 / 4622"}],
 [2018,"PlaNet","mb",["Pixel-based control","Continuous control"],1,"Recurrent state-space model for latent dynamics; planning in latent space from pixels.","Hafner et al. · ICML 2019"],
 [2019,"Go-Explore","exp",["Hard exploration","Discrete (Atari)"],1,"Archive promising states, return to them, then explore; solved Montezuma's Revenge and Pitfall.","Ecoffet et al. · Nature 2021",{"text": "Nature 2021, Fig. 2b: Montezuma's Revenge 43,791 without domain knowledge and 1,731,645 with; Pitfall 6,954 and 102,571; both far above any human-normalised chart"}],
 [2019,"AlphaStar","ma",["Board & strategy games","Multi-agent"],1,"League-based population self-play reached Grandmaster level in StarCraft II.","Vinyals et al. · Nature"],
@@ -307,10 +313,10 @@ const D = [
 [2019,"MBPO","mb","Continuous control",1,"Short model rollouts branched from real states, with theory for when model use helps.","Janner et al. · NeurIPS"],
 [2019,"BCQ","off","Offline datasets",1,"Diagnosed extrapolation error and constrained actions to the behavior distribution.","Fujimoto et al. · ICML"],
 [2019,"GTrXL","seq",["Partially observed","Multi-task / generalist"],1,"Gated Transformer-XL stabilized transformers as agent memory, beating LSTMs.","Parisotto et al. · ICML 2020"],
-[2019,"MuZero","mb",["Board & strategy games","Discrete (Atari)"],1,"Learned a latent model of value, policy and reward only; planning without knowing the rules, across board games and Atari.","Schrittwieser et al. · Nature 2020",[{"med": 2041, "mean": 4999, "reg": "200M", "src": "MuZero Table 1, 20B frames; Agent57's re-tabulation reads 2381 / 5661; MuZero Reanalyse at 200M frames 731 / 2169"}, {"med": 23, "mean": 56, "reg": "100k", "src": "EfficientZero Table 1 re-run of MuZero at 100k"}]],
+[2019,"MuZero","mb",["Board & strategy games","Discrete (Atari)"],1,"Learned a latent model of value, policy and reward only; planning without knowing the rules, across board games and Atari.","Schrittwieser et al. · Nature 2020",[{"med": 2041, "mean": 4999, "reg": "200M", "frames": "20B", "src": "MuZero Table 1, 20B frames; Agent57's re-tabulation reads 2381 / 5661; the same table's MuZero Reanalyse at 200M frames is its own row"}, {"med": 23, "mean": 56, "reg": "100k", "src": "EfficientZero Table 1 re-run of MuZero at 100k"}]],
 [2019,"Dreamer","mb",["Pixel-based control","Continuous control"],1,"Actor-critic trained by backpropagating through imagined latent trajectories.","Hafner et al. · ICLR 2020"],
-[2020,"NGU","exp",["Hard exploration","Discrete (Atari)"],1,"Never Give Up: episodic plus lifelong novelty, and a family of policies with different exploration rates.","Badia et al. · ICLR",{"med": 1360, "mean": 3422, "reg": "200M", "src": "Agent57 Table 1; the NGU paper itself gives median 1354 (abstract 1344) and no mean; 35B frames"}],
-[2020,"Agent57","exp","Discrete (Atari)",1,"Surpassed human baselines on all 57 Atari games using an adaptive meta-controller and curiosity-driven intrinsic motivation.","Badia et al. · ICML",{"med": 1933, "mean": 4766, "reg": "200M", "src": "Agent57 Table 1, 90B frames; above human on all 57 games; R2D2 (bandit) in the same table 2358 / 5462"}],
+[2020,"NGU","exp",["Hard exploration","Discrete (Atari)"],1,"Never Give Up: episodic plus lifelong novelty, and a family of policies with different exploration rates.","Badia et al. · ICLR",{"med": 1360, "mean": 3422, "reg": "200M", "frames": "35B", "src": "Agent57 Table 1; the NGU paper itself gives median 1354 (abstract 1344) and no mean; 35B frames"}],
+[2020,"Agent57","exp","Discrete (Atari)",1,"Surpassed human baselines on all 57 Atari games using an adaptive meta-controller and curiosity-driven intrinsic motivation.","Badia et al. · ICML",{"med": 1933, "mean": 4766, "reg": "200M", "frames": "90B", "src": "Agent57 Table 1, 90B frames; above human on all 57 games; R2D2 (bandit) in the same table 2358 / 5462"}],
 [2020,"Implementation Matters / What Matters","pg","Continuous control",2,"Showed code-level details drive much of PPO's edge over TRPO and catalogued which choices matter in on-policy RL.","Engstrom et al.; Andrychowicz et al."],
 [2020,"OTRainbow","value","Discrete (Atari)",2,"Overtrained Rainbow: more gradient steps per environment step for the 100k regime.","Kielak",{"med": 20, "mean": 26, "reg": "100k", "src": "Kielak Table 4 median 20.4; mean from SPR Table 1; 33 median at 500k steps"}],
 [2020,"CURL / DrQ / RAD","rep",["Pixel-based control","Continuous control","Discrete (Atari)"],1,"Contrastive learning and simple image augmentation closed the pixels-versus-state gap.","Laskin; Kostrikov; Laskin et al.",{"med": 27, "mean": 36, "reg": "100k", "src": "SPR Table 1: DrQ 26.8 / 35.7; CURL 17.5 / 38.1; DrQ(ε) 31 / 47 (Agarwal 2021's 100-seed rerun, via BBF Table A.1)"}],
@@ -326,7 +332,8 @@ const D = [
 [2021,"PlayVirtual / MLR","rep","Discrete (Atari)",2,"Cycle-consistent virtual trajectories (PlayVirtual) and masked latent reconstruction (MLR) on top of SPR.","Yu et al. · NeurIPS; Yu et al. · NeurIPS 2022",{"med": 47, "reg": "100k", "src": "PlayVirtual Table 1 median 47.2, 15 seeds, no mean; MLR reports IQM 43 only (Table 5)"}],
 [2021,"TES-SAC (target-entropy scheduling)","ac","Discrete (Atari)",2,"Anneals discrete SAC's target entropy from its maximum whenever policy entropy plateaus.","Xu et al. · NeurIPS DRL workshop",{"text": "23 games at 1M steps, 3 seeds: recomputed median 2% / mean 15%, vs −0.1 / −0.4 for fixed-entropy discrete SAC at Christodoulou's default (Table 2); wins 8 of 24 environments"}],
 [2021,"Muesli","mb",["Discrete (Atari)","Board & strategy games"],2,"MuZero-style model with a regularized policy gradient; no search at act time.","Hessel et al. · ICML",{"med": 1041, "mean": 2524, "reg": "200M", "src": "Muesli Table 10, MuZero architecture, 200M frames, sticky actions; MuZero Reanalyse in the same table 1047 / 2971"}],
-[2021,"MuZero Unplugged / Sampled / Gumbel","mb",["Board & strategy games","Discrete (Atari)","Continuous control","Offline datasets"],2,"MuZero for offline data, continuous actions, and few-simulation search via Gumbel top-k.","Schrittwieser; Hubert; Danihelka et al.",{"med": 1006, "mean": 2856, "reg": "200M", "src": "MuZero Unplugged Table 1: MuZero Reanalyse online, 200M frames, sticky actions (1332 / 4094 at 2B); offline on RL Unplugged's 46 games 265 / 596 vs CRR 156 / 271. Sampled MuZero: Ms. Pac-Man only"}],
+[2021,"MuZero Reanalyse","mb",["Discrete (Atari)","Board & strategy games"],2,"Re-runs MuZero's search on stored trajectories to refresh their targets, so each frame trains the model many times; the data-efficient MuZero and the base of Muesli and MuZero Unplugged.","Schrittwieser et al. · NeurIPS 2021 (MuZero Unplugged); first in the MuZero paper",[{"med": 1006, "mean": 2856, "reg": "200M", "src": "MuZero Unplugged Table 1, online Reanalyse, 200M frames, sticky actions; the MuZero paper's own Reanalyse at 200M read 731 / 2169 (no-op), Muesli's table 1047 / 2971"}, {"med": 1332, "mean": 4094, "reg": "200M", "frames": "2B", "src": "MuZero Unplugged Table 1 at 2B frames, sticky actions"}]],
+[2021,"MuZero Unplugged / Sampled / Gumbel","mb",["Board & strategy games","Discrete (Atari)","Continuous control","Offline datasets"],2,"MuZero for offline data, continuous actions, and few-simulation search via Gumbel top-k.","Schrittwieser; Hubert; Danihelka et al.",{"text": "Offline, on RL Unplugged's 46 Atari games: 265% median / 596% mean vs CRR 156 / 271 (MuZero Unplugged Table 1); the online Reanalyse numbers are the MuZero Reanalyse row. Sampled MuZero: Ms. Pac-Man only"}],
 [2021,"DroQ","ac","Continuous control",2,"Dropout and LayerNorm critics matched REDQ at a fraction of the cost.","Hiraoka et al. · ICLR 2022"],
 [2021,"MAPPO","ma",["Multi-agent","Board & strategy games"],2,"PPO with centralized critics matched off-policy MARL methods on standard benchmarks.","Yu et al. · NeurIPS 2022"],
 [2021,"Isaac Gym massively parallel RL","sys","Goal-conditioned / robotics",2,"Thousands of GPU-resident environments; legged locomotion trained in minutes.","Makoviychuk et al.; Rudin et al."],
@@ -335,7 +342,7 @@ const D = [
 [2021,"TD3+BC","off","Offline datasets",1,"Minimalist offline RL: one behavior-cloning regularizer added to TD3.","Fujimoto & Gu · NeurIPS"],
 [2021,"IQL","off",["Offline datasets","Goal-conditioned / robotics"],1,"Implicit Q-Learning via expectile regression; never queries out-of-distribution actions.","Kostrikov et al. · ICLR 2022"],
 [2021,"EfficientZero","mb",["Discrete (Atari)","Continuous control"],1,"MuZero plus self-supervised consistency; human-level Atari from two hours of data.","Ye et al. · NeurIPS",{"med": 109, "mean": 194, "reg": "100k", "src": "EfficientZero Table 1 (109.0 / 194.3, 32 seeds)"}],
-[2022,"MEME","exp","Discrete (Atari)",1,"Agent57 made 200× more data-efficient: an approximate trust region for value updates, normalised losses and priorities, cross-mixture training and policy distillation; above human on all 57 games in 390M frames.","Kapturowski et al. · DeepMind",{"med": 848, "mean": 3305, "reg": "200M", "src": "MEME Table 1 at 200M frames (capped mean 98, 54 games above human), 6 seeds; 1185 / 4087 at 1B"}],
+[2022,"MEME","exp","Discrete (Atari)",1,"Agent57 made 200× more data-efficient: an approximate trust region for value updates, normalised losses and priorities, cross-mixture training and policy distillation; above human on all 57 games in 390M frames.","Kapturowski et al. · DeepMind",[{"med": 848, "mean": 3305, "reg": "200M", "src": "MEME Table 1 at 200M frames (capped mean 98, 54 games above human), 6 seeds"}, {"med": 1185, "mean": 4087, "reg": "200M", "frames": "1B", "src": "MEME Table 1 at 1B frames, all 57 games above human by 390M"}]],
 [2022,"DNA","pg","Discrete (Atari)",2,"Dual Network Architecture: separate policy and value networks with distillation; also the best external measurement of PPO on Atari-57.","Aitchison & Sweetser",{"med": 311, "reg": "200M", "src": "DNA Table 8, 200M frames, deterministic ALE; 207 with sticky actions; PPO 224 / 155 and Rainbow 223 in the same table"}],
 [2022,"GDI / LBC","exp","Discrete (Atari)",2,"Generalized Data Distribution Iteration and Learnable Behavior Control: a population of behaviour policies whose sampling distribution is itself optimised; very high means, protocol thinly described.","Fan et al.",{"med": 1146, "mean": 9620, "reg": "200M", "src": "GDI Table 1 (GDI-H3, 200M frames; GDI-I3 833 / 7810); the paper does not state starts or sticky actions, and its R2D2 row (1342 / 3373) does not match R2D2's own. LBC (2023, 1B frames): 1934 / 10078"}],
 [2022,"TD-MPC","mb",["Continuous control","Pixel-based control"],1,"Temporal-difference learning for model predictive control in a task-oriented latent space.","Hansen et al. · ICML"],
@@ -421,7 +428,7 @@ const fmt=v=>v.toLocaleString("en-US");
 function scoreKey(r){const a=r.ataris.find(x=>x.med!=null)||r.atari; return a&&a.med!=null?a.med:(a&&a.mean!=null?a.mean/3:-1);}   // sort: first median, else a rough stand-in, else last
 function scoreOne(a){
   if(a.text) return `<span class="txt">${esc(a.text)}</span>`;
-  const reg=`<span class="reg" title="${REG_TITLE[a.reg]||a.reg}">${a.reg}</span>`;
+  const reg=`<span class="reg" title="${REG_TITLE[a.reg]||a.reg}">${a.reg}</span>${a.frames?`<span class="reg" title="frames of experience, past the regime's budget">${esc(a.frames)}</span>`:""}`;
   const med=a.med!=null?`<span class="m">${a.approx?"≈":""}${fmt(a.med)}%</span> median`:`<span class="m">${a.approx?"≈":""}${fmt(a.mean)}%</span> mean`;
   const sub=[a.med!=null&&a.mean!=null?`mean ${fmt(a.mean)}%`:null, a.starts==="human"?"human starts":null].filter(Boolean).join(" · ");
   return `${med}${reg}<span class="sub">${esc(sub?sub+" · ":"")}${esc(a.src)}</span>`;
@@ -430,6 +437,10 @@ function scoreCell(r){
   if(!r.ataris.length) return '<span style="color:var(--ink-3)">—</span>';
   return r.ataris.map((a,i)=>i?`<span class="alt">${scoreOne(a)}</span>`:scoreOne(a)).join("");
 }
+const FRAMES_DEFAULT={"200M":"200M","100k":"400k","10M":"40M"};
+const framesOf=a=>a.frames||FRAMES_DEFAULT[a.reg]||"";
+const framesNum=f=>{const m=/^([\d.]+)\s*([kMB])$/.exec(f); return m?parseFloat(m[1])*{k:1e3,M:1e6,B:1e9}[m[2]]:NaN;};
+const panelOf=a=>a.reg==="200M"&&framesNum(framesOf(a))>5e8?"big":a.reg;   // a 200M-regime run past 500M frames draws in the beyond-200M panel
 const LOG={min:10,max:10000};  // log axis from 10% to 100× human; the mean view widens to 200×, since a few games at thousands of percent pull means far above medians
 const xpos=v=>Math.max(0,Math.min(1,Math.log10(v/LOG.min)/Math.log10(LOG.max/LOG.min)))*100;
 function renderScores(list){
@@ -438,18 +449,18 @@ function renderScores(list){
   document.querySelectorAll(".stat-word").forEach(e=>e.textContent=word);
   $("#statHint").textContent = k==="med" ? "median over games: the honest summary, one game cannot move it" : "mean over games: a few games at thousands of percent (Atlantis, Breakout, Video Pinball) dominate it, so it rewards the tail";
   let any=false;
-  for(const reg of ["200M","100k","10M"]){
+  for(const reg of ["200M","big","100k","10M"]){
     const el=$("#bars-"+reg); el.innerHTML="";
     const rows=[];
-    list.forEach(r=>r.ataris.forEach(a=>{ if(!a.text&&a.reg===reg&&a[k]!=null) rows.push({r,a}); }));
+    list.forEach(r=>r.ataris.forEach(a=>{ if(!a.text&&panelOf(a)===reg&&a[k]!=null) rows.push({r,a}); }));
     if(rows.length) (REFS[reg]||[]).forEach(x=>{ if(x[k]!=null) rows.push({r:{name:x.name,year:x.year,fam:null},a:x,ref:true}); });
     rows.sort((p,q)=>q.a[k]-p.a[k]);
     $("#panel-"+reg).hidden=rows.length===0; if(!rows.length) continue; any=true;
     rows.forEach(({r,a,ref})=>{
       const lbl=document.createElement("div"); lbl.className="lbl"+(ref?" ref":"");
-      lbl.innerHTML=`<span class="dot" style="background:${ref?"var(--ink-3)":FAM[r.fam].c}" title="${ref?"reference run":FAM[r.fam].n}"></span><span class="nm">${esc(r.name)}</span><span class="yr">${r.year}</span>`;
+      lbl.innerHTML=`<span class="dot" style="background:${ref?"var(--ink-3)":FAM[r.fam].c}" title="${ref?"reference run":FAM[r.fam].n}"></span><span class="nm">${esc(r.name)}</span><span class="yr">${r.year}</span>${reg==="big"?`<span class="fr" title="frames of experience">${esc(framesOf(a))}</span>`:""}`;
       const tr=document.createElement("div"); tr.className="track";
-      const tip=[`${r.name} (${r.year})${ref?", reference run":", "+FAM[r.fam].n}`,`${word} ${fmt(a[k])}% human-normalised${a[other]!=null?`, ${other==="med"?"median":"mean"} ${fmt(a[other])}%`:""}`,a.starts==="human"?"human starts":"no-op starts",a.approx?"≈ unverified":null,a.src].filter(Boolean).join("\n");
+      const tip=[`${r.name} (${r.year})${ref?", reference run":", "+FAM[r.fam].n}`,`${word} ${fmt(a[k])}% human-normalised${a[other]!=null?`, ${other==="med"?"median":"mean"} ${fmt(a[other])}%`:""}`,a.starts==="human"?"human starts":"no-op starts",framesOf(a)?framesOf(a)+" frames":null,a.approx?"≈ unverified":null,a.src].filter(Boolean).join("\n");
       tr.title=tip;
       tr.innerHTML=`${[10,100,1000,10000].map(v=>`<span class="tick" style="left:${xpos(v)}%"></span>`).join("")}<span class="human" style="left:${xpos(100)}%"></span><div class="bar${a.approx?" approx":""}${ref?" refbar":""}" style="width:${xpos(a[k])}%"></div><span class="val" style="left:${xpos(a[k])}%">${a.approx?"≈":""}${fmt(a[k])}%</span>`;
       el.appendChild(lbl); el.appendChild(tr);
