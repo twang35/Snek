@@ -21,9 +21,11 @@ are in git history before 2026-09-10.
 - **Warm starts.** b32 is the first batch to start from a checkpoint (`SNEK_INIT_FROM`, step 0). If its
   arms hold the 99.8 plateau from their first eval, any knob can be tried *on the converged policy* at
   100M instead of 200M from scratch, and a collapse there is a verdict on the knob rather than on the seed.
-- **b32's `hof30k`** closes ~11:00 2026-09-13. `b32g` @62423040 reads 29,967 /30,000 so far (23 games over the
-  HOF pair, ~3.4 SE): if it stands, promote it, and ask whether the gain is the warm start's extra converged
-  training or the horizon — b30 says the horizon alone does nothing from scratch.
+- **b32's record.** `b32g` @62423040 stood at 29,967 /30,000 when the pass closed (2026-09-13) and read 29,957 on a second
+  30,000 at seed 13; it is in the Hall of Fame as the record. The open question is whether the gain is the warm start's
+  extra converged training or the horizon reaching 1.0 — b30 says the horizon alone does nothing from scratch, and seven of
+  the eight warm starts moved nothing, so the next batch should separate the two (a warm start that keeps 0.999, and the
+  same eight sources re-run on other seeds).
 - **The 99.82 /30k ceiling** was reached by b28 (200M hold), b30 (horizon 1.0) and matched by nothing at
   100M from scratch; b29 and b31 both fell short. Whatever moves it is not steps, horizon, optimiser decay or
   the value loss.
@@ -38,7 +40,7 @@ are in git history before 2026-09-10.
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
 | [b33](#b33--the-perfect-game-reward) | `SNEK_PERFECT_GAME_REWARD` 0 / 10 / 30 / 50 / 100 / 200 / 300 / 1000 | pen01 + hist8, anneal final at 25M | 8 × 4 | 50M | registered | — |
-| [b32](#b32--b28s-best-checkpoints-annealed-on-to-a-horizon-of-10) | warm start from b28's eight best /30k checkpoints; γ and λ 0.999 → 1.0 over 50M, held 50M | b28's converged values | 1 × 8 | 100M | held so far | stage B 99.8% in every window from the first eval; `hof30k` running with `b32g` @62423040 at 29,967 /30k so far (23 games over the HOF pair) |
+| [b32](#b32--b28s-best-checkpoints-annealed-on-to-a-horizon-of-10) | warm start from b28's eight best /30k checkpoints; γ and λ 0.999 → 1.0 over 50M, held 50M | b28's converged values | 1 × 8 | 100M | falsified (the top moved) | stage B 99.8% in every window from the first eval; `hof30k` 92 full rows, 78 at ≥99.8; **`b32g` @62423040 at 29,967 /30k, the new record** (99.86 on a second seed), from a 61-63M plateau averaging the old ceiling; the other seven arms stayed on it |
 | [b31](#b31--mse-value-loss-on-the-hist8-base) | `SNEK_PPO_VALUE_LOSS` mse | pen01 + hist8 | 1 × 8 | 100M | falsified | worse on this base: onset 51 vs 83% at 0-25M, 88.0% density, nothing reaches 30k at 99.8; only the stability columns keep `mse`'s old gain |
 | [b30](#b30--the-horizon-annealed-to-10) | γ and λ finals 1.0, not 0.999 | pen01 + hist8 | 1 × 8 | 100M | falsified | level with `hist8` at every depth, no collapse; top `b30a` 29,946 /30k, the same 99.82 ceiling as `b28k` |
 | [b29](#b29--lr-and-clip-annealed-to-zero) | lr 2.5e-4 → 0 and clip 0.2 → 0.001 over the whole cap; horizon fixed | pen01 + hist8 | 1 × 8 | 100M | falsified | worse in every window: 83.1% density, nothing through the 99.6 /5k gate; confounded with the missing horizon anneal |
@@ -122,13 +124,20 @@ the default, dense enough to see whether the response is monotone or a plateau.
 | varies | the start. Each arm is warm-started (`SNEK_INIT_FROM`) from one of b28's eight best /30k checkpoints — its actor, plus the source arm's critic and optimiser — and anneals γ and λ 0.999 → 1.0 over its first 50M, then holds 1.0 for 50M (`SNEK_PPO_ANNEAL_FRACTION` 0.5 of 100M; the step starts at 0) |
 | cells × seeds | 1 × 8 (`b32a`-`b32h`, seeds 1-8; sources `b28k` @162.86M / 162.69M / 162.96M, `b28m` @131.50M / 134.58M / 138.31M, `b28n` @185.93M, `b28o` @136.48M — 29,940-29,946 /30,000 each) |
 | control | b28's own arms, the plateau these start on (99.79-99.82 /30k); b30, the same 1.0 finals reached from scratch |
-| predicted | registered at queue time 2026-09-11 by the agent, not the user: every arm's first stage-A evals read ≥ 98 (the warm start holds), no arm collapses, stage-B density at or above b28's 97.5% — and the 30k top stays within noise of 99.82, nothing at 99.83 or above — **holding so far** (2026-09-13): every arm ≥99.5% stage-B density from its first window, no collapse; `hof30k` pending |
+| predicted | registered at queue time 2026-09-11 by the agent, not the user: every arm's first stage-A evals read ≥ 98 (the warm start holds), no arm collapses, stage-B density at or above b28's 97.5% — and the 30k top stays within noise of 99.82, nothing at 99.83 or above — **held on the arms and falsified on the top** (2026-09-13): every arm ≥99.5% stage-B density from its first window, no collapse — and `b32g` @62423040 read 29,967 /30,000, the first row above 99.82 |
 
 **Why.** b28 said holding converged values widens the plateau and does not raise it, and b30 asks
 whether the last 0.001 of horizon raises it from scratch. This asks the same of the best policies
 already found, at a tenth of the cost per answer: 100M from a 99.8 start rather than 200M from zero,
 with the critic and optimiser carried over so the one change is the horizon. Eight starts in the same
 plateau also say how much of a 30k rank is the checkpoint and how much is the seed.
+
+**Learned.** The warm start holds (stage B 99.8% in every 25M window, the first included, where b28 read 89.3% from
+scratch), and one arm of eight left the plateau: `b32g` @62423040 at **29,967 /30,000**, confirmed at 29,957 on seed 13
+and promoted as the record (`hallOfFame/HOF.md`). Its 61-63M plateau averages 29,950 — the old ceiling as a region's
+mean — while the other seven arms' tops (29,943-29,958) sit in basins on the plateau and fall back to it on a fresh seed.
+So a 30k rank is mostly the checkpoint's basin, and the recipe found a higher one once in eight; whether the horizon or
+the extra 100M did it is the open item above. `hof30k` 92 full rows of 6,859, 5,000 → 30,000 drop +0.02 pp.
 
 ## b31 — `mse` value loss on the `hist8` base
 

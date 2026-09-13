@@ -33,7 +33,8 @@ stays the default on this base.
 
 Together with b28 (200M hold) and b29 (lr/clip → 0): four one-knob batches off the `hist8` config, and the 30k top
 moved for none of them — 29,946 twice, below it twice. Measured 2026-09-12 and 2026-09-13; readings in
-`results.md`. b32, the warm-start batch, is the first to read above it (`b32g` 29,967, pass in flight).
+`results.md`. b32, the warm-start batch, is the first to read above it: `b32g` @62423040 at 29,967, confirmed 29,957 on a second seed and
+promoted as the record on 2026-09-13 (`hallOfFame/HOF.md`); its other seven arms stayed on the plateau.
 
 ### Holding a converged config for 100M more widens the record plateau by an order of magnitude and does not raise the top; annealing lr and clip to zero on a fixed short horizon is worse in every window
 
