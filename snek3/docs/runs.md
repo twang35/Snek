@@ -13,6 +13,9 @@ are in git history before 2026-09-10.
 
 ## Open
 
+- **Invariant 6 under PPO.** b33 sweeps the perfect-game reward two decades either side of 100 on the
+  `hist8` base; if 0 or 10 still reach the plateau, the W > 1/(1−γ^k) rule is a DQN-era result and
+  `invariants.md` 6 is rewritten.
 - **A clean test of the PPO paper's optimiser schedule**: b29 confounded lr/clip → 0 with removing the
   horizon anneal. The unconfounded arm keeps γ/λ → 0.999 and adds lr/clip → 0 on top.
 - **Warm starts.** b32 is the first batch to start from a checkpoint (`SNEK_INIT_FROM`, step 0). If its
@@ -34,6 +37,7 @@ are in git history before 2026-09-10.
 
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
+| [b33](#b33--the-perfect-game-reward) | `SNEK_PERFECT_GAME_REWARD` 0 / 10 / 30 / 50 / 100 / 200 / 300 / 1000 | pen01 + hist8, anneal final at 25M | 8 × 4 | 50M | registered | — |
 | [b32](#b32--b28s-best-checkpoints-annealed-on-to-a-horizon-of-10) | warm start from b28's eight best /30k checkpoints; γ and λ 0.999 → 1.0 over 50M, held 50M | b28's converged values | 1 × 8 | 100M | held so far | stage B 99.8% in every window from the first eval; `hof30k` running with `b32g` @62423040 at 29,967 /30k so far (23 games over the HOF pair) |
 | [b31](#b31--mse-value-loss-on-the-hist8-base) | `SNEK_PPO_VALUE_LOSS` mse | pen01 + hist8 | 1 × 8 | 100M | falsified | worse on this base: onset 51 vs 83% at 0-25M, 88.0% density, nothing reaches 30k at 99.8; only the stability columns keep `mse`'s old gain |
 | [b30](#b30--the-horizon-annealed-to-10) | γ and λ finals 1.0, not 0.999 | pen01 + hist8 | 1 × 8 | 100M | falsified | level with `hist8` at every depth, no collapse; top `b30a` 29,946 /30k, the same 99.82 ceiling as `b28k` |
@@ -92,6 +96,23 @@ evals below 50% and 80%), then best30. `hof5000` re-measures the top rows at 5,0
 at complete separation (Mann-Whitney p=0.029). Details in [`protocol.md`](protocol.md).
 
 ---
+
+## b33 — the perfect-game reward
+
+| | |
+|---|---|
+| base | b27's `hist8` config (pen01 + `SNEK_OBS_HISTORY=8`) at 50M, `SNEK_PPO_ANNEAL_FRACTION` 0.5: every ramp final at 25M, the last 25M at the finals |
+| varies | `SNEK_PERFECT_GAME_REWARD` 0 / 10 / 30 / 50 / 100 / 200 / 300 / 1000 — the bonus paid on the last meal in place of its food reward of 1 |
+| cells × seeds | 8 × 4 (`b33aa`-`b33bf`, seeds 1-4) |
+| control | the batch's own `win100` cell — also the first run of b27's config at 50M; b27's `hist8` cell at 100M is the reference |
+| predicted | registered 2026-09-13 by the agent with the user: 0 and 10 lose density but do not stall as snek2's b33 did, since the step penalty and starvation already charge for dawdling — watch the starve/death split; 30-300 level with 100 at the top, no monotone trend readable at n=4; 1000 the lowest density of the eight through slower onset (the huber critic at δ 1 learns a 1000-point terminal jump slowly, and the value error swamps normalised advantages), few or no collapses; the 30k top of every cell from 30 up within noise of 99.8. The user expects 10 to do poorly and 1000 to be unstable |
+
+**Why.** At γ 0.999 a meal of delay costs ~1% of the win bonus, so the bonus sets how urgent finishing
+is relative to eating — 0.1 of a food reward at 10, one at 100, ten at 1000. Invariant 6 says progress
+toward the win only raises value when W > 1/(1−γ^k), 84-143 at γ 0.999, so 100 is marginal and
+anything below should fail as snek2's win-10 batch did; yet b30 at γ 1.0 reached the 99.82 ceiling. The
+rule was derived for DQN without a step penalty and is under test for PPO. Two decades either side of
+the default, dense enough to see whether the response is monotone or a plateau.
 
 ## b32 — b28's best checkpoints annealed on to a horizon of 1.0
 
