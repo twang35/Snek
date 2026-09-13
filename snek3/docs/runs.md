@@ -18,8 +18,12 @@ are in git history before 2026-09-10.
 - **Warm starts.** b32 is the first batch to start from a checkpoint (`SNEK_INIT_FROM`, step 0). If its
   arms hold the 99.8 plateau from their first eval, any knob can be tried *on the converged policy* at
   100M instead of 200M from scratch, and a collapse there is a verdict on the knob rather than on the seed.
-- **b30 / b31**, one knob each off b27's `hist8` at 100M: horizon to 1.0 (stage B level, passes pending), `mse`
-  (queued). Whether either moves the 30k top past 99.8; b28 says more steps will not.
+- **b32's `hof30k`** closes ~11:00 2026-09-13. `b32g` @62423040 reads 29,967 /30,000 so far (23 games over the
+  HOF pair, ~3.4 SE): if it stands, promote it, and ask whether the gain is the warm start's extra converged
+  training or the horizon — b30 says the horizon alone does nothing from scratch.
+- **The 99.82 /30k ceiling** was reached by b28 (200M hold), b30 (horizon 1.0) and matched by nothing at
+  100M from scratch; b29 and b31 both fell short. Whatever moves it is not steps, horizon, optimiser decay or
+  the value loss.
 - **Should `SNEK_OBS_HISTORY=8` become the default.** b27 says yes; nothing has run against it yet.
 - **Next sweeps on the `hist8` base**: a `hist16` cell, and step penalties above 0.01 (0.02, 0.05) —
   b26's curve never turned.
@@ -30,9 +34,9 @@ are in git history before 2026-09-10.
 
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
-| [b32](#b32--b28s-best-checkpoints-annealed-on-to-a-horizon-of-10) | warm start from b28's eight best /30k checkpoints; γ and λ 0.999 → 1.0 over 50M, held 50M | b28's converged values | 1 × 8 | 100M | — | — |
-| [b31](#b31--mse-value-loss-on-the-hist8-base) | `SNEK_PPO_VALUE_LOSS` mse | pen01 + hist8 | 1 × 8 | 100M | — | — |
-| [b30](#b30--the-horizon-annealed-to-10) | γ and λ finals 1.0, not 0.999 | pen01 + hist8 | 1 × 8 | 100M | falsified so far | stage B level with `hist8` (95.3 vs 95.4%), no collapse; passes pending |
+| [b32](#b32--b28s-best-checkpoints-annealed-on-to-a-horizon-of-10) | warm start from b28's eight best /30k checkpoints; γ and λ 0.999 → 1.0 over 50M, held 50M | b28's converged values | 1 × 8 | 100M | held so far | stage B 99.8% in every window from the first eval; `hof30k` running with `b32g` @62423040 at 29,967 /30k so far (23 games over the HOF pair) |
+| [b31](#b31--mse-value-loss-on-the-hist8-base) | `SNEK_PPO_VALUE_LOSS` mse | pen01 + hist8 | 1 × 8 | 100M | falsified | worse on this base: onset 51 vs 83% at 0-25M, 88.0% density, nothing reaches 30k at 99.8; only the stability columns keep `mse`'s old gain |
+| [b30](#b30--the-horizon-annealed-to-10) | γ and λ finals 1.0, not 0.999 | pen01 + hist8 | 1 × 8 | 100M | falsified | level with `hist8` at every depth, no collapse; top `b30a` 29,946 /30k, the same 99.82 ceiling as `b28k` |
 | [b29](#b29--lr-and-clip-annealed-to-zero) | lr 2.5e-4 → 0 and clip 0.2 → 0.001 over the whole cap; horizon fixed | pen01 + hist8 | 1 × 8 | 100M | falsified | worse in every window: 83.1% density, nothing through the 99.6 /5k gate; confounded with the missing horizon anneal |
 | [b28](#b28--the-hist8-config-held-for-100m-more) | 100M more hold | pen01 + hist8, anneal over 25% | 1 × 8 | 200M | — | 97.5% density; 152 rows at 99.8 /30k against 9, top 99.82 — the plateau widens, the top does not move |
 | [b27](#b27--move-history-depth) | `SNEK_OBS_HISTORY` 0 / 4 / 8 | pen01 | 3 × 8 | 100M | falsified | **the largest lever found**: 49 → 94-95% density; `b27t`/`b27k` 99.81 /30k, the record |
@@ -97,7 +101,7 @@ at complete separation (Mann-Whitney p=0.029). Details in [`protocol.md`](protoc
 | varies | the start. Each arm is warm-started (`SNEK_INIT_FROM`) from one of b28's eight best /30k checkpoints — its actor, plus the source arm's critic and optimiser — and anneals γ and λ 0.999 → 1.0 over its first 50M, then holds 1.0 for 50M (`SNEK_PPO_ANNEAL_FRACTION` 0.5 of 100M; the step starts at 0) |
 | cells × seeds | 1 × 8 (`b32a`-`b32h`, seeds 1-8; sources `b28k` @162.86M / 162.69M / 162.96M, `b28m` @131.50M / 134.58M / 138.31M, `b28n` @185.93M, `b28o` @136.48M — 29,940-29,946 /30,000 each) |
 | control | b28's own arms, the plateau these start on (99.79-99.82 /30k); b30, the same 1.0 finals reached from scratch |
-| predicted | registered at queue time 2026-09-11 by the agent, not the user: every arm's first stage-A evals read ≥ 98 (the warm start holds), no arm collapses, stage-B density at or above b28's 97.5% — and the 30k top stays within noise of 99.82, nothing at 99.83 or above |
+| predicted | registered at queue time 2026-09-11 by the agent, not the user: every arm's first stage-A evals read ≥ 98 (the warm start holds), no arm collapses, stage-B density at or above b28's 97.5% — and the 30k top stays within noise of 99.82, nothing at 99.83 or above — **holding so far** (2026-09-13): every arm ≥99.5% stage-B density from its first window, no collapse; `hof30k` pending |
 
 **Why.** b28 said holding converged values widens the plateau and does not raise it, and b30 asks
 whether the last 0.001 of horizon raises it from scratch. This asks the same of the best policies
@@ -113,12 +117,19 @@ plateau also say how much of a 30k rank is the checkpoint and how much is the se
 | varies | `SNEK_PPO_VALUE_LOSS` `mse` instead of `huber`; nothing else |
 | cells × seeds | 1 × 8 (seeds 1-8, `b31a`-`b31h`) |
 | control | b27's `hist8` arms, seeds 17-24 |
-| predicted | registered at queue time 2026-09-10 by the agent, not the user: density above b27 `hist8`'s 95.4% and fewer evals below 80, on b19 and b23's `mse` result; the 30k top unchanged |
+| predicted | registered at queue time 2026-09-10 by the agent, not the user: density above b27 `hist8`'s 95.4% and fewer evals below 80, on b19 and b23's `mse` result; the 30k top unchanged — **falsified** on both counts: 88.0% against 95.4 with complete separation, and no row reached 30,000 at 99.8 (best 99.77, stopped) |
 
 **Why.** `mse` was the largest single step on the corner-grid ladder — b19's most stable cell at
 +5 pp, and b23's 32.7 → 61.6% with the collapses gone — but the horizon-anneal base has run `huber`
 since b24 and the two have never been combined. One knob off the current best config, at the cap
 the reference used, says whether that step still exists on top of move history.
+
+
+**Learned.** It does not. `mse` reads 88.0% density (85.4-91.3) against 95.4 with the seeds cleanly
+separated, and the loss is onset — 51.0% in the first 25M against 82.9 — that the endgame (99.2 against
+99.8) never recovers. The stability gain b19 found survives (0.17% of evals below 80 against 0.68) but the
+density gain that made `mse` the ladder's largest step does not transfer: it belonged to the λ 0.99 base.
+`hof5000` 833 rows through the gate against 1,836; `hof30k` retired every row (best 99.77). `huber` stays.
 
 ## b30 — the horizon annealed to 1.0
 
@@ -128,13 +139,20 @@ the reference used, says whether that step still exists on top of move history.
 | varies | `SNEK_PPO_DISCOUNT_FINAL` and `SNEK_PPO_GAE_LAMBDA_FINAL` 1.0 instead of 0.999; entropy 0.01 → 0.001, lr and clip fixed as before |
 | cells × seeds | 1 × 8 (seeds 1-8, `b30a`-`b30h`) |
 | control | b27's `hist8` arms, seeds 17-24 |
-| predicted | registered at queue time 2026-09-10 by the agent, not the user: some seeds collapse after 50M as b10's fixed γ 1.0 cell did (44% of evals below 50), the survivors level with b27 `hist8` at the top — **falsified so far**: no seed has an eval below 50, stage B 95.3% against 95.4; passes pending |
+| predicted | registered at queue time 2026-09-10 by the agent, not the user: some seeds collapse after 50M as b10's fixed γ 1.0 cell did (44% of evals below 50), the survivors level with b27 `hist8` at the top — **falsified so far**: no seed has an eval below 50, stage B 95.3% against 95.4; passes pending — **falsified**: no seed had an eval below 50, and the survivors' top (29,946 /30k) equals b28's rather than b27's |
 
 **Why.** The horizon anneal ends at 0.999 because b10 ran γ 1.0 from step 0 and it collapsed half
 the time while holding the record (`b10ck` 99.65). Reaching 1.0 only after 50M of training under a
 finite horizon is a different regime, and the undiscounted objective is the one the game actually
 scores. This asks whether the last 0.001 of horizon is worth anything once the policy is already
 competent.
+
+
+**Learned.** Nothing visible, and nothing lost. Level with `hist8` at every depth (stage B 95.3 against
+95.4, `hof5000` 1,844 gate rows against 1,836, `hof30k` 43 rows at ≥99.8 against 9) and no collapse in any
+seed — the b10 regime does not return when γ reaches 1.0 after 50M under a finite horizon. The top,
+`b30a` @94371840 at 29,946 /30,000, is exactly `b28k`'s count: the 99.82 ceiling reached a third time, by a
+third route. The ceiling is not the horizon and not the step count.
 
 ## b29 — lr and clip annealed to zero
 

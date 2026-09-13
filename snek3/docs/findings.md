@@ -17,6 +17,24 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### On the horizon-anneal + `hist8` base, `mse` slows onset and loses density (88.0% against 95.4), annealing the horizon to 1.0 changes nothing, and the 99.82 /30,000 ceiling was reached a third time
+
+b30 (8 seeds, b28's `hist8` config at 100M with γ and λ annealed to 1.0 instead of 0.999): level with b27 `hist8` at
+every depth — stage B 95.3% against 95.4, `hof5000` 1,844 rows through the 99.6 gate against 1,836, `hof30k` 43 rows
+at ≥99.8 against 9 — and **no collapse in any seed**, so b10's γ 1.0 regime (44% of evals below 50) is a property of
+starting undiscounted, not of ending there. Its top, `b30a` @94371840 at 29,946 /30,000, is exactly `b28k`'s count.
+
+b31 (8 seeds, the same base with `SNEK_PPO_VALUE_LOSS` `mse`): 88.0% density (85.4-91.3) against 95.4 (94.3-95.7),
+complete separation, and the deficit is onset — 51.0% in the first 25M against 82.9 — which the endgame (99.2
+against 99.8) never recovers; `hof30k` retired every row (best 99.77). The stability gain b19 measured for `mse`
+survives (0.17% of evals below 80 against 0.68, sef 97.5 against 95.5) but **the density gain that made it the
+corner-grid ladder's largest step (b23: 32.7 → 61.6%) belonged to the λ 0.99 base and does not transfer**. `huber`
+stays the default on this base.
+
+Together with b28 (200M hold) and b29 (lr/clip → 0): four one-knob batches off the `hist8` config, and the 30k top
+moved for none of them — 29,946 twice, below it twice. Measured 2026-09-12 and 2026-09-13; readings in
+`results.md`. b32, the warm-start batch, is the first to read above it (`b32g` 29,967, pass in flight).
+
 ### Holding a converged config for 100M more widens the record plateau by an order of magnitude and does not raise the top; annealing lr and clip to zero on a fixed short horizon is worse in every window
 
 b28 (8 seeds, b27's `hist8` config at 200M with the same 50M anneal, then 150M at the final values): the first 100M
