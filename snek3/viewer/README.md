@@ -2,7 +2,7 @@
 
 | page | live | what |
 |---|---|---|
-| **chart viewer** | https://twang35.github.io/Snek/ | every arm's stage-A, stage-B, hof5000 and hof30k chart, batch by batch. Reloads itself at :00 of every ten minutes while its window has focus |
+| **chart viewer** | https://twang35.github.io/Snek/ | every arm's stage-A, stage-B, hof5000 and hof30k chart, batch by batch. Reloads itself at :00 of every ten minutes while the tab is visible |
 | **Deep RL Atlas** | https://twang35.github.io/Snek/atlas | the Atari scores view and the table of published agents, `pages/atlas.html` |
 | sweep page | local only: `sweep.html` beside `sweep.json` | one knob's traces across a batch |
 

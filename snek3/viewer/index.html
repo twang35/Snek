@@ -315,11 +315,14 @@
   readHash(); render();
   if (state.zoom) { var z = current.filter(function (a) { return a.policy === state.zoom; })[0]; if (z) zoom(z); }
 
-  // ---- reload the manifest at :00 of every ten minutes, while the window has focus (user, 2026-09-13).
+  // ---- reload the manifest at :00 of every ten minutes, while the page is visible (user, 2026-09-13).
   // The laptop publishes at :08, the desktop fetches both feeds and rebuilds the site at :09, so :00 is
   // when the page is stale. `manifest.js` is re-fetched with a cache-buster and swapped in place -- the
   // view, the hash and an open zoom survive -- and the charts follow through `src()`'s `?v=generated`.
-  // Unfocused at :00: nothing is fetched; the reload happens when focus returns, if a slot went by.
+  // Visible means the tab is showing on a lit screen, whichever app has focus -- so a viewer beside the
+  // terminal refreshes, and a background tab, a minimised window or a dark display does not (focus was
+  // the first test, and it missed the side-by-side case). Hidden at :00: nothing is fetched; the reload
+  // happens when the page is next shown, if a slot went by. A timer cannot keep the laptop awake.
   var REFRESH_MS = 10 * 60 * 1000, pending = false;
   function refresh() {
     pending = false;
@@ -336,11 +339,11 @@
     document.head.appendChild(tag);
   }
   function tick() {
-    if (document.hasFocus()) refresh(); else pending = true;
+    if (document.visibilityState === 'visible') refresh(); else pending = true;
     schedule();
   }
   function schedule() { setTimeout(tick, REFRESH_MS - (Date.now() % REFRESH_MS) + 1000); }   // one second past :00
-  window.addEventListener('focus', function () { if (pending) refresh(); });
+  document.addEventListener('visibilitychange', function () { if (pending && document.visibilityState === 'visible') refresh(); });
   schedule();
 })();
 </script>
