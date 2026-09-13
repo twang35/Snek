@@ -146,7 +146,7 @@ mark{background:none;color:var(--accent);font-weight:600}
 <header>
   <div>
     <h1>Deep RL Atlas</h1>
-    <p class="sub">Significant deep reinforcement learning advances, 2013–2026. Core rows introduced a new mechanism or landmark result; refinements port, combine, or fix an existing one. An algorithm lists its primary domain first and, in smaller type, the others it was demonstrated on; the domain filter matches any of them. The page opens on core Atari-style discrete-action work; widen it with the controls, or click a year, family, or column header to filter and sort.</p>
+    <p class="sub">Significant deep reinforcement learning advances, 2013–2026. Core rows introduced a new mechanism or landmark result; refinements port, combine, or fix an existing one. An algorithm lists its primary domain first and, in smaller type, the others it was demonstrated on; the domain filter matches any of them. The page opens on the Atari scores of every discrete-action algorithm; switch to the table for the full atlas, and click a year, family, or column header to filter and sort.</p>
   </div>
   <div class="stat"><b id="count">0</b>shown of <span id="total">0</span></div>
 </header>
@@ -393,8 +393,8 @@ const REFS = {"10M":[
 ]};
 const REG_TITLE = {"200M":"Atari-57, 200M frames or more","100k":"Atari 100k benchmark, 26 games","10M":"Zhou et al.'s 20 games, 10M agent steps = 40M frames"};
 const YEARS = []; for(let y=2013;y<=2026;y++) YEARS.push(y);
-const DEFAULTS = {dom:"Discrete (Atari)", tier:"core"};   // the landing view; Reset returns to it, "All domains" and "All" widen it
-const state = {fams:new Set(), dom:DEFAULTS.dom, tier:DEFAULTS.tier, q:"", year:null, sortK:"year", sortDir:1, view:location.hash==="#scores"?"scores":"table", stat:"med"};   // stat: "med" or "mean", what the scores view draws   // atlas.html#scores opens on the chart
+const DEFAULTS = {dom:"Discrete (Atari)", tier:""};   // the landing view; Reset returns to it, "All domains" and "All" widen it
+const state = {fams:new Set(), dom:DEFAULTS.dom, tier:DEFAULTS.tier, q:"", year:null, sortK:"year", sortDir:1, view:location.hash==="#table"?"table":"scores", stat:"med"};   // opens on the scores view; atlas.html#table opens on the table   // stat: "med" or "mean", what the scores view draws   // atlas.html#scores opens on the chart
 
 const $ = s=>document.querySelector(s);
 const famChips=$("#famChips"), yearsEl=$("#years"), rowsEl=$("#rows"), domSel=$("#domain");
@@ -410,7 +410,7 @@ Object.entries(FAM).forEach(([k,f])=>{
 domSel.value=state.dom;
 domSel.onchange=()=>{state.dom=domSel.value;render();};
 document.querySelectorAll(".seg-btn[data-tier]").forEach(b=>b.onclick=()=>{state.tier=b.dataset.tier;render();});
-document.querySelectorAll(".view-btn").forEach(b=>b.onclick=()=>{state.view=b.dataset.view;history.replaceState(null,"",state.view==="scores"?"#scores":location.pathname);render();});
+document.querySelectorAll(".view-btn").forEach(b=>b.onclick=()=>{state.view=b.dataset.view;history.replaceState(null,"",state.view==="table"?"#table":location.pathname);render();});
 document.querySelectorAll(".stat-btn").forEach(b=>b.onclick=()=>{state.stat=b.dataset.stat;render();});
 $("#q").oninput=e=>{state.q=e.target.value.trim().toLowerCase();render();};
 $("#reset").onclick=()=>{state.fams.clear();state.dom=DEFAULTS.dom;state.tier=DEFAULTS.tier;state.q="";state.year=null;$("#q").value="";domSel.value=state.dom;render();};
