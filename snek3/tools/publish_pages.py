@@ -1,4 +1,4 @@
-"""Builds the GitHub Pages site -- `index.html`, `manifest.js`, `charts/*.png`, `.nojekyll` -- from `viewer/` and a runs directory.
+"""Builds the GitHub Pages site -- `index.html`, `manifest.js`, `charts/*.png`, the standalone pages, `.nojekyll` -- from `viewer/` and a runs directory.
 Pages serves the **`site` branch**, which `tools/site_build.py` builds on the desktop from both boxes'
 results feeds and pushes as a snapshot; `publish(runs_dir, viewer_dir, site_dir, manifest)` is the writer,
 a library function with no default target. Until 2026-09-05 the site was `master`'s `/docs`, committed by
@@ -9,6 +9,7 @@ the progress update; that local build is gone -- to see the page locally, regene
 | `index.html` | `viewer/index.html`, byte for byte |
 | `manifest.js` | the same manifest `viewer/manifest.js` gets, with `charts_dir` set to `charts/` |
 | `charts/<policy>*.png` | every chart the manifest refers to -- stage A, stage B, hof5000, hof30k |
+| `<page>.html`, `fonts/` | the tree under `viewer/pages/`, byte for byte, at the site root -- self-contained pages with no manifest and the assets they carry (the Deep RL Atlas, `atlas.html`, and its IBM Plex woff2 files under `fonts/`). Drop a file in, and the next build serves it |
 | `.nojekyll` | so Pages serves the files as they are |
 Files under `charts/` that no arm refers to any more are removed, so the folder never grows past what
 the page can show. A copy happens only when size or mtime differ, so a run with nothing new changes
@@ -22,6 +23,7 @@ from tools import viewer_manifest
 
 VIEWER_DIR = os.path.join(constants.ROOT, 'viewer')
 CHARTS_SUBDIR = 'charts'
+PAGES_SUBDIR = 'pages'                                 # viewer/pages/<path> -> site/<path>
 SITE_URL = 'https://twang35.github.io/Snek/'
 SITE_CHARTS_URL = SITE_URL + CHARTS_SUBDIR + '/'      # where the docs link a picture: the site, not master
 
@@ -38,6 +40,19 @@ def chart_files(manifest):
             if arm.get(flag):
                 names.append(arm['policy'] + suffix)
     return names
+
+
+def standalone_pages(viewer_dir):
+    """Every file under `viewer/pages/` as a path relative to it (`atlas.html`, `fonts/x.woff2`), sorted;
+    [] when the directory is absent. Dotfiles are skipped."""
+    pages_dir = os.path.join(viewer_dir, PAGES_SUBDIR)
+    found = []
+    for root, dirs, files in os.walk(pages_dir):
+        dirs[:] = [d for d in dirs if not d.startswith('.')]
+        for name in files:
+            if not name.startswith('.'):
+                found.append(os.path.relpath(os.path.join(root, name), pages_dir))
+    return sorted(found)
 
 
 def _same(src, dst):
@@ -59,6 +74,10 @@ def publish(runs_dir, viewer_dir, site_dir, manifest=None):
     with open(os.path.join(site_dir, 'manifest.js'), 'w') as handle:
         handle.write(viewer_manifest.render(manifest, charts_dir=CHARTS_SUBDIR + '/'))
     open(os.path.join(site_dir, '.nojekyll'), 'a').close()
+    for rel in standalone_pages(viewer_dir):
+        target = os.path.join(site_dir, rel)
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        shutil.copyfile(os.path.join(viewer_dir, PAGES_SUBDIR, rel), target)
 
     wanted = chart_files(manifest)
     copied = 0

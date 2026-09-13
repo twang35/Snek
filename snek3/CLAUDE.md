@@ -32,7 +32,7 @@ reason.
 | `desktop/` | the git-bus job queue. stdlib only, imports nothing from this project | no | no |
 | `skills/` | the procedures an agent runs often: launching, queueing, stopping, progress updates. Markdown only | | |
 | `docs/` | the investigation | | |
-| `viewer/` | the chart viewer's source, `index.html` (`manifest.js` beside it is a local build, gitignored), and the sweep page `sweep.html` (`sweep.js` likewise, from `tools.sweep_analysis reduce`). The desktop builds the GitHub Pages `site` branch from it and both boxes' results feeds (`tools/site_build.py`). No server | | |
+| `viewer/` | the chart viewer's source, `index.html` (`manifest.js` beside it is a local build, gitignored), the sweep page `sweep.html` (`sweep.js` likewise, from `tools.sweep_analysis reduce`), and `pages/` -- self-contained pages published to the site root byte for byte (`atlas.html`, the Deep RL Atlas, with its IBM Plex woff2 files under `pages/fonts/` so the page has no external requests; linked from the viewer's header). The desktop builds the GitHub Pages `site` branch from it and both boxes' results feeds (`tools/site_build.py`). No server | | |
 | `plans/` | designs | | |
 | `tests/` | | | |
 

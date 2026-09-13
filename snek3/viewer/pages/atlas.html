@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Deep RL Atlas</title>
+<style>
+/* IBM Plex, served from fonts/ beside this page (woff2, latin + latin-ext); no external requests */
+@font-face{font-family:'IBM Plex Mono';font-style:normal;font-weight:400;font-display:swap;src:url(fonts/plex-mono-400-latin-ext.woff2) format('woff2');unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF}
+@font-face{font-family:'IBM Plex Mono';font-style:normal;font-weight:400;font-display:swap;src:url(fonts/plex-mono-400-latin.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
+@font-face{font-family:'IBM Plex Mono';font-style:normal;font-weight:500;font-display:swap;src:url(fonts/plex-mono-500-latin-ext.woff2) format('woff2');unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF}
+@font-face{font-family:'IBM Plex Mono';font-style:normal;font-weight:500;font-display:swap;src:url(fonts/plex-mono-500-latin.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
+@font-face{font-family:'IBM Plex Sans';font-style:normal;font-weight:400 600;font-display:swap;src:url(fonts/plex-sans-latin-ext.woff2) format('woff2');unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF}
+@font-face{font-family:'IBM Plex Sans';font-style:normal;font-weight:400 600;font-display:swap;src:url(fonts/plex-sans-latin.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
+@font-face{font-family:'IBM Plex Sans Condensed';font-style:normal;font-weight:500;font-display:swap;src:url(fonts/plex-sans-condensed-500-latin-ext.woff2) format('woff2');unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF}
+@font-face{font-family:'IBM Plex Sans Condensed';font-style:normal;font-weight:500;font-display:swap;src:url(fonts/plex-sans-condensed-500-latin.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
+@font-face{font-family:'IBM Plex Sans Condensed';font-style:normal;font-weight:600;font-display:swap;src:url(fonts/plex-sans-condensed-600-latin-ext.woff2) format('woff2');unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF}
+@font-face{font-family:'IBM Plex Sans Condensed';font-style:normal;font-weight:600;font-display:swap;src:url(fonts/plex-sans-condensed-600-latin.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
+:root{
+  color-scheme:light dark;
+  --bg:#f2f4f6; --panel:#ffffff; --ink:#151b22; --ink-2:#4a5560; --ink-3:#7b8792;
+  --line:#d9dee4; --line-2:#e9edf0; --accent:#c8641a; --accent-ink:#ffffff;
+  --row-hover:#f7f9fb; --chip-bg:#eef1f4; --focus:#2b6cb0;
+  --f-value:#2f6fb3; --f-dist:#6a4fb8; --f-pg:#2e8b6a; --f-ac:#0f8a9a; --f-mb:#a04a9c;
+  --f-off:#b9541f; --f-exp:#c99a1c; --f-sys:#6b7680; --f-ma:#c2456d; --f-hm:#7a8a2e;
+  --f-im:#8a6d3b; --f-seq:#3f6f8f; --f-rep:#3a9a6e;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#12161b; --panel:#191f26; --ink:#e7ebef; --ink-2:#aeb8c2; --ink-3:#7d8893;
+    --line:#2b333c; --line-2:#222931; --accent:#e58a3e; --accent-ink:#141414;
+    --row-hover:#1f262e; --chip-bg:#242c35; --focus:#7fb3ee;
+    --f-value:#6ea3e0; --f-dist:#a793e6; --f-pg:#63c39a; --f-ac:#4fc3d1; --f-mb:#d38bcf;
+    --f-off:#e0895a; --f-exp:#e2c04f; --f-sys:#9aa5af; --f-ma:#ec7f9f; --f-hm:#b3c25a;
+    --f-im:#c7a56c; --f-seq:#7fb0d1; --f-rep:#6fd0a0;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#12161b; --panel:#191f26; --ink:#e7ebef; --ink-2:#aeb8c2; --ink-3:#7d8893;
+  --line:#2b333c; --line-2:#222931; --accent:#e58a3e; --accent-ink:#141414;
+  --row-hover:#1f262e; --chip-bg:#242c35; --focus:#7fb3ee;
+  --f-value:#6ea3e0; --f-dist:#a793e6; --f-pg:#63c39a; --f-ac:#4fc3d1; --f-mb:#d38bcf;
+  --f-off:#e0895a; --f-exp:#e2c04f; --f-sys:#9aa5af; --f-ma:#ec7f9f; --f-hm:#b3c25a;
+  --f-im:#c7a56c; --f-seq:#7fb0d1; --f-rep:#6fd0a0;
+}
+*{box-sizing:border-box}
+img{max-width:100%}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "IBM Plex Sans",system-ui,sans-serif;padding-block:28px 64px;padding-inline:clamp(16px,4vw,48px)}
+.wrap{max-width:1280px;margin:0 auto}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px 32px;margin-bottom:22px}
+h1{font:600 clamp(28px,3.4vw,40px)/1.05 "IBM Plex Sans Condensed","IBM Plex Sans",sans-serif;letter-spacing:-.01em;margin:0 0 6px;text-wrap:balance}
+.sub{color:var(--ink-2);max-width:62ch;margin:0}
+.stat{font:500 13px/1.3 "IBM Plex Mono",ui-monospace,monospace;color:var(--ink-3);text-align:right}
+.stat b{display:block;font-size:26px;color:var(--ink);font-variant-numeric:tabular-nums}
+
+/* year strip */
+.strip{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px 10px;margin-bottom:14px}
+.strip-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:8px;flex-wrap:wrap}
+.label{font:500 11px/1 "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.years{display:grid;grid-template-columns:repeat(14,1fr);gap:6px;align-items:end;height:96px}
+.yr{display:flex;flex-direction:column;justify-content:flex-end;height:100%;cursor:pointer;border:none;background:none;padding:0;border-radius:3px}
+.yr:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.bar{display:flex;flex-direction:column-reverse;gap:1px;width:100%}
+.seg{width:100%;min-height:4px;border-radius:1px;opacity:.9;transition:opacity .15s}
+.yr.dim .seg{opacity:.18}
+.yr .n{font:500 11px/1 "IBM Plex Mono",ui-monospace,monospace;color:var(--ink-3);text-align:center;margin-top:6px;font-variant-numeric:tabular-nums}
+.yr.on .n{color:var(--accent);font-weight:600}
+
+/* filters */
+.filters{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px;display:grid;gap:12px;margin-bottom:14px}
+.frow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.frow .label{min-width:64px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--chip-bg);color:var(--ink-2);border-radius:999px;padding:4px 10px 4px 8px;font:500 12.5px/1.2 "IBM Plex Sans",sans-serif;cursor:pointer;transition:background .12s,color .12s,border-color .12s}
+.chip .dot{width:9px;height:9px;border-radius:50%;background:var(--c,var(--ink-3))}
+.chip:hover{border-color:var(--ink-3)}
+.chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip:focus-visible,select:focus-visible,input:focus-visible,.seg-btn:focus-visible,.reset:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+select,input[type=search]{font:inherit;font-size:13.5px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:6px 10px}
+input[type=search]{min-width:min(260px,100%);flex:1}
+.segctl{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.seg-btn{font:500 12.5px/1 "IBM Plex Sans",sans-serif;background:var(--panel);color:var(--ink-2);border:none;padding:8px 12px;cursor:pointer}
+.seg-btn+.seg-btn{border-left:1px solid var(--line)}
+.seg-btn.on{background:var(--ink);color:var(--bg)}
+.reset{margin-left:auto;font:500 12.5px/1 "IBM Plex Sans",sans-serif;color:var(--accent);background:none;border:none;cursor:pointer;padding:6px 4px;text-decoration:underline;text-underline-offset:3px}
+
+/* table */
+.tablewrap{background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:820px}
+thead th{position:sticky;top:0;background:var(--panel);text-align:left;font:500 11px/1 "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);padding:12px 14px;border-bottom:1px solid var(--line);z-index:1;cursor:pointer;user-select:none;white-space:nowrap}
+thead th.sorted{color:var(--ink)}
+thead th .arr{opacity:.6;margin-left:4px}
+tbody td{padding:11px 14px;border-bottom:1px solid var(--line-2);vertical-align:top}
+tbody tr:hover{background:var(--row-hover)}
+tbody tr:last-child td{border-bottom:none}
+td.year{font:500 14px/1.5 "IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap}
+td.name{font-weight:600;white-space:nowrap}
+td.name .ref{display:block;font:400 12px/1.4 "IBM Plex Mono",ui-monospace,monospace;color:var(--ink-3);white-space:normal;margin-top:2px;max-width:22ch}
+td.fam{white-space:nowrap}
+.tag{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink-2)}
+.tag .dot{width:9px;height:9px;border-radius:50%;flex:none}
+td.dom{color:var(--ink-2);font-size:13.5px;white-space:nowrap}
+td.dom .also{display:block;color:var(--ink-3);font-size:12px;line-height:1.4;margin-top:2px;white-space:normal;max-width:20ch}
+td.what{max-width:60ch;color:var(--ink);font-size:14px}
+.tier{display:inline-block;font:500 10.5px/1 "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.06em;text-transform:uppercase;border-radius:3px;padding:3px 6px;margin-top:6px}
+.tier.core{background:var(--accent);color:var(--accent-ink)}
+.tier.ref{border:1px solid var(--line);color:var(--ink-3)}
+.year-band td{border-top:2px solid var(--line)}
+td.score{white-space:nowrap;font:500 13px/1.5 "IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;color:var(--ink-2)}
+td.score .m{color:var(--ink);font-size:14px}
+td.score .sub{display:block;font-size:11.5px;color:var(--ink-3);white-space:normal;max-width:22ch;font-family:"IBM Plex Sans",sans-serif;line-height:1.4}
+td.score .txt{display:block;font:400 12.5px/1.4 "IBM Plex Sans",sans-serif;color:var(--ink-2);white-space:normal;max-width:26ch}
+td.score .reg{display:inline-block;font-size:10px;letter-spacing:.06em;border:1px solid var(--line);border-radius:3px;padding:1px 4px;margin-left:6px;color:var(--ink-3);vertical-align:1px}
+
+/* scores view */
+.scores .panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px 12px;margin-bottom:14px}
+.panel-head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.bars{display:grid;grid-template-columns:minmax(150px,220px) 1fr;gap:6px 12px;align-items:center}
+.bars .lbl{display:flex;align-items:center;gap:7px;min-width:0;font-size:13px}
+.bars .lbl .dot{width:8px;height:8px;border-radius:50%;flex:none}
+.bars .lbl .nm{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bars .lbl .yr{font:500 11px/1 "IBM Plex Mono",ui-monospace,monospace;color:var(--ink-3);flex:none}
+.bars .track{position:relative;height:22px;background:linear-gradient(to right,var(--line-2) 1px,transparent 1px) 0 0/25% 100% repeat-x;border-left:1px solid var(--line)}
+.bars .bar{position:absolute;left:0;top:3px;height:16px;background:var(--accent);border-radius:0 4px 4px 0;min-width:2px;opacity:.85}
+.bars .bar.approx{background:repeating-linear-gradient(135deg,var(--accent) 0 4px,transparent 4px 7px)}
+.bars .val{position:absolute;top:0;line-height:22px;font:500 12px/22px "IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;color:var(--ink);padding-left:6px;white-space:nowrap}
+.bars .human{position:absolute;top:-2px;bottom:-2px;width:0;border-left:1px dashed var(--ink-3)}
+.bars .axis{grid-column:2;position:relative;height:16px;font:500 10.5px/16px "IBM Plex Mono",ui-monospace,monospace;color:var(--ink-3)}
+.bars .axis span{position:absolute;transform:translateX(-50%)}
+.bars .track:hover .bar{opacity:1}
+@media (max-width:640px){.bars{grid-template-columns:minmax(110px,150px) 1fr}}
+.empty{padding:36px;text-align:center;color:var(--ink-3)}
+.note{color:var(--ink-3);font-size:13px;max-width:78ch;margin:16px 0 0}
+mark{background:none;color:var(--accent);font-weight:600}
+@media (max-width:640px){.years{gap:3px;height:72px}.yr .n{font-size:9px}.yr:nth-child(even) .n{visibility:hidden}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+<header>
+  <div>
+    <h1>Deep RL Atlas</h1>
+    <p class="sub">Significant deep reinforcement learning advances, 2013–2026. Core rows introduced a new mechanism or landmark result; refinements port, combine, or fix an existing one. An algorithm lists its primary domain first and, in smaller type, the others it was demonstrated on; the domain filter matches any of them. The page opens on core Atari-style discrete-action work; widen it with the controls, or click a year, family, or column header to filter and sort.</p>
+  </div>
+  <div class="stat"><b id="count">0</b>shown of <span id="total">0</span></div>
+</header>
+
+<section class="strip" aria-label="Entries per year">
+  <div class="strip-head"><span class="label">Entries per year, coloured by family</span><span class="label" id="yearHint">All years</span></div>
+  <div class="years" id="years"></div>
+</section>
+
+<section class="filters" aria-label="Filters">
+  <div class="frow"><span class="label">Family</span><div id="famChips" class="frow" style="gap:6px"></div></div>
+  <div class="frow">
+    <span class="label">Domain</span>
+    <select id="domain" aria-label="Domain"><option value="">All domains</option></select>
+    <span class="label" style="margin-left:8px">Tier</span>
+    <div class="segctl" role="group" aria-label="Tier">
+      <button class="seg-btn" id="tier-all" data-tier="">All</button>
+      <button class="seg-btn on" id="tier-core" data-tier="core">Core</button>
+      <button class="seg-btn" id="tier-ref" data-tier="ref">Refinements</button>
+    </div>
+    <input type="search" id="q" placeholder="Search name, idea, or author…" aria-label="Search">
+    <span class="label" style="margin-left:8px">View</span>
+    <div class="segctl" role="group" aria-label="View">
+      <button class="seg-btn view-btn on" data-view="table">Table</button>
+      <button class="seg-btn view-btn" data-view="scores">Atari scores</button>
+    </div>
+    <button class="reset" id="reset">Reset</button>
+  </div>
+</section>
+
+<div class="tablewrap">
+<table id="tbl">
+  <thead><tr>
+    <th data-k="year" class="sorted">Year<span class="arr">▲</span></th>
+    <th data-k="name">Algorithm</th>
+    <th data-k="fam">Family</th>
+    <th data-k="dom">Domain</th>
+    <th data-k="what" style="cursor:default">Core breakthrough</th>
+    <th data-k="score" title="Median human-normalised score, Atari-57 at 200M frames or Atari 100k">Atari</th>
+  </tr></thead>
+  <tbody id="rows"></tbody>
+</table>
+<div class="empty" id="empty" hidden>Nothing matches these filters.</div>
+</div>
+
+<div id="scores" class="scores" hidden>
+  <div class="panel" id="panel-200M">
+    <div class="panel-head"><span class="label">Atari-57 · 200M frames (or more) · median human-normalised score, log scale</span><span class="label">100% = human</span></div>
+    <div class="bars" id="bars-200M"></div>
+  </div>
+  <div class="panel" id="panel-100k">
+    <div class="panel-head"><span class="label">Atari 100k · 26 games · 100k agent steps = 400k frames, 1/500th of the panel above · median human-normalised score, log scale</span><span class="label">100% = human</span></div>
+    <div class="bars" id="bars-100k"></div>
+  </div>
+  <div class="empty" id="scores-empty" hidden>No algorithm in the current selection has an Atari score.</div>
+  <p class="note">Two regimes, two panels: a 200M-frame agent and a 100k agent are not on the same axis. Numbers are each paper's own table where the source says so; ≈ marks a value written from memory and worth checking against the paper before quoting. Human starts, sticky actions and game counts differ between papers, so read differences under a factor of ~1.3 as noise. Hover a bar for the mean and the source. Game-specific results (Montezuma's Revenge, Procgen) sit in the table's Atari column instead.</p>
+</div>
+
+<p class="note">Years are first public release (arXiv or blog), not conference year. LLM post-training methods (RLHF, DPO, GRPO and descendants) are deliberately excluded. 2026 entries come from the RLC 2026 pre-proceedings (RLJ vol. 7); their tiers reflect the novelty of the mechanism, not yet proven influence.</p>
+</div>
+
+<script>
+const FAM = {
+  value:{n:"Value-based",c:"var(--f-value)"},
+  dist:{n:"Distributional",c:"var(--f-dist)"},
+  pg:{n:"On-policy / policy gradient",c:"var(--f-pg)"},
+  ac:{n:"Off-policy actor-critic",c:"var(--f-ac)"},
+  mb:{n:"Model-based & planning",c:"var(--f-mb)"},
+  off:{n:"Offline RL",c:"var(--f-off)"},
+  exp:{n:"Exploration",c:"var(--f-exp)"},
+  sys:{n:"Distributed & systems",c:"var(--f-sys)"},
+  ma:{n:"Multi-agent",c:"var(--f-ma)"},
+  hm:{n:"Hierarchical & meta",c:"var(--f-hm)"},
+  im:{n:"Imitation & reward learning",c:"var(--f-im)"},
+  seq:{n:"Sequence models & transformers",c:"var(--f-seq)"},
+  rep:{n:"Representation & sample efficiency",c:"var(--f-rep)"},
+};
+// year, name, family, domain (a string, or a list whose first entry is the primary), tier (1 core / 2 refinement), breakthrough, reference,
+// and optionally Atari: {med, mean} human-normalised %, reg "200M" (Atari-57, 200M frames, no-op starts unless starts:"human") or "100k"
+// (Atari 100k, 26 games), approx when the number is from memory, src; or {text} for a game-specific or non-comparable result.
+const D = [
+[2013,"DQN","value","Discrete (Atari)",1,"Pioneered deep RL from raw pixels; experience replay plus a target network stabilized Q-learning with a CNN.","Mnih et al. · DeepMind",{"med": 79, "mean": 228, "reg": "200M", "src": "Rainbow (Hessel 2017) and IQN (Dabney 2018) tables"}],
+[2014,"DPG","ac","Continuous control",1,"Deterministic Policy Gradient theorem: the gradient of a deterministic policy flows through the critic, enabling efficient off-policy continuous control.","Silver et al. · ICML"],
+[2015,"Gorila","sys","Discrete (Atari)",2,"First massively distributed DQN across many actors and learners; superseded by Ape-X and IMPALA.","Nair et al. · DeepMind",{"text": "49 games, human starts: above DQN on 41 of 49"}],
+[2015,"TRPO","pg",["Continuous control","Discrete (Atari)"],1,"Monotonic-improvement guarantee via a KL trust region on each policy update.","Schulman et al. · ICML",{"text": "7 games; roughly DQN-level, no human-normalised median"}],
+[2015,"GAE","pg",["Continuous control","Discrete (Atari)"],1,"Generalized Advantage Estimation: λ-weighted advantages trade bias for variance; became standard in PPO and TRPO.","Schulman et al. · ICLR 2016"],
+[2015,"DDPG","ac",["Continuous control","Goal-conditioned / robotics"],1,"Combined DPG with DQN's replay and target networks; first practical deep off-policy continuous control.","Lillicrap et al. · ICLR 2016"],
+[2015,"Double DQN","value","Discrete (Atari)",1,"Corrected overestimation bias by separating action selection from evaluation.","van Hasselt et al. · AAAI 2016",{"med": 117, "reg": "200M", "src": "Rainbow (Hessel 2017) table"}],
+[2015,"Dueling DQN","value","Discrete (Atari)",1,"Split the network into state-value and advantage streams, learning V(s) without sampling every action.","Wang et al. · ICML 2016",{"med": 151, "reg": "200M", "src": "Rainbow (Hessel 2017) table"}],
+[2015,"PER","value","Discrete (Atari)",1,"Prioritized Experience Replay: sample transitions by TD-error magnitude with importance-sampling correction.","Schaul et al. · ICLR 2016",{"med": 128, "reg": "200M", "src": "Rainbow (Hessel 2017) table, prioritized Double DQN"}],
+[2016,"A3C","pg",["Discrete (Atari)","Continuous control"],1,"Asynchronous parallel actors replaced replay buffers and made on-policy actor-critic scalable on CPUs.","Mnih et al. · ICML",{"med": 117, "mean": 497, "reg": "200M", "starts": "human", "src": "A3C paper, feed-forward, 4 days"}],
+[2016,"AlphaGo","mb","Board & strategy games",1,"Policy and value networks guiding MCTS; first superhuman Go and the seed of the search-plus-learning line.","Silver et al. · Nature"],
+[2016,"Bootstrapped DQN","exp",["Discrete (Atari)","Hard exploration"],2,"Deep exploration through an ensemble of bootstrapped Q-heads; influential idea, niche adoption.","Osband et al. · NeurIPS"],
+[2016,"Retrace(λ)","value",["Discrete (Atari)","Continuous control"],1,"Safe, low-variance off-policy multi-step returns using truncated importance weights.","Munos et al. · NeurIPS"],
+[2016,"GAIL","im",["Continuous control","Goal-conditioned / robotics"],1,"Framed imitation as a GAN: the discriminator is the reward, the policy is the generator.","Ho & Ermon · NeurIPS"],
+[2016,"Option-Critic","hm","Discrete (Atari)",2,"End-to-end learning of options (temporally extended actions) and their termination.","Bacon et al. · AAAI 2017"],
+[2016,"ACER","pg",["Discrete (Atari)","Continuous control"],1,"Off-policy actor-critic with Retrace, truncated importance sampling with bias correction, and a trust-region step.","Wang et al. · ICLR 2017"],
+[2016,"UNREAL","rep",["Pixel-based control","Discrete (Atari)"],1,"Auxiliary tasks (pixel control, reward prediction) improved representations and sample efficiency.","Jaderberg et al. · ICLR 2017",{"mean": 880, "reg": "200M", "starts": "human", "src": "UNREAL paper; median not reported"}],
+[2016,"RL²","hm","Meta-learning",1,"A recurrent policy trained across a task distribution learns an RL algorithm in its hidden state.","Duan et al. · OpenAI"],
+[2017,"C51","dist","Discrete (Atari)",1,"Distributional RL: learn the full return distribution over 51 atoms instead of a mean Q-value.","Bellemare et al. · ICML",{"med": 178, "mean": 701, "reg": "200M", "src": "Rainbow and IQN tables"}],
+[2017,"Noisy Nets","exp",["Discrete (Atari)","Continuous control"],1,"Learned parametric noise in the weights replaced ε-greedy with state-dependent exploration.","Fortunato et al. · ICLR 2018",{"med": 118, "reg": "200M", "src": "Rainbow (Hessel 2017) table, NoisyNet-DQN"}],
+[2017,"Rainbow","value","Discrete (Atari)",1,"Combined Double DQN, PER, dueling, n-step, C51 and Noisy Nets; ablations showed PER and distributional mattered most.","Hessel et al. · AAAI 2018",{"med": 223, "mean": 1213, "reg": "200M", "src": "Rainbow paper; mean from the IQN table"}],
+[2017,"PPO","pg",["Continuous control","Discrete (Atari)","Board & strategy games","Goal-conditioned / robotics"],1,"Simplified safe policy updates using a clipped surrogate objective for on-policy stability.","Schulman et al. · OpenAI",{"text": "49 games at 40M frames, beat A2C and ACER on most; no human-normalised median in the paper"}],
+[2017,"ACKTR","pg",["Continuous control","Discrete (Atari)"],1,"Kronecker-factored approximate natural gradient made second-order policy updates cheap.","Wu et al. · NeurIPS"],
+[2017,"HER","exp",["Goal-conditioned / robotics","Continuous control"],1,"Hindsight Experience Replay: relabel failed trajectories with the goals actually achieved, solving sparse-reward manipulation.","Andrychowicz et al. · NeurIPS"],
+[2017,"ICM (Curiosity)","exp",["Hard exploration","Pixel-based control"],1,"Intrinsic reward equals the prediction error of a forward model in an inverse-dynamics feature space.","Pathak et al. · ICML"],
+[2017,"QR-DQN","dist","Discrete (Atari)",1,"Quantile regression over fixed quantile fractions; distributional RL without a bounded support.","Dabney et al. · AAAI 2018",{"med": 211, "mean": 915, "reg": "200M", "src": "QR-DQN paper (QR-DQN-1); IQN re-measured it at 193 / 864"}],
+[2017,"Reactor","dist","Discrete (Atari)",2,"Distributional Retrace plus a β-leave-one-out policy gradient; eclipsed by Rainbow.","Gruslys et al. · ICLR 2018"],
+[2017,"MADDPG","ma",["Multi-agent","Continuous control"],1,"Centralized critics with decentralized actors for mixed cooperative and competitive settings.","Lowe et al. · NeurIPS"],
+[2017,"COMA / VDN","ma","Multi-agent",2,"Counterfactual multi-agent baselines and additive value decomposition; direct precursors to QMIX.","Foerster et al.; Sunehag et al."],
+[2017,"FeUdal Networks","hm","Discrete (Atari)",2,"Manager sets latent goals, worker follows them; hierarchical RL that never became mainstream.","Vezhnevets et al. · ICML"],
+[2017,"CPO","pg","Safe RL",2,"Constrained Policy Optimization: trust-region updates that satisfy cost constraints; seeded Lagrangian PPO variants.","Achiam et al. · ICML"],
+[2017,"MAML","hm",["Meta-learning","Continuous control"],1,"Gradient-based meta-learning: initialize parameters so a few gradient steps adapt to a new task.","Finn et al. · ICML"],
+[2017,"Evolution Strategies","pg",["Continuous control","Discrete (Atari)"],1,"Showed black-box ES is a scalable, gradient-free competitor to policy gradients.","Salimans et al. · OpenAI"],
+[2017,"Deep RL from Human Preferences","im","Reward learning",1,"Learned a reward model from pairwise human comparisons; the direct ancestor of RLHF.","Christiano et al. · NeurIPS"],
+[2017,"AlphaGo Zero / AlphaZero","mb","Board & strategy games",1,"Self-play from scratch with MCTS as the policy-improvement operator; one algorithm for Go, chess and shogi.","Silver et al. · Nature / Science"],
+[2018,"SAC","ac",["Continuous control","Goal-conditioned / robotics"],1,"Maximum-entropy objective with a stochastic actor; became the default off-policy continuous baseline.","Haarnoja et al. · ICML"],
+[2018,"SAC (auto-temperature)","ac","Continuous control",2,"Learned the entropy coefficient against a target entropy; the SAC everyone actually runs.","Haarnoja et al."],
+[2018,"TD3","ac",["Continuous control","Goal-conditioned / robotics"],1,"Applied twin critics, delayed actor updates and target smoothing to crush overestimation in continuous spaces.","Fujimoto et al. · ICML"],
+[2018,"IMPALA","sys",["Multi-task / generalist","Discrete (Atari)"],1,"Decoupled actors and learner at scale; V-trace corrected the resulting off-policy lag.","Espeholt et al. · ICML",{"med": 192, "mean": 958, "reg": "200M", "src": "IMPALA paper, deep net, one expert per game"}],
+[2018,"Ape-X","sys",["Discrete (Atari)","Continuous control"],1,"Distributed PER with hundreds of actors feeding one learner; massive throughput gains.","Horgan et al. · ICLR",{"med": 434, "mean": 1695, "reg": "200M", "src": "Ape-X paper, 22.8B frames"}],
+[2018,"D4PG","ac","Continuous control",2,"Distributed distributional DDPG with n-step returns; a combination of existing parts.","Barth-Maron et al. · ICLR"],
+[2018,"IQN","dist","Discrete (Atari)",1,"Implicit Quantile Networks sample quantile fractions as network inputs, enabling risk-sensitive policies.","Dabney et al. · ICML",{"med": 218, "mean": 1019, "reg": "200M", "src": "IQN paper"}],
+[2018,"MPO","ac",["Continuous control","Discrete (Atari)"],1,"Maximum a-posteriori Policy Optimization: EM-style, hyperparameter-robust policy improvement.","Abdolmaleki et al. · ICLR"],
+[2018,"World Models","mb",["Pixel-based control","Discrete (Atari)"],1,"VAE plus RNN world model; the policy is trained entirely inside the learned dream.","Ha & Schmidhuber · NeurIPS"],
+[2018,"PETS","mb","Continuous control",1,"Probabilistic ensembles with trajectory sampling; MPC over learned dynamics rivaled model-free returns.","Chua et al. · NeurIPS"],
+[2018,"QT-Opt","ac","Goal-conditioned / robotics",1,"Large-scale off-policy Q-learning on 580k real robot grasps.","Kalashnikov et al. · CoRL"],
+[2018,"RND","exp",["Hard exploration","Discrete (Atari)"],1,"Random Network Distillation: novelty is the error predicting a fixed random network; first strong Montezuma progress.","Burda et al. · ICLR 2019",{"text": "Montezuma's Revenge ~8,000 mean (best run 17,500), 22 rooms; first agent past the first level without demonstrations"}],
+[2018,"QMIX","ma",["Multi-agent","Board & strategy games"],1,"Monotonic value factorization enabling centralized training with decentralized execution.","Rashid et al. · ICML"],
+[2018,"DIAYN","exp","Unsupervised skills",2,"Diversity Is All You Need: discover distinguishable skills without any reward.","Eysenbach et al. · ICLR 2019"],
+[2018,"Dactyl / ADR","pg","Goal-conditioned / robotics",2,"PPO plus automatic domain randomization transferred sim policies to a real hand solving a Rubik's cube.","OpenAI · 2018–2019"],
+[2018,"R2D2","value",["Discrete (Atari)","Partially observed"],1,"Recurrent replay at Ape-X scale with stored hidden states and burn-in; a large jump over Rainbow.","Kapturowski et al. · ICLR 2019",{"med": 1921, "mean": 4025, "reg": "200M", "src": "R2D2 paper, ~10B frames"}],
+[2018,"PlaNet","mb",["Pixel-based control","Continuous control"],1,"Recurrent state-space model for latent dynamics; planning in latent space from pixels.","Hafner et al. · ICML 2019"],
+[2019,"Go-Explore","exp",["Hard exploration","Discrete (Atari)"],1,"Archive promising states, return to them, then explore; solved Montezuma's Revenge and Pitfall.","Ecoffet et al. · Nature 2021",{"text": "Montezuma's Revenge 43,763 without domain knowledge (1.7M with), Pitfall 6,954: both far above any human-normalised chart"}],
+[2019,"AlphaStar","ma",["Board & strategy games","Multi-agent"],1,"League-based population self-play reached Grandmaster level in StarCraft II.","Vinyals et al. · Nature"],
+[2019,"OpenAI Five","pg",["Board & strategy games","Multi-agent"],1,"PPO scaled to ten months of training at enormous batch sizes; beat the Dota 2 world champions.","Berner et al. · OpenAI"],
+[2019,"Discrete SAC","ac","Discrete (Atari)",2,"Ported SAC's max-entropy objective to discrete actions by taking the softmax expectation exactly; later shown unstable on Atari without fixes.","Christodoulou",{"text": "20 games at 100k steps, below Rainbow"}],
+[2019,"V-MPO","pg",["Multi-task / generalist","Discrete (Atari)","Continuous control"],2,"On-policy MPO with a non-parametric target distribution; strong at scale, mostly used inside DeepMind.","Song et al. · ICLR 2020"],
+[2019,"AWR / AWAC","off","Offline-to-online",2,"Advantage-weighted regression; simple offline pretraining then online fine-tuning.","Peng et al.; Nair et al. 2020"],
+[2019,"FQF","dist","Discrete (Atari)",2,"Learned the quantile fractions themselves; the last step of the C51 → QR-DQN → IQN line.","Yang et al. · NeurIPS",{"med": 272, "mean": 3324, "reg": "200M", "approx": true, "src": "FQF paper, from memory -- verify"}],
+[2019,"SimPLe","mb","Discrete (Atari)",2,"Video-prediction world models for Atari 100k; superseded by DreamerV2 and EfficientZero.","Kaiser et al. · ICLR 2020",{"med": 14, "mean": 44, "reg": "100k", "src": "SPR / CURL comparison tables"}],
+[2019,"SEED RL","sys",["Discrete (Atari)","Continuous control"],2,"Centralized inference on accelerators with remote environments; infrastructure rather than algorithm.","Espeholt et al. · ICLR 2020"],
+[2019,"MBPO","mb","Continuous control",1,"Short model rollouts branched from real states, with theory for when model use helps.","Janner et al. · NeurIPS"],
+[2019,"BCQ","off","Offline datasets",1,"Diagnosed extrapolation error and constrained actions to the behavior distribution.","Fujimoto et al. · ICML"],
+[2019,"GTrXL","seq",["Partially observed","Multi-task / generalist"],1,"Gated Transformer-XL stabilized transformers as agent memory, beating LSTMs.","Parisotto et al. · ICML 2020"],
+[2019,"MuZero","mb",["Board & strategy games","Discrete (Atari)"],1,"Learned a latent model of value, policy and reward only; planning without knowing the rules, across board games and Atari.","Schrittwieser et al. · Nature 2020",{"med": 2381, "mean": 5661, "reg": "200M", "src": "MuZero paper, 20B frames"}],
+[2019,"Dreamer","mb",["Pixel-based control","Continuous control"],1,"Actor-critic trained by backpropagating through imagined latent trajectories.","Hafner et al. · ICLR 2020"],
+[2020,"NGU","exp",["Hard exploration","Discrete (Atari)"],1,"Never Give Up: episodic plus lifelong novelty, and a family of policies with different exploration rates.","Badia et al. · ICLR",{"med": 1208, "mean": 3169, "reg": "200M", "approx": true, "src": "NGU paper, 35B frames -- verify"}],
+[2020,"Agent57","exp","Discrete (Atari)",1,"Surpassed human baselines on all 57 Atari games using an adaptive meta-controller and curiosity-driven intrinsic motivation.","Badia et al. · ICML",{"med": 1933, "mean": 4766, "reg": "200M", "src": "Agent57 paper; above human on all 57 games"}],
+[2020,"Implementation Matters / What Matters","pg","Continuous control",2,"Showed code-level details drive much of PPO's edge over TRPO and catalogued which choices matter in on-policy RL.","Engstrom et al.; Andrychowicz et al."],
+[2020,"CURL / DrQ / RAD","rep",["Pixel-based control","Continuous control","Discrete (Atari)"],1,"Contrastive learning and simple image augmentation closed the pixels-versus-state gap.","Laskin; Kostrikov; Laskin et al.",{"med": 28, "mean": 36, "reg": "100k", "src": "DrQ; CURL reads 17.5 / 38.1, DrQ(eps) 31 / 47"}],
+[2020,"CQL","off",["Offline datasets","Discrete (Atari)"],1,"Conservative Q-Learning penalizes Q-values of out-of-distribution actions; the standard offline baseline.","Kumar et al. · NeurIPS"],
+[2020,"TQC","dist","Continuous control",2,"Truncated quantile critics control overestimation; distributional SAC.","Kuznetsov et al. · ICML"],
+[2020,"Munchausen RL","value","Discrete (Atari)",2,"Add the scaled log-policy to the reward, giving implicit KL regularization.","Vieillard et al. · NeurIPS"],
+[2020,"Sample Factory","sys",["Discrete (Atari)","Pixel-based control"],2,"Single-machine asynchronous PPO past 100k frames per second; infrastructure.","Petrenko et al. · ICML"],
+[2020,"SPR","rep",["Discrete (Atari)","Pixel-based control"],1,"Self-Predictive Representations: multi-step latent prediction for sample efficiency on Atari 100k.","Schwarzer et al. · ICLR 2021",{"med": 42, "mean": 70, "reg": "100k", "src": "SPR paper, with augmentation"}],
+[2020,"PPG","pg","Discrete (Atari)",1,"Phasic Policy Gradient separates actor and critic training phases, allowing aggressive critic updates without destabilizing the actor's policy ratios.","Cobbe et al. · ICML 2021",{"text": "Procgen, not Atari"}],
+[2020,"DreamerV2","mb",["Discrete (Atari)","Pixel-based control"],1,"Discrete latents and KL balancing; the first world-model agent to beat humans on Atari.","Hafner et al. · ICLR 2021",{"med": 164, "reg": "200M", "src": "DreamerV2 paper, gamer-normalised median, 55 games, sticky actions"}],
+[2021,"REDQ","ac",["Continuous control","Goal-conditioned / robotics"],1,"Randomized critic ensembles with a high update-to-data ratio; model-free sample efficiency matching MBPO.","Chen et al. · ICLR"],
+[2021,"Muesli","mb",["Discrete (Atari)","Board & strategy games"],2,"MuZero-style model with a regularized policy gradient; no search at act time.","Hessel et al. · ICML",{"med": 2538, "reg": "200M", "approx": true, "src": "Muesli paper, 200M frames -- verify"}],
+[2021,"MuZero Unplugged / Sampled / Gumbel","mb",["Board & strategy games","Discrete (Atari)","Continuous control","Offline datasets"],2,"MuZero for offline data, continuous actions, and few-simulation search via Gumbel top-k.","Schrittwieser; Hubert; Danihelka et al."],
+[2021,"DroQ","ac","Continuous control",2,"Dropout and LayerNorm critics matched REDQ at a fraction of the cost.","Hiraoka et al. · ICLR 2022"],
+[2021,"MAPPO","ma",["Multi-agent","Board & strategy games"],2,"PPO with centralized critics matched off-policy MARL methods on standard benchmarks.","Yu et al. · NeurIPS 2022"],
+[2021,"Isaac Gym massively parallel RL","sys","Goal-conditioned / robotics",2,"Thousands of GPU-resident environments; legged locomotion trained in minutes.","Makoviychuk et al.; Rudin et al."],
+[2021,"Decision Transformer","seq",["Offline datasets","Discrete (Atari)"],1,"Cast RL as return-conditioned sequence modeling with no value functions or bootstrapping.","Chen et al. · NeurIPS",{"text": "4 games, gamer-normalised: Breakout 268, Pong 106, Qbert 25, Seaquest 2.5"}],
+[2021,"Trajectory Transformer","seq","Offline datasets",1,"Transformer as a joint dynamics model with beam search for planning.","Janner et al. · NeurIPS"],
+[2021,"TD3+BC","off","Offline datasets",1,"Minimalist offline RL: one behavior-cloning regularizer added to TD3.","Fujimoto & Gu · NeurIPS"],
+[2021,"IQL","off",["Offline datasets","Goal-conditioned / robotics"],1,"Implicit Q-Learning via expectile regression; never queries out-of-distribution actions.","Kostrikov et al. · ICLR 2022"],
+[2021,"EfficientZero","mb",["Discrete (Atari)","Continuous control"],1,"MuZero plus self-supervised consistency; human-level Atari from two hours of data.","Ye et al. · NeurIPS",{"med": 109, "mean": 194, "reg": "100k", "src": "EfficientZero paper"}],
+[2022,"TD-MPC","mb",["Continuous control","Pixel-based control"],1,"Temporal-difference learning for model predictive control in a task-oriented latent space.","Hansen et al. · ICML"],
+[2022,"Gato / Multi-Game DT","seq",["Multi-task / generalist","Discrete (Atari)","Goal-conditioned / robotics"],1,"A single transformer policy across hundreds of tasks and modalities.","Reed et al.; Lee et al."],
+[2022,"AlphaTensor","mb","Algorithm discovery",1,"AlphaZero-style search discovered faster matrix-multiplication algorithms.","Fawzi et al. · Nature"],
+[2022,"Diffusion-QL / Decision Diffuser","off",["Offline datasets","Continuous control"],2,"Diffusion models as expressive policies for multimodal offline data.","Wang et al.; Ajay et al."],
+[2022,"IRIS / TWM / STORM","mb","Discrete (Atari)",2,"Transformer world models for Atari 100k.","Micheli et al.; Robine et al.; Zhang et al. 2023",{"med": 58, "mean": 127, "reg": "100k", "src": "STORM; IRIS 29 / 105, TWM 51 / 96"}],
+[2022,"DeepNash (R-NaD)","ma","Board & strategy games",2,"Regularized Nash dynamics reached expert level in Stratego without search.","Perolat et al. · Science"],
+[2022,"Revisiting Discrete SAC","ac","Discrete (Atari)",2,"Entropy-penalty clipping and double average Q made discrete SAC competitive on Atari.","Zhou et al."],
+[2023,"DreamerV3","mb",["Multi-task / generalist","Discrete (Atari)","Continuous control"],1,"Fixed hyperparameters across 150+ tasks; first to collect diamonds in Minecraft from scratch.","Hafner et al. · Nature 2025",{"med": 49, "mean": 112, "reg": "100k", "approx": true, "src": "DreamerV3 paper (2023 arXiv) -- verify"}],
+[2023,"BBF","rep",["Discrete (Atari)","Pixel-based control"],1,"Bigger, Better, Faster: scaled SPR-style networks with resets and annealed hyperparameters; human-level on Atari 100k (interquartile mean 105%) from 400k frames, 1/500th of the classic budget.","Schwarzer et al. · ICML",{"med": 92, "mean": 225, "reg": "100k", "src": "BBF paper; IQM 105"}],
+[2023,"CrossQ","ac","Continuous control",2,"Batch norm, no target networks, update-to-data ratio of 1; a large compute win.","Bhatt et al. · ICLR 2024"],
+[2023,"Cal-QL / ReBRAC","off","Offline-to-online",2,"Calibrated Q-values for fine-tuning; a minimalist, re-tuned TD3+BC.","Nakamoto et al.; Tarasov et al."],
+[2023,"TD-MPC2","mb",["Multi-task / generalist","Continuous control"],1,"Scalable world models; a single agent across 80+ tasks and embodiments.","Hansen et al. · ICLR 2024"],
+[2024,"DIAMOND","mb","Discrete (Atari)",2,"Diffusion-based world model for Atari.","Alonso et al. · NeurIPS",{"mean": 146, "reg": "100k", "approx": true, "src": "DIAMOND paper; median from memory not trusted, omitted"}],
+[2024,"SimBa","rep","Continuous control",2,"An architectural simplicity bias lets off-policy RL scale parameters without collapse.","Lee et al. · ICLR 2025"],
+[2026,"PPO+","pg","Continuous control",1,"Off-policy critic training with on-policy actor updates, bounded action policies, and entropy regularization; closes much of the gap to off-policy methods on MuJoCo and DMC without implementation tricks.","Kallel et al. · RLJ vol. 7"],
+[2026,"PPO at 1M parallel environments","pg",["Discrete (Atari)","Continuous control"],1,"Models PPO's outer loop as stochastic optimization: plateaus come from the step-size-to-noise ratio, and scaling to a million parallel environments removes them.","Beukman et al. · RLJ vol. 7"],
+[2026,"Delightful Policy Gradient","pg","Continuous control",1,"Gates each per-sample policy-gradient term with a sigmoid of advantage times action surprisal, suppressing variance from rare negative-advantage actions.","Osband · RLJ vol. 7"],
+[2026,"Approximate Next Policy Sampling","pg","Discrete (Atari)",1,"An iteratively updated behavior policy matches the next policy's state distribution, permitting large policy steps without trust regions or clipping.","Sandhu & Parr · RLJ vol. 7"],
+[2026,"SOReL / TOReL (Fully Offline RL)","off","Offline datasets",1,"Bayesian model-based offline RL with ensemble uncertainty predicts a policy's value offline, enabling hyperparameter tuning with no online evaluation.","Fellows et al. · RLJ vol. 7"],
+[2026,"Decentralized Asymmetric DQN","ma","Multi-agent",1,"A centralized state-conditioned Q-function serves as the regression target for independent per-agent Q-networks, replacing value factorization with projection.","Bhati et al. · RLJ vol. 7"],
+[2026,"ACPO","ma","Multi-agent",1,"Agent-Chained Policy Optimization: exact decentralized decomposition of the joint policy gradient via serialized agent commitments.","Matsunaga et al. · RLJ vol. 7"],
+[2026,"Adaptive Q(λ) (streaming RL)","value",["Discrete (Atari)","Continuous control"],1,"Shows DQN and C51 updates work without replay in streaming RL given bounded gradients and variance-adjusted steps; derives Adaptive Q(λ) from eligibility traces.","Gogianu et al. · RLJ vol. 7"],
+[2026,"Gradient Iterated TD","value","Discrete (Atari)",2,"Takes full gradients, not semi-gradients, through the moving targets of iterated TD's parallel Q-function sequence.","Vincent et al. · RLJ vol. 7"],
+[2026,"Gated Q(λ)","value","Discrete (Atari)",2,"State-action-dependent gating of eligibility traces interpolates between Watkins' and Peng's Q(λ) without importance sampling; proven contraction.","Daley · RLJ vol. 7"],
+[2026,"StaQ","value","Discrete (Atari)",2,"Implements policy mirror descent exactly by keeping only the last M Q-functions, avoiding actor-network policy update errors.","Davey et al. · RLJ vol. 7"],
+[2026,"Endpoint Replay","value","Discrete (Atari)",2,"Stores only the end-points of chained n-step sequences, matching large-buffer performance with an order of magnitude less memory.","Panahi et al. · RLJ vol. 7"],
+[2026,"Valid-action suppression fix","pg","Discrete (Atari)",2,"Shows unmasked softmax policy gradients exponentially suppress valid actions at unvisited states; adds a feasibility-classification loss to counteract it.","Zabounidis et al. · RLJ vol. 7"],
+[2026,"DART","pg","Continuous control",2,"Pairs a bootstrapped base critic with a frozen-target residual critic tracking a Monte Carlo correction, reducing GAE bias.","Mohammadzadeh et al. · RLJ vol. 7"],
+[2026,"R-HCA","pg","Hard exploration",2,"Extends COCOA hindsight credit reweighting to immediate rewards, provably reducing variance under noisy rewards.","Ramesh et al. · RLJ vol. 7"],
+[2026,"Learned supports for categorical critics","dist","Continuous control",2,"Jointly learns the lower and upper support bounds of HL-Gauss categorical critics via an upper bound on the mean-squared Bellman error.","Chang et al. · RLJ vol. 7"],
+[2026,"Momba","dist","Continuous control",2,"Observation, feature and weight normalization plus distributional returns modernize entropy-regularized multi-objective RL.","Štafa et al. · RLJ vol. 7"],
+[2026,"Prefix-optimal diffusion policies","ac","Continuous control",2,"Learns a prefix value function at each denoising step via a Bellman recursion, giving a parameter-free early-stopping rule for diffusion policies.","Salla et al. · RLJ vol. 7"],
+[2026,"Instant Episode Repetition","ac","Continuous control",2,"Immediately replays the action sequences of high-reward episodes for several subsequent episodes during collection, on top of SAC or TD3.","Yamani et al. · RLJ vol. 7"],
+[2026,"Direct Advantage Estimation (deep)","rep","Discrete (Atari)",2,"Extends DAE to POMDPs and swaps explicit transition models for discrete latent dynamics to cut compute.","Pan & Schölkopf · RLJ vol. 7"],
+[2026,"V-Simba","rep","Pixel-based control",2,"Ports the SimBa architecture to visual RL on SAC with augmentation, normalization layers and pointwise convolutions.","Kim et al. · RLJ vol. 7"],
+[2026,"Q-learning for offline in-context RL","seq","Offline datasets",2,"Replaces the supervised Algorithm Distillation objective with conservative Q-learning, improving about 30% across 150+ datasets.","Tarasov et al. · RLJ vol. 7"],
+[2026,"QFIX","ma","Multi-agent",2,"A thin fixing layer that makes VDN- and QMIX-style mixers IGM-complete.","Baisero et al. · RLJ vol. 7"],
+[2026,"Hierarchical Behaviour Spaces","hm","Hard exploration",2,"The controller outputs linear combinations over option reward functions, inducing a continuous behaviour space; gains traced to exploration.","Matthews et al. · RLJ vol. 7"],
+];
+
+const rows = D.map((r,i)=>{const doms=Array.isArray(r[3])?r[3]:[r[3]]; return {id:i,year:r[0],name:r[1],fam:r[2],dom:doms[0],doms,tier:r[4]===1?"core":"ref",what:r[5],ref:r[6],atari:r[7]||null};});
+const YEARS = []; for(let y=2013;y<=2026;y++) YEARS.push(y);
+const DEFAULTS = {dom:"Discrete (Atari)", tier:"core"};   // the landing view; Reset returns to it, "All domains" and "All" widen it
+const state = {fams:new Set(), dom:DEFAULTS.dom, tier:DEFAULTS.tier, q:"", year:null, sortK:"year", sortDir:1, view:location.hash==="#scores"?"scores":"table"};   // atlas.html#scores opens on the chart
+
+const $ = s=>document.querySelector(s);
+const famChips=$("#famChips"), yearsEl=$("#years"), rowsEl=$("#rows"), domSel=$("#domain");
+
+Object.entries(FAM).forEach(([k,f])=>{
+  const b=document.createElement("button"); b.className="chip"; b.type="button"; b.id="fam-"+k; b.dataset.k=k;
+  b.style.setProperty("--c",f.c); b.innerHTML=`<span class="dot"></span>${f.n}`;
+  b.setAttribute("aria-pressed","false");
+  b.onclick=()=>{state.fams.has(k)?state.fams.delete(k):state.fams.add(k); render();};
+  famChips.appendChild(b);
+});
+[...new Set(rows.flatMap(r=>r.doms))].sort().forEach(d=>{const o=document.createElement("option");o.value=d;o.textContent=d;domSel.appendChild(o);});
+domSel.value=state.dom;
+domSel.onchange=()=>{state.dom=domSel.value;render();};
+document.querySelectorAll(".seg-btn[data-tier]").forEach(b=>b.onclick=()=>{state.tier=b.dataset.tier;render();});
+document.querySelectorAll(".view-btn").forEach(b=>b.onclick=()=>{state.view=b.dataset.view;history.replaceState(null,"",state.view==="scores"?"#scores":location.pathname);render();});
+$("#q").oninput=e=>{state.q=e.target.value.trim().toLowerCase();render();};
+$("#reset").onclick=()=>{state.fams.clear();state.dom=DEFAULTS.dom;state.tier=DEFAULTS.tier;state.q="";state.year=null;$("#q").value="";domSel.value=state.dom;render();};
+document.querySelectorAll("thead th[data-k]").forEach(th=>{ if(th.dataset.k==="what")return; th.onclick=()=>{ if(state.sortK===th.dataset.k) state.sortDir*=-1; else {state.sortK=th.dataset.k;state.sortDir=th.dataset.k==="score"?-1:1;} render(); };});
+
+const pct=v=>v>=1000?(v/100).toFixed(1).replace(/\.0$/,"")+"×":v+"%";
+const fmt=v=>v.toLocaleString("en-US");
+function scoreKey(r){const a=r.atari; return a&&a.med!=null?a.med:(a&&a.mean!=null?a.mean/3:-1);}   // sort: median, else a rough stand-in, else last
+function scoreCell(r){
+  const a=r.atari; if(!a) return '<span style="color:var(--ink-3)">—</span>';
+  if(a.text) return `<span class="txt">${esc(a.text)}</span>`;
+  const reg=`<span class="reg" title="${a.reg==="200M"?"Atari-57, 200M frames or more":"Atari 100k benchmark, 26 games"}">${a.reg}</span>`;
+  const med=a.med!=null?`<span class="m">${a.approx?"≈":""}${fmt(a.med)}%</span> median`:`<span class="m">${a.approx?"≈":""}${fmt(a.mean)}%</span> mean`;
+  const sub=[a.med!=null&&a.mean!=null?`mean ${fmt(a.mean)}%`:null, a.starts==="human"?"human starts":null].filter(Boolean).join(" · ");
+  return `${med}${reg}<span class="sub">${esc(sub?sub+" · ":"")}${esc(a.src)}</span>`;
+}
+const LOG={min:10,max:10000};  // log axis from 10% to 100× human
+const xpos=v=>Math.max(0,Math.min(1,Math.log10(v/LOG.min)/Math.log10(LOG.max/LOG.min)))*100;
+function renderScores(list){
+  let any=false;
+  for(const reg of ["200M","100k"]){
+    const el=$("#bars-"+reg); el.innerHTML="";
+    const rows=list.filter(r=>r.atari&&!r.atari.text&&r.atari.reg===reg&&r.atari.med!=null).sort((a,b)=>b.atari.med-a.atari.med);
+    $("#panel-"+reg).hidden=rows.length===0; if(!rows.length) continue; any=true;
+    rows.forEach(r=>{
+      const a=r.atari;
+      const lbl=document.createElement("div"); lbl.className="lbl";
+      lbl.innerHTML=`<span class="dot" style="background:${FAM[r.fam].c}" title="${FAM[r.fam].n}"></span><span class="nm">${esc(r.name)}</span><span class="yr">${r.year}</span>`;
+      const tr=document.createElement("div"); tr.className="track";
+      const tip=[`${r.name} (${r.year}), ${FAM[r.fam].n}`,`median ${fmt(a.med)}% human-normalised${a.mean!=null?`, mean ${fmt(a.mean)}%`:""}`,a.starts==="human"?"human starts":"no-op starts",a.approx?"≈ from memory, verify":null,a.src].filter(Boolean).join("\n");
+      tr.title=tip;
+      tr.innerHTML=`<span class="human" style="left:${xpos(100)}%"></span><div class="bar${a.approx?" approx":""}" style="width:${xpos(a.med)}%"></div><span class="val" style="left:${xpos(a.med)}%">${a.approx?"≈":""}${fmt(a.med)}%</span>`;
+      el.appendChild(lbl); el.appendChild(tr);
+    });
+    const ax=document.createElement("div"); ax.className="axis";
+    [10,100,1000,10000].forEach(v=>{const sp=document.createElement("span");sp.style.left=xpos(v)+"%";sp.textContent=v===100?"human":pct(v);ax.appendChild(sp);});
+    el.appendChild(ax);
+  }
+  $("#scores-empty").hidden=any;
+}
+
+function passes(r, ignoreYear){
+  if(state.fams.size && !state.fams.has(r.fam)) return false;
+  if(state.dom && !r.doms.includes(state.dom)) return false;
+  if(state.tier && r.tier!==state.tier) return false;
+  if(!ignoreYear && state.year!==null && r.year!==state.year) return false;
+  if(state.q){const h=(r.name+" "+r.what+" "+r.ref+" "+FAM[r.fam].n+" "+r.doms.join(" ")).toLowerCase(); if(!h.includes(state.q)) return false;}
+  return true;
+}
+function esc(s){return s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function hl(s){ if(!state.q) return esc(s); const i=s.toLowerCase().indexOf(state.q); if(i<0) return esc(s); return esc(s.slice(0,i))+"<mark>"+esc(s.slice(i,i+state.q.length))+"</mark>"+esc(s.slice(i+state.q.length)); }
+
+function renderYears(){
+  const perYear = YEARS.map(y=>rows.filter(r=>r.year===y && passes(r,true)));
+  const max = Math.max(1,...perYear.map(a=>a.length));
+  yearsEl.innerHTML="";
+  YEARS.forEach((y,i)=>{
+    const list=perYear[i];
+    const b=document.createElement("button"); b.type="button"; b.id="yr-"+y; b.className="yr"+(state.year===y?" on":"")+(state.year!==null&&state.year!==y?" dim":"");
+    b.title=`${y}: ${list.length} entr${list.length===1?"y":"ies"}`; b.setAttribute("aria-label",b.title);
+    const bar=document.createElement("div"); bar.className="bar"; bar.style.height=(list.length/max*72)+"px";
+    const groups={}; list.forEach(r=>groups[r.fam]=(groups[r.fam]||0)+1);
+    Object.entries(groups).forEach(([k,n])=>{const s=document.createElement("div");s.className="seg";s.style.flex=n;s.style.background=FAM[k].c;bar.appendChild(s);});
+    const n=document.createElement("div"); n.className="n"; n.textContent=String(y).slice(2);
+    b.appendChild(bar); b.appendChild(n);
+    b.onclick=()=>{state.year=state.year===y?null:y;render();};
+    yearsEl.appendChild(b);
+  });
+  $("#yearHint").textContent = state.year===null ? "All years · click a bar to isolate a year" : `Showing ${state.year} · click again to clear`;
+}
+
+function render(){
+  document.querySelectorAll("#famChips .chip").forEach(c=>{const on=state.fams.has(c.dataset.k);c.classList.toggle("on",on);c.setAttribute("aria-pressed",on);});
+  document.querySelectorAll(".seg-btn[data-tier]").forEach(b=>b.classList.toggle("on",b.dataset.tier===state.tier));
+  document.querySelectorAll(".view-btn").forEach(b=>b.classList.toggle("on",b.dataset.view===state.view));
+  $("#tbl").parentElement.hidden = state.view!=="table"; $("#scores").hidden = state.view!=="scores";
+  document.querySelectorAll("thead th[data-k]").forEach(th=>{const on=th.dataset.k===state.sortK;th.classList.toggle("sorted",on);const a=th.querySelector(".arr");if(a)a.remove();if(on){const s=document.createElement("span");s.className="arr";s.textContent=state.sortDir>0?"▲":"▼";th.appendChild(s);}});
+  renderYears();
+  let list=rows.filter(r=>passes(r,false));
+  const key=state.sortK;
+  list.sort((a,b)=>{let va=a[key],vb=b[key]; if(key==="fam"){va=FAM[va].n;vb=FAM[vb].n;} if(key==="score"){va=scoreKey(a);vb=scoreKey(b);} let c= va<vb?-1:va>vb?1:0; if(c===0) c=a.year-b.year||a.id-b.id; return c*state.sortDir;});
+  renderScores(list);
+  rowsEl.innerHTML="";
+  let lastYear=null;
+  list.forEach(r=>{
+    const tr=document.createElement("tr"); if(key==="year"&&lastYear!==null&&r.year!==lastYear) tr.className="year-band"; lastYear=r.year;
+    tr.innerHTML=`<td class="year">${r.year}</td>
+      <td class="name">${hl(r.name)}<span class="ref">${hl(r.ref)}</span><span class="tier ${r.tier}">${r.tier==="core"?"core":"refinement"}</span></td>
+      <td class="fam"><span class="tag"><span class="dot" style="background:${FAM[r.fam].c}"></span>${FAM[r.fam].n}</span></td>
+      <td class="dom">${esc(r.dom)}${r.doms.length>1?`<span class="also">${r.doms.slice(1).map(esc).join(" · ")}</span>`:""}</td>
+      <td class="what">${hl(r.what)}</td>
+      <td class="score">${scoreCell(r)}</td>`;
+    rowsEl.appendChild(tr);
+  });
+  $("#count").textContent=list.length; $("#total").textContent=rows.length;
+  $("#empty").hidden=list.length>0;
+}
+render();
+</script>
+
+</body>
+</html>
