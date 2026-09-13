@@ -64,8 +64,9 @@ def test_build_reduces_each_arm_to_the_docs_numbers(tmp_path):
     manifest = vm.build(runs)
     by = {a['policy']: a for a in manifest['arms']}
     assert list(by) == ['b9ce-lam999-seed1', 'b9cf-lam999-seed2', 'b9cg-lam999-seed3']
+    assert manifest['cuts'] == {'h': 99.2, 'k': 99.6}, 'the captions quote the cuts the passes select on'
     a = by['b9ce-lam999-seed1']
-    assert (a['rows'], a['density98'], a['cands99'], a['best_row']) == (4, 75.0, 1, 99.2)
+    assert (a['rows'], a['density98'], a['cands'], a['best_row']) == (4, 75.0, 1, 99.2)
     assert (a['best30'], a['drawdown50'], a['stage_b_png']) == (99, 33.33, True)
     assert (a['hof_png'], a['hof_rows'], a['hof_mean'], a['hof_best'], a['hof_9873']) == (True, 3, 98.8, 99.4, 2)
     assert (a['hof30k_png'], a['hof30k_rows'], a['hof30k_mean'], a['hof30k_best'], a['hof30k_best_step']) == (True, 2, 99.1, 99.3, 10)
@@ -149,7 +150,7 @@ def test_status_follows_the_files_when_nothing_is_live(tmp_path):
     _arm(runs, 'b30af-x-seed6', evals=[90, 99])
     by = {a['policy']: a for a in vm.build(runs)['arms']}
     assert by['b30aa-x-seed1']['status'] == {'a': 'done', 'b': 'done', 'h': 'done', 'k': 'done'}
-    assert by['b30aa-x-seed1']['hof_99'] == 1
+    assert by['b30aa-x-seed1']['hof_cands'] == 0        # 99.1 is under the 99.6 hof30k cut
     assert by['b30ab-x-seed2']['status'] == {'a': 'done', 'b': 'done', 'h': 'done', 'k': 'none'}
     assert by['b30ac-x-seed3']['status'] == {'a': 'done', 'b': 'done', 'h': 'none', 'k': 'none'}
     assert by['b30ad-x-seed4']['status'] == {'a': 'done', 'b': 'done', 'h': 'pending', 'k': 'upstream'}

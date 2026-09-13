@@ -12,11 +12,12 @@ the page and the tables cannot disagree:
 |---|---|
 | `best30` | `summary.best_perfect30`, the peak 30-eval trailing perfect rate |
 | `sef` | `summary.strong_eval_fraction`, share of stage-A evals at >=80% perfect |
-| `rows`, `density98`, `cands99`, `best_row` | stage-B row count, share at >=98/500, `hof5000` candidates at >=99, max |
+| `rows`, `density98`, `cands`, `best_row` | stage-B row count, share at >=98/500, `hof5000` candidates at >=`eta.HOF_THRESHOLD` /500, max |
 | `drawdown50`, `drawdown80` | share of post-competence stage-A evals (onset = first >=80%) below 50 / 80 |
 | `hof_rows`, `hof_stopped`, `hof_mean`, `hof_best`, `hof_9873`, `hof_996` | the `hof5000` pass: rows, rows stopped early, mean over the full rows, max, count at >=98.73 (the snek2 champion), count at >=99.6 (the `hof30k` cut) |
 | `hof30k_rows`, `hof30k_stopped`, `hof30k_mean`, `hof30k_best`, `hof30k_best_step`, `hof30k_998` | the `hof30k` pass (30,000 episodes, seed 7): rows, rows stopped early, mean over the full rows, max and where it is, count at >=99.8 |
-| `hof_99` | `hof5000` rows at >=99 /5,000 — the `hof30k` candidate cut until 2026-09-08 |
+| `hof_cands` | `hof5000` rows at >=`eta.HOF30K_THRESHOLD` /5,000, the `hof30k` candidates |
+| `cuts` (top level) | `{h, k}`: the two thresholds, so the page's captions say the cut the code runs |
 
 A row stopped early (`abandoned`, `plans/archive/early-stop.md`) is a short sample that is only ever below its
 pass's target: it counts as a row and never in a mean, and it sits below every `>=` count by arithmetic.
@@ -44,6 +45,7 @@ import re
 from env import constants
 from tools import live_runs
 from tools import results
+from tools import eta
 
 MANIFEST_PATH = os.path.join(constants.ROOT, 'viewer', 'manifest.js')
 # Which earlier arms are a batch's control cell, so the page can show them beside the batch's own.
@@ -268,7 +270,7 @@ def arm_record(policy, runs_dir, desktop=None, laptop_live=frozenset(), arm_boxe
     record.update({
         'rows': len(rows) if stage_b is not None else None,
         'density98': round(100.0 * sum(s >= 98 for s in scores) / len(scores), 1) if scores else None,
-        'cands99': sum(s >= 99 for s in scores) if scores else None,
+        'cands': sum(s >= eta.HOF_THRESHOLD for s in scores) if scores else None,
         'best_row': max(scores) if scores else None,
     })
     hof = _read(os.path.join(runs_dir, policy + '_checkpoint_evals_hof5000.json'))
@@ -294,7 +296,7 @@ def arm_record(policy, runs_dir, desktop=None, laptop_live=frozenset(), arm_boxe
         'hof30k_best': best.get('perfect_percent') if best else None,
         'hof30k_best_step': best.get('step') if best else None,
         'hof30k_998': sum(r.get('perfect_percent', 0) >= 99.8 for r in h30_rows) if h30 is not None else None,
-        'hof_99': sum(s >= 99 for s in hof_scores) if hof is not None else None,
+        'hof_cands': sum(s >= eta.HOF30K_THRESHOLD for s in hof_scores) if hof is not None else None,
     })
     # Where each view stands. Stage A is live if this box or the desktop is training it, or if its
     # measurements are still the desktop snapshot rather than the close-out's file.
@@ -306,10 +308,10 @@ def arm_record(policy, runs_dir, desktop=None, laptop_live=frozenset(), arm_boxe
     else:
         stage_a_state = 'queued' if job == 'queued' else 'done'
     # Each pass selects from the one before it: stage B needs the training finished, hof5000 needs
-    # stage-B rows at >=99 /500, hof30k needs hof5000 rows at >=99 /5,000.
+    # stage-B rows at >=HOF_THRESHOLD /500, hof30k needs hof5000 rows at >=HOF30K_THRESHOLD /5,000 (`tools/eta.py`).
     candidates = {'b': None if stage_a_state != 'done' else 1,
-                  'h': sum(s >= 99 for s in scores) if stage_b is not None else None,
-                  'k': record['hof_99']}
+                  'h': sum(s >= eta.HOF_THRESHOLD for s in scores) if stage_b is not None else None,
+                  'k': record['hof_cands']}
     record['status'] = {'a': stage_a_state}
     # Which box a running or queued view is on, per view (None when unknown or unclaimed), so the caption
     # can say "queued on the laptop" rather than assuming the desktop.
@@ -354,7 +356,8 @@ def build(runs_dir=None, references_path=None):
                     'after': ref.get('after')}
             for batch, ref in references(references_path).items()}
     return {'generated': datetime.datetime.now().isoformat(timespec='seconds'), 'arms': arms,
-            'references': refs, 'desktop_iso': desktop['iso']}
+            'references': refs, 'desktop_iso': desktop['iso'],
+            'cuts': {'h': eta.HOF_THRESHOLD, 'k': eta.HOF30K_THRESHOLD}}
 
 
 def render(manifest, charts_dir='../runs/'):

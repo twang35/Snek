@@ -113,6 +113,7 @@
   // every manifest load -- the first, and each ten-minute reload below.
   var batches, byPolicy, refLabel, names;
   function index() {
+  cuts();
   batches = {};
   M.arms.forEach(function (a) { (batches[a.batch] = batches[a.batch] || []).push(a); });
   // A batch's control cell from an earlier batch rides along at the end of its list, marked, so the
@@ -170,10 +171,13 @@
   }
   // ---- pass state: one word per view from the manifest (`status: {a, b, h, k}`), see tools/viewer_manifest.py
   var PASS = { a: 'training', b: 'stage B', h: 'hof5000', k: 'hof30k' };
-  var CUT = { h: '≥99 /500', k: '≥99 /5,000' };
+  // The candidate cuts, from the manifest (`tools/eta.py`'s HOF_THRESHOLD and HOF30K_THRESHOLD) so the
+  // captions say what the passes actually select on; 99.2 / 99.6 as of 2026-09-08.
+  var CUT = {};
+  function cuts() { var c = M.cuts || { h: 99.2, k: 99.6 }; CUT = { h: '≥' + c.h + ' /500', k: '≥' + c.k + ' /5,000' }; }
   function stateOf(a) { return (a.status || {})[state.mode] || null; }
   // How many checkpoints the view's pass would measure for this arm (its candidate cut).
-  function candidates(a) { return state.mode === 'h' ? a.cands99 : state.mode === 'k' ? a.hof_99 : null; }
+  function candidates(a) { return state.mode === 'h' ? a.cands : state.mode === 'k' ? a.hof_cands : null; }
   // " on the desktop" / " on the laptop" from the manifest's `status_box`, or nothing when it does not know.
   function boxText(a) { var b = (a.status_box || {})[state.mode]; return b ? ' on the ' + b : ''; }
   function stateText(a) {
