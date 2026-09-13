@@ -86,6 +86,7 @@ from tools import eta
 from tools import eval_queue
 from tools import laptop_status
 from tools import results_feed
+from desktop.daemon import cadence
 from tools import live_runs
 from tools import results
 from tools import window as window_module
@@ -419,12 +420,13 @@ class Driver(object):
         # What the box is doing, for the status file and the window: the arms live under this driver
         # (spec, pid), the pass in flight (pass_name, number, arms), the eval spec in flight, and the
         # PNGs the window should show. `reporter` is a `Reporter`, or None to write nothing; `clock`
-        # is injectable so a test can drive the ten-minute republish.
+        # is injectable so a test can drive the ten-minute republish, which lands on the wall clock's :08
+        # slot (`laptop_status.REPUBLISH_OFFSET`, `cadence.due`) so the desktop's :09 site build carries it.
         self.reporter, self.clock = reporter, clock
         self.live, self.active_pass, self.active_eval = [], None, None
         self.panels = []
         self.unfinished = []            # arms that exited short of their cap after every relaunch
-        self._last_report = 0.0
+        self._last_report = None        # None: never published; the launch publishes whatever the clock reads
         # The box's window and its shared eval workers, both owned here. `window` is a
         # `window_module.Window` or None (tests, `SNEK_CHART_WINDOW=0` is handled inside it).
         self.window = window
@@ -551,21 +553,27 @@ class Driver(object):
         if self.reporter is not None:
             self.reporter.publish(self)
             self._last_report = self.clock()
-        if self.results is not None and (self._last_live is None
-                                         or self.clock() - self._last_live >= laptop_status.REPUBLISH_SECONDS):
+        if self.results is not None and self._live_due():
             self._last_live = self.clock()
             self.results.publish_live(results_feed.live_files([spec['policy'] for spec, _ in self.live], self._runs_dir()))
 
+    def _due(self, last):
+        return cadence.due(last, self.clock(), laptop_status.REPUBLISH_SECONDS, laptop_status.REPUBLISH_OFFSET)
+
+    def _live_due(self):
+        return self._due(self._last_live)
+
     def _tick(self):
-        """Called once per wait poll: republishes every `REPUBLISH_SECONDS` so percentages move, honours
-        a window reopen request, and reaps exited workers so none stays a zombie."""
+        """Called once per wait poll: republishes at each `REPUBLISH_OFFSET` slot of `REPUBLISH_SECONDS`
+        (the :08 of every ten minutes) so percentages move, honours a window reopen request, and reaps
+        exited workers so none stays a zombie."""
         if self.window is not None and self.window.poll():
             self._report()          # a fresh window reads its panels from the file; write it now
         elif live_runs.take_republish(self.runs_dir):
             _log('republish requested; publishing the status now')
             self._report()
         self.workers = eval_queue.reap(self.workers)
-        if self.reporter is not None and self.clock() - self._last_report >= laptop_status.REPUBLISH_SECONDS:
+        if self.reporter is not None and self._due(self._last_report):
             self._report()
 
     def _show(self, panels):

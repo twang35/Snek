@@ -201,10 +201,29 @@ def test_the_poll_floor_holds():
     assert config['poll_seconds'] == HOST['MIN_POLL_SECONDS']
 
 
+def test_the_network_half_is_due_once_per_git_minute_slot(tmp_path, monkeypatch):
+    daemon, bus = _box(tmp_path, monkeypatch, [], runtime_text='{"git_seconds": 600, "git_minute": 9}')
+    daemon.runtime = dict(daemon.runtime, git_seconds=600, git_minute=9)
+    now = {'t': 13 * 3600 + 5 * 60.0}                                  # 13:05:00
+    monkeypatch.setattr(daemon_module.time, 'time', lambda: now['t'])
+    assert daemon.git_due(), 'a fresh daemon fetches at once'
+    daemon._last_git = now['t']
+    now['t'] = 13 * 3600 + 8 * 60 + 50.0                               # 13:08:50: before the :09 slot
+    assert not daemon.git_due()
+    now['t'] = 13 * 3600 + 9 * 60 + 10.0                               # 13:09:10: the slot has passed
+    assert daemon.git_due()
+    daemon._last_git = now['t']
+    now['t'] = 13 * 3600 + 18 * 60 + 59.0                              # 13:18:59: the next slot is :19
+    assert not daemon.git_due()
+    daemon.runtime = dict(daemon.runtime, git_seconds=0)
+    assert daemon.git_due(), 'zero is the opt-out: every cycle'
+
+
 def test_git_seconds_may_be_zero_because_zero_is_the_opt_out():
     # 0 means a network cycle every poll, which is what the daemon did before the knob existed.
     config, notes = config_module.parse_runtime_config('{"git_seconds": 0}', HOST)
     assert config['git_seconds'] == 0 and notes == []
+    assert config['git_minute'] == 9, 'the default slot: the laptop publishes at :08, the page reloads at :00'
 
 
 def test_max_evals_is_gone_and_naming_it_is_an_error_rather_than_a_no_op():

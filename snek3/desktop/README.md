@@ -136,6 +136,7 @@ than a rejected one because it looks like it worked. Values are then clamped to 
 | `eval_shards` | 16 | the scheduler's `--shards`: the stage-B shard pool, spread over the wave's arms |
 | `poll_seconds` | 30 | the local half: mirror the queue, relay the hold, publish what finished. Off-network, so it stays fast |
 | `git_seconds` | 600 | the network half: one fetch, one status push, one retry of any local-only commit |
+| `git_minute` | 9 | which minute of each `git_seconds` the network half runs at, on the wall clock (:09, :19, ...). The laptop publishes at :08 and the page reloads itself at :00, so a build carries both boxes' latest pictures (`desktop/daemon/cadence.py`) |
 | `torch_threads` | 1 | measured, not cautious. `SNEK_TORCH_THREADS` |
 | `omp_num_threads` | 1 | same, for numpy's BLAS underneath |
 | `nice` | 0 | |

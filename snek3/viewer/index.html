@@ -109,13 +109,16 @@
     if (location.hash.replace(/^#/, '') !== h) history.replaceState(null, '', '#' + h);
   }
 
-  // ---- batches: newest first in the picker, b9 default when present
-  var batches = {};
+  // ---- batches: newest first in the picker, b9 default when present. Rebuilt from M by `index()` on
+  // every manifest load -- the first, and each ten-minute reload below.
+  var batches, byPolicy, refLabel, names;
+  function index() {
+  batches = {};
   M.arms.forEach(function (a) { (batches[a.batch] = batches[a.batch] || []).push(a); });
   // A batch's control cell from an earlier batch rides along at the end of its list, marked, so the
   // comparison the batch exists for is on the page with it.
-  var byPolicy = {}; M.arms.forEach(function (a) { byPolicy[a.policy] = a; });
-  var refLabel = {};
+  byPolicy = {}; M.arms.forEach(function (a) { byPolicy[a.policy] = a; });
+  refLabel = {};
   Object.keys(M.references || {}).forEach(function (batch) {
     var ref = M.references[batch]; if (!batches[batch]) return;
     var copies = [];
@@ -132,16 +135,19 @@
     batches[batch].splice.apply(batches[batch], [at, 0].concat(copies));
     refLabel[batch] = ref.label;
   });
-  var names = Object.keys(batches).sort(function (x, y) {
+  names = Object.keys(batches).sort(function (x, y) {
     var nx = parseInt(x.replace(/\D/g, ''), 10), ny = parseInt(y.replace(/\D/g, ''), 10);
     if (isNaN(nx) || isNaN(ny)) return x < y ? -1 : 1;
     return ny - nx;
   });
+  $('batch').innerHTML = '';
   names.forEach(function (n) {
     var o = document.createElement('option'); o.value = n;
     var own = batches[n].filter(function (a) { return !a.reference; }).length;
     o.textContent = n + ' (' + own + (batches[n].length > own ? ' + ' + (batches[n].length - own) + ' ref' : '') + ')'; $('batch').appendChild(o);
   });
+  }
+  index();
 
   function num(v) { return (v === null || v === undefined) ? null : v; }
   function sorted(arms) {
@@ -263,7 +269,7 @@
 
   function move(d) { state.start = Math.max(0, Math.min(state.start + d, Math.max(0, current.length - PAGE))); render(); }
   function zoom(a) {
-    var lb = $('lightbox'); lb.querySelector('img').src = src(a);
+    var lb = $('lightbox'); lb.querySelector('img').src = src(a); lb.querySelector('img').alt = a.policy;
     lb.querySelector('.cap').textContent = a.policy + (state.mode === 'b' ? ' — stage B' : state.mode === 'h' ? ' — hof5000' : state.mode === 'k' ? ' — hof30k' : ' — stage A'); lb.style.display = 'flex';
   }
   function unzoom() { $('lightbox').style.display = 'none'; }
@@ -308,6 +314,34 @@
 
   readHash(); render();
   if (state.zoom) { var z = current.filter(function (a) { return a.policy === state.zoom; })[0]; if (z) zoom(z); }
+
+  // ---- reload the manifest at :00 of every ten minutes, while the window has focus (user, 2026-09-13).
+  // The laptop publishes at :08, the desktop fetches both feeds and rebuilds the site at :09, so :00 is
+  // when the page is stale. `manifest.js` is re-fetched with a cache-buster and swapped in place -- the
+  // view, the hash and an open zoom survive -- and the charts follow through `src()`'s `?v=generated`.
+  // Unfocused at :00: nothing is fetched; the reload happens when focus returns, if a slot went by.
+  var REFRESH_MS = 10 * 60 * 1000, pending = false;
+  function refresh() {
+    pending = false;
+    var tag = document.createElement('script');
+    tag.src = 'manifest.js?v=' + Date.now();
+    tag.onload = function () {
+      M = window.SNEK_MANIFEST || M; RUNS = M.charts_dir || RUNS;
+      index(); render();
+      var lb = $('lightbox');
+      if (lb.style.display === 'flex') { var img = lb.querySelector('img'), open = current.filter(function (a) { return a.policy === img.alt; })[0]; if (open) img.src = src(open); }
+      tag.remove();
+    };
+    tag.onerror = function () { tag.remove(); };
+    document.head.appendChild(tag);
+  }
+  function tick() {
+    if (document.hasFocus()) refresh(); else pending = true;
+    schedule();
+  }
+  function schedule() { setTimeout(tick, REFRESH_MS - (Date.now() % REFRESH_MS) + 1000); }   // one second past :00
+  window.addEventListener('focus', function () { if (pending) refresh(); });
+  schedule();
 })();
 </script>
 </body>

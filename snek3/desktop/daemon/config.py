@@ -66,6 +66,7 @@ RUNTIME_DEFAULTS = {
     # ten minutes. **So a `status.json` up to 10 minutes old is a healthy daemon.** 0 restores one
     # network cycle per poll.
     'git_seconds': 600,
+    'git_minute': 9,
     'torch_threads': 1,         # SNEK_TORCH_THREADS. See the header: 1 is measured, not cautious
     'omp_num_threads': 1,       # oneDNN/BLAS. Same reason
     'nice': 0,
@@ -88,7 +89,7 @@ RUNTIME_DEFAULTS = {
     'viewer': True,
 }
 
-_INT_KEYS = ('max_trainers', 'eval_shards', 'poll_seconds', 'git_seconds',
+_INT_KEYS = ('max_trainers', 'eval_shards', 'poll_seconds', 'git_seconds', 'git_minute',
              'torch_threads', 'omp_num_threads', 'nice', 'disk_min_gb')
 _BOOL_KEYS = ('paused', 'drain', 'auto_stage_b', 'viewer')
 
@@ -156,6 +157,7 @@ def clamp_runtime(config, host):
     # Not floored at MIN_POLL_SECONDS: 0 is the meaningful opt-out — a network cycle every poll,
     # which is what the daemon did before this knob existed. Ceiling is a day.
     clamp('git_seconds', 0, 86400)
+    clamp('git_minute', 0, 59)
     clamp('torch_threads', 1, 64)
     clamp('omp_num_threads', 1, 64)
     clamp('nice', 0, 19)

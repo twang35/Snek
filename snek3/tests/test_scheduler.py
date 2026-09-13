@@ -507,11 +507,14 @@ def test_the_queue_publishes_both_boxes_shape_on_every_event_and_empty_when_it_e
     assert last['box'] == 'laptop' and last['iso'] and last['running'] == []
 
 
-def test_a_waiting_driver_republishes_every_ten_minutes_so_the_percent_moves(box):
-    clock = {'now': 0.0}
+NOON = 12 * 3600.0
+
+
+def test_a_waiting_driver_republishes_at_the_eighth_minute_of_every_ten_so_the_percent_moves(box):
+    clock = {'now': NOON}                                    # 12:00:00 on the wall clock
 
     def sleep(seconds):
-        clock['now'] += 400.0
+        clock['now'] += 300.0                                # polls at 12:05, 12:10, 12:15
 
     calls = Calls()
 
@@ -529,17 +532,17 @@ def test_a_waiting_driver_republishes_every_ten_minutes_so_the_percent_moves(box
                             popen=calls.popen, call=calls.call, sleep=sleep, python='py', ensure_workers=no_workers, stage_b=False,
                             reporter=scheduler.Reporter(published), clock=lambda: clock['now'])
     d.run()
-    # at launch (t=0); at the poll that crosses 600 s (t=800); at the arm's exit
+    # at launch (12:00); at the poll that crosses the :08 slot (12:10); at the arm's exit (12:15)
     assert len(published.statuses) == 3
     assert published.glance(0)['running'] == ['b1 | x | training (1 arm)']
     assert published.glance(-1)['running'] == []
 
 
-def test_a_driver_publishes_its_live_arms_pictures_with_the_ten_minute_republish(box):
-    clock = {'now': 0.0}
+def test_a_driver_publishes_its_live_arms_pictures_with_the_slot_republish(box):
+    clock = {'now': NOON}                                    # 12:00:00 on the wall clock
 
     def sleep(seconds):
-        clock['now'] += 400.0
+        clock['now'] += 300.0                                # polls at 12:05, 12:10, 12:15
 
     calls = Calls()
 
@@ -559,8 +562,8 @@ def test_a_driver_publishes_its_live_arms_pictures_with_the_ten_minute_republish
                             popen=calls.popen, call=calls.call, sleep=sleep, python='py', ensure_workers=no_workers, stage_b=False,
                             reporter=scheduler.Reporter(published), clock=lambda: clock['now'], results=feed)
     d.run()
-    # at launch (t=0) and at the poll that crosses 600 s (t=800) -- the arm's exit at t=1200 is within
-    # ten minutes of the last one, so the status republishes (3) and the pictures do not (2); the picture
+    # at launch (12:00) and at the poll that crosses the :08 slot (12:10) -- the arm's exit at 12:15 is
+    # inside the same slot, so the status republishes (3) and the pictures do not (2); the picture
     # and the report, never the 3.6 MB `_evals.json`; the exit publishes the arm's finals through `publish`
     assert len(published.statuses) == 3
     assert feed.live == [{'b1a-x-seed1': ['b1a-x-seed1.md', 'b1a-x-seed1.png']}] * 2

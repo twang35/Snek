@@ -39,6 +39,7 @@ import subprocess
 import sys
 import time
 
+from . import cadence
 from . import config as config_module
 from . import gitbus
 from . import launch
@@ -284,9 +285,12 @@ class Daemon(object):
     # -------------------------------------------------------------------- loop
 
     def git_due(self):
-        """Whether this cycle does its network half. `git_seconds` of 0 means every cycle."""
+        """Whether this cycle does its network half: once a wall-clock slot `git_minute` minutes into each
+        `git_seconds` has passed since the last one (minute 9 of every ten: the laptop publishes at 8, the
+        page reloads at 0; `cadence.py`). `git_seconds` of 0 means every cycle."""
         interval = int(self.runtime.get('git_seconds', 0) or 0)
-        return interval <= 0 or (time.time() - self._last_git) >= interval
+        offset = 60 * int(self.runtime.get('git_minute', 0) or 0)
+        return cadence.due(self._last_git or None, time.time(), interval, offset)
 
     def take_trigger(self):
         """Consumes a manual trigger if one is waiting. **The unlink *is* the test.**"""

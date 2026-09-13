@@ -3,6 +3,7 @@
   "eval_shards": 16,
   "poll_seconds": 30,
   "git_seconds": 600,
+  "git_minute": 9,
   "torch_threads": 1,
   "omp_num_threads": 1,
   "nice": 0,

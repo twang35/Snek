@@ -43,6 +43,10 @@ BRANCH = os.environ.get('SNEK_LAPTOP_STATUS_BRANCH', 'laptop-status')
 WORKTREE = os.environ.get('SNEK_LAPTOP_STATUS_WORKTREE', os.path.expanduser('~/.snek3-laptop/status'))
 REMOTE = 'origin'
 REPUBLISH_SECONDS = 600     # the desktop's `git_seconds`: how often a waiting scheduler refreshes the percentages
+# Where in each ten minutes the laptop publishes: minute 8 (:08, :18, ...), one minute before the desktop's
+# network half (`git_minute` 9) so its pictures are in the site the desktop builds; the page reloads at :00
+# (`desktop/daemon/cadence.py`).
+REPUBLISH_OFFSET = 8 * 60
 
 
 def host(repo=REPO, worktree=WORKTREE, branch=BRANCH, remote=REMOTE):
