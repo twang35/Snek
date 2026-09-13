@@ -120,7 +120,8 @@ td.score .reg{display:inline-block;font-size:10px;letter-spacing:.06em;border:1p
 .bars .lbl .dot{width:8px;height:8px;border-radius:50%;flex:none}
 .bars .lbl .nm{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bars .lbl .yr{font:500 11px/1 "IBM Plex Mono",ui-monospace,monospace;color:var(--ink-3);flex:none}
-.bars .track{position:relative;height:22px;background:linear-gradient(to right,var(--line-2) 1px,transparent 1px) 0 0/25% 100% repeat-x;border-left:1px solid var(--line)}
+.bars .track{position:relative;height:22px;border-left:1px solid var(--line)}
+.bars .tick{position:absolute;top:0;bottom:0;width:0;border-left:1px solid var(--line-2)}
 .bars .bar{position:absolute;left:0;top:3px;height:16px;background:var(--accent);border-radius:0 4px 4px 0;min-width:2px;opacity:.85}
 .bars .bar.approx{background:repeating-linear-gradient(135deg,var(--accent) 0 4px,transparent 4px 7px)}
 .bars .bar.refbar{background:var(--ink-3);opacity:.45}
@@ -192,20 +193,28 @@ mark{background:none;color:var(--accent);font-weight:600}
 </div>
 
 <div id="scores" class="scores" hidden>
+  <div class="frow" style="margin-bottom:12px">
+    <span class="label">Statistic</span>
+    <div class="segctl" role="group" aria-label="Statistic">
+      <button class="seg-btn stat-btn on" data-stat="med">Median</button>
+      <button class="seg-btn stat-btn" data-stat="mean">Mean</button>
+    </div>
+    <span class="label" id="statHint" style="margin-left:8px"></span>
+  </div>
   <div class="panel" id="panel-200M">
-    <div class="panel-head"><span class="label">Atari-57 · 200M frames (or more) · median human-normalised score, log scale</span><span class="label">100% = human</span></div>
+    <div class="panel-head"><span class="label">Atari-57 · 200M frames (or more) · <span class="stat-word">median</span> human-normalised score, log scale</span><span class="label">100% = human</span></div>
     <div class="bars" id="bars-200M"></div>
   </div>
   <div class="panel" id="panel-100k">
-    <div class="panel-head"><span class="label">Atari 100k · 26 games · 100k agent steps = 400k frames, 1/500th of the panel above · median human-normalised score, log scale</span><span class="label">100% = human</span></div>
+    <div class="panel-head"><span class="label">Atari 100k · 26 games · 100k agent steps = 400k frames, 1/500th of the panel above · <span class="stat-word">median</span> human-normalised score, log scale</span><span class="label">100% = human</span></div>
     <div class="bars" id="bars-100k"></div>
   </div>
   <div class="panel" id="panel-10M">
-    <div class="panel-head"><span class="label">Discrete SAC line · Zhou et al.'s 20 games · 10M agent steps = 40M frames, one fifth of Atari-57's budget · their own runs, 3 seeds, deterministic policy · median human-normalised score, log scale</span><span class="label">100% = human</span></div>
+    <div class="panel-head"><span class="label">Discrete SAC line · Zhou et al.'s 20 games · 10M agent steps = 40M frames, one fifth of Atari-57's budget · their own runs, 3 seeds, deterministic policy · <span class="stat-word">median</span> human-normalised score, log scale</span><span class="label">100% = human</span></div>
     <div class="bars" id="bars-10M"></div>
   </div>
   <div class="empty" id="scores-empty" hidden>No algorithm in the current selection has an Atari score.</div>
-  <p class="note">Three regimes, three panels: a 200M-frame agent, a 100k agent and a 40M-frame 20-game run are not on the same axis. Every number was checked against the paper table its source line names (2026-09-13); grey bars are the reference runs a paper measured alongside its own method, so a panel can be read within one protocol. Human starts, sticky actions and game counts differ between papers, so read differences under a factor of ~1.3 as noise: Rainbow is 223% in its own table, 153% with human starts and 147–150% under Dopamine's sticky actions. Hover a bar for the mean and the source. Game-specific results (Montezuma's Revenge, Procgen) sit in the table's Atari column instead.</p>
+  <p class="note">Three regimes, three panels: a 200M-frame agent, a 100k agent and a 40M-frame 20-game run are not on the same axis. Every number was checked against the paper table its source line names (2026-09-13); grey bars are the reference runs a paper measured alongside its own method, so a panel can be read within one protocol. Human starts, sticky actions and game counts differ between papers, so read differences under a factor of ~1.3 as noise: Rainbow is 223% in its own table, 153% with human starts and 147–150% under Dopamine's sticky actions. Median or mean is the toggle above; hover a bar for the other statistic and the source. Game-specific results (Montezuma's Revenge, Procgen) sit in the table's Atari column instead.</p>
 </div>
 
 <p class="note">Years are first public release (arXiv or blog), not conference year. LLM post-training methods (RLHF, DPO, GRPO and descendants) are deliberately excluded. 2026 entries come from the RLC 2026 pre-proceedings (RLJ vol. 7); their tiers reflect the novelty of the mechanism, not yet proven influence.</p>
@@ -385,7 +394,7 @@ const REFS = {"10M":[
 const REG_TITLE = {"200M":"Atari-57, 200M frames or more","100k":"Atari 100k benchmark, 26 games","10M":"Zhou et al.'s 20 games, 10M agent steps = 40M frames"};
 const YEARS = []; for(let y=2013;y<=2026;y++) YEARS.push(y);
 const DEFAULTS = {dom:"Discrete (Atari)", tier:"core"};   // the landing view; Reset returns to it, "All domains" and "All" widen it
-const state = {fams:new Set(), dom:DEFAULTS.dom, tier:DEFAULTS.tier, q:"", year:null, sortK:"year", sortDir:1, view:location.hash==="#scores"?"scores":"table"};   // atlas.html#scores opens on the chart
+const state = {fams:new Set(), dom:DEFAULTS.dom, tier:DEFAULTS.tier, q:"", year:null, sortK:"year", sortDir:1, view:location.hash==="#scores"?"scores":"table", stat:"med"};   // stat: "med" or "mean", what the scores view draws   // atlas.html#scores opens on the chart
 
 const $ = s=>document.querySelector(s);
 const famChips=$("#famChips"), yearsEl=$("#years"), rowsEl=$("#rows"), domSel=$("#domain");
@@ -402,6 +411,7 @@ domSel.value=state.dom;
 domSel.onchange=()=>{state.dom=domSel.value;render();};
 document.querySelectorAll(".seg-btn[data-tier]").forEach(b=>b.onclick=()=>{state.tier=b.dataset.tier;render();});
 document.querySelectorAll(".view-btn").forEach(b=>b.onclick=()=>{state.view=b.dataset.view;history.replaceState(null,"",state.view==="scores"?"#scores":location.pathname);render();});
+document.querySelectorAll(".stat-btn").forEach(b=>b.onclick=()=>{state.stat=b.dataset.stat;render();});
 $("#q").oninput=e=>{state.q=e.target.value.trim().toLowerCase();render();};
 $("#reset").onclick=()=>{state.fams.clear();state.dom=DEFAULTS.dom;state.tier=DEFAULTS.tier;state.q="";state.year=null;$("#q").value="";domSel.value=state.dom;render();};
 document.querySelectorAll("thead th[data-k]").forEach(th=>{ if(th.dataset.k==="what")return; th.onclick=()=>{ if(state.sortK===th.dataset.k) state.sortDir*=-1; else {state.sortK=th.dataset.k;state.sortDir=th.dataset.k==="score"?-1:1;} render(); };});
@@ -420,28 +430,33 @@ function scoreCell(r){
   if(!r.ataris.length) return '<span style="color:var(--ink-3)">—</span>';
   return r.ataris.map((a,i)=>i?`<span class="alt">${scoreOne(a)}</span>`:scoreOne(a)).join("");
 }
-const LOG={min:10,max:10000};  // log axis from 10% to 100× human
+const LOG={min:10,max:10000};  // log axis from 10% to 100× human; the mean view widens to 200×, since a few games at thousands of percent pull means far above medians
 const xpos=v=>Math.max(0,Math.min(1,Math.log10(v/LOG.min)/Math.log10(LOG.max/LOG.min)))*100;
 function renderScores(list){
+  const k=state.stat, other=k==="med"?"mean":"med", word=k==="med"?"median":"mean";
+  LOG.max = k==="mean" ? 20000 : 10000;
+  document.querySelectorAll(".stat-word").forEach(e=>e.textContent=word);
+  $("#statHint").textContent = k==="med" ? "median over games: the honest summary, one game cannot move it" : "mean over games: a few games at thousands of percent (Atlantis, Breakout, Video Pinball) dominate it, so it rewards the tail";
   let any=false;
   for(const reg of ["200M","100k","10M"]){
     const el=$("#bars-"+reg); el.innerHTML="";
     const rows=[];
-    list.forEach(r=>r.ataris.forEach(a=>{ if(!a.text&&a.reg===reg&&a.med!=null) rows.push({r,a}); }));
-    if(rows.length) (REFS[reg]||[]).forEach(x=>rows.push({r:{name:x.name,year:x.year,fam:null},a:x,ref:true}));
-    rows.sort((p,q)=>q.a.med-p.a.med);
+    list.forEach(r=>r.ataris.forEach(a=>{ if(!a.text&&a.reg===reg&&a[k]!=null) rows.push({r,a}); }));
+    if(rows.length) (REFS[reg]||[]).forEach(x=>{ if(x[k]!=null) rows.push({r:{name:x.name,year:x.year,fam:null},a:x,ref:true}); });
+    rows.sort((p,q)=>q.a[k]-p.a[k]);
     $("#panel-"+reg).hidden=rows.length===0; if(!rows.length) continue; any=true;
     rows.forEach(({r,a,ref})=>{
       const lbl=document.createElement("div"); lbl.className="lbl"+(ref?" ref":"");
       lbl.innerHTML=`<span class="dot" style="background:${ref?"var(--ink-3)":FAM[r.fam].c}" title="${ref?"reference run":FAM[r.fam].n}"></span><span class="nm">${esc(r.name)}</span><span class="yr">${r.year}</span>`;
       const tr=document.createElement("div"); tr.className="track";
-      const tip=[`${r.name} (${r.year})${ref?", reference run":", "+FAM[r.fam].n}`,`median ${fmt(a.med)}% human-normalised${a.mean!=null?`, mean ${fmt(a.mean)}%`:""}`,a.starts==="human"?"human starts":"no-op starts",a.approx?"≈ unverified":null,a.src].filter(Boolean).join("\n");
+      const tip=[`${r.name} (${r.year})${ref?", reference run":", "+FAM[r.fam].n}`,`${word} ${fmt(a[k])}% human-normalised${a[other]!=null?`, ${other==="med"?"median":"mean"} ${fmt(a[other])}%`:""}`,a.starts==="human"?"human starts":"no-op starts",a.approx?"≈ unverified":null,a.src].filter(Boolean).join("\n");
       tr.title=tip;
-      tr.innerHTML=`<span class="human" style="left:${xpos(100)}%"></span><div class="bar${a.approx?" approx":""}${ref?" refbar":""}" style="width:${xpos(a.med)}%"></div><span class="val" style="left:${xpos(a.med)}%">${a.approx?"≈":""}${fmt(a.med)}%</span>`;
+      tr.innerHTML=`${[10,100,1000,10000].map(v=>`<span class="tick" style="left:${xpos(v)}%"></span>`).join("")}<span class="human" style="left:${xpos(100)}%"></span><div class="bar${a.approx?" approx":""}${ref?" refbar":""}" style="width:${xpos(a[k])}%"></div><span class="val" style="left:${xpos(a[k])}%">${a.approx?"≈":""}${fmt(a[k])}%</span>`;
       el.appendChild(lbl); el.appendChild(tr);
     });
     const ax=document.createElement("div"); ax.className="axis";
     [10,100,1000,10000].forEach(v=>{const sp=document.createElement("span");sp.style.left=xpos(v)+"%";sp.textContent=v===100?"human":pct(v);ax.appendChild(sp);});
+    if(LOG.max>10000){const sp=document.createElement("span");sp.style.left="100%";sp.textContent=pct(LOG.max);ax.appendChild(sp);}
     el.appendChild(ax);
   }
   $("#scores-empty").hidden=any;
@@ -481,6 +496,7 @@ function render(){
   document.querySelectorAll("#famChips .chip").forEach(c=>{const on=state.fams.has(c.dataset.k);c.classList.toggle("on",on);c.setAttribute("aria-pressed",on);});
   document.querySelectorAll(".seg-btn[data-tier]").forEach(b=>b.classList.toggle("on",b.dataset.tier===state.tier));
   document.querySelectorAll(".view-btn").forEach(b=>b.classList.toggle("on",b.dataset.view===state.view));
+  document.querySelectorAll(".stat-btn").forEach(b=>b.classList.toggle("on",b.dataset.stat===state.stat));
   $("#tbl").parentElement.hidden = state.view!=="table"; $("#scores").hidden = state.view!=="scores";
   document.querySelectorAll("thead th[data-k]").forEach(th=>{const on=th.dataset.k===state.sortK;th.classList.toggle("sorted",on);const a=th.querySelector(".arr");if(a)a.remove();if(on){const s=document.createElement("span");s.className="arr";s.textContent=state.sortDir>0?"▲":"▼";th.appendChild(s);}});
   renderYears();
