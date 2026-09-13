@@ -22,6 +22,64 @@ whose published artifacts are history, and the daemon's ledger, whose keys are t
 waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
 
 
+<!-- progress_update: batch b31 -->
+## Batch b31 — the `knob` sweep, 1 values x 8 seeds, 100M, closed 2026-09-13
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b27q-hist8-seed17, b27r-hist8-seed18, b27s-hist8-seed19, b27t-hist8-seed20, b27u-hist8-seed21, b27v-hist8-seed22, b27w-hist8-seed23, b27x-hist8-seed24`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| knob | rows | ≥98%/500 | per-seed share | ≥99 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| mse | 22,079 | 88.0% | 91.3 85.4 88.6 85.7 87.4 87.8 88.5 89.5 | 12299 | 100.0 | 99.80 (99.7-99.9) | 97.5 | 0.0% | 0.17% | 81.8% |
+| **huber** (reference) | 22,192 | 95.4% | 95.7 94.3 95.6 95.6 95.5 95.6 95.1 95.7 | 15168 | 100.0 | 99.79 (99.7-99.9) | 95.5 | 0.0% | 0.68% | 85.4% |
+
+<!-- reading -->
+b28's `hist8` config at 100M with the value loss switched from `huber` to `mse` and nothing else; the reference is b27's `hist8` cell. **Closed 2026-09-12, and `mse` is worse on this base**: 88.0% stage-B density (85.4-91.3) against 95.4 (94.3-95.7), the eight seeds cleanly below the reference's eight. The loss is onset, not the endgame: 25M-window density 51.0 / 91.9 / 98.5 / 99.2% against 82.9 / 95.4 / 99.5 / 99.8, so the arm spends the first 25M catching up and never quite closes. What b19 and b23 found for `mse` still shows in the stability columns — 0.17% of evals below 80 against 0.68, sef 97.5 against 95.5 — but the density gain that made it the ladder's largest step (32.7 → 61.6% on the λ 0.99 base) does not transfer to the horizon-anneal + `hist8` base. The passes agree: `hof5000` 833 rows through the 99.6 gate against 1,836 and 33 at ≥99.8 against 85, with one joint-best 5k row (`b31f` @82640896, 4,997 /5,000); `hof30k` retired every row short of 99.8 — the best is `b31f` @82182144 at 27,288 /27,350 (99.77), stopped. Prediction falsified on both counts (density above 95.4, top unchanged). Verdict: `huber` stays; b19/b23's `mse` result was a property of the λ 0.99 base, not of the value loss.
+<!-- /reading -->
+
+### Every arm
+
+| arm | knob | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b31a-mse-seed1` | mse | 2802 | 91.3% | 1674 | 100.0 | 99.7 @64.2M | 97.6 | 0.0% |
+| `b31b-mse-seed2` | mse | 2765 | 85.4% | 1265 | 100.0 | 99.7 @85.5M | 97.4 | 0.0% |
+| `b31c-mse-seed3` | mse | 2733 | 88.6% | 1589 | 100.0 | 99.8 @71.6M | 97.7 | 0.0% |
+| `b31d-mse-seed4` | mse | 2699 | 85.7% | 1396 | 100.0 | 99.8 @82.7M | 97.1 | 0.0% |
+| `b31e-mse-seed5` | mse | 2752 | 87.4% | 1605 | 100.0 | 99.9 @51.5M | 97.5 | 0.0% |
+| `b31f-mse-seed6` | mse | 2778 | 87.8% | 1589 | 100.0 | 99.9 @85.4M | 97.9 | 0.0% |
+| `b31g-mse-seed7` | mse | 2786 | 88.5% | 1583 | 100.0 | 99.8 @70.6M | 97.4 | 0.0% |
+| `b31h-mse-seed8` | mse | 2764 | 89.5% | 1598 | 100.0 | 99.8 @79.5M | 97.2 | 0.0% |
+
+<!-- /progress_update: batch b31 -->
+
+<!-- progress_update: batch b30 -->
+## Batch b30 — the `knob` sweep, 1 values x 8 seeds, 100M, closed 2026-09-13
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b27q-hist8-seed17, b27r-hist8-seed18, b27s-hist8-seed19, b27t-hist8-seed20, b27u-hist8-seed21, b27v-hist8-seed22, b27w-hist8-seed23, b27x-hist8-seed24`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| knob | rows | ≥98%/500 | per-seed share | ≥99 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| **0.999** (reference) | 22,192 | 95.4% | 95.7 94.3 95.6 95.6 95.5 95.6 95.1 95.7 | 15168 | 100.0 | 99.79 (99.7-99.9) | 95.5 | 0.0% | 0.68% | 85.4% |
+| gl1 | 22,090 | 95.3% | 94.0 95.4 94.9 96.1 96.2 96.5 93.6 95.7 | 14987 | 100.0 | 99.86 (99.8-99.9) | 95.4 | 0.0% | 0.82% | 85.0% |
+
+<!-- reading -->
+b28's `hist8` config at 100M with the horizon anneals ending at 1.0 instead of 0.999 (γ 0.99 → 1.0, λ 0.95 → 1.0 by 50M; entropy 0.01 → 0.001, lr and clip fixed); the reference is b27's `hist8` cell, same cap, same 50M ramp. **Every pass is in (closed 2026-09-12) and it is b27 `hist8` to within noise at every depth**: stage B 95.3% (93.6-96.5) against 95.4 (94.3-95.7), window for window 81.4 / 96.6 / 99.3 / 99.3 against 82.9 / 95.4 / 99.5 / 99.8; `hof5000` 1,844 rows through the 99.6 gate against 1,836 and 114 at ≥99.8 against 85; `hof30k` 1,000 / 353 / 43 rows at ≥99.6 / ≥99.7 / ≥99.8 against 937 / 278 / 9. The top is `b30a` @94371840 at **29,946 /30,000 (99.82)** — the same count as `b28k`, so the 99.82 ceiling has now been reached from 200M of hold (b28) and from a horizon of 1.0 at 100M (b30), one game above the Hall of Fame pair and inside one standard error of it. The predicted collapse (b10's fixed γ 1.0 cell lost 44% of its evals below 50) did not happen in any seed: 0.0% below 50 everywhere, so reaching γ 1.0 after 50M under a finite horizon is a different regime from starting there. Verdict: the last 0.001 of horizon costs nothing and buys nothing visible; the ceiling is not the horizon.
+<!-- /reading -->
+
+### Every arm
+
+| arm | knob | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b30a-gl1-seed1` | gl1 | 2760 | 94.0% | 1879 | 100.0 | 99.9 @95.9M | 96.0 | 0.0% |
+| `b30b-gl1-seed2` | gl1 | 2782 | 95.4% | 1745 | 100.0 | 99.8 @71.8M | 96.5 | 0.0% |
+| `b30c-gl1-seed3` | gl1 | 2760 | 94.9% | 1911 | 100.0 | 99.9 @89.4M | 96.5 | 0.0% |
+| `b30d-gl1-seed4` | gl1 | 2824 | 96.1% | 1934 | 100.0 | 99.8 @68.4M | 96.4 | 0.0% |
+| `b30e-gl1-seed5` | gl1 | 2779 | 96.2% | 1880 | 100.0 | 99.9 @84.9M | 95.1 | 0.0% |
+| `b30f-gl1-seed6` | gl1 | 2738 | 96.5% | 1934 | 100.0 | 99.8 @93.8M | 94.9 | 0.0% |
+| `b30g-gl1-seed7` | gl1 | 2746 | 93.6% | 1824 | 100.0 | 99.9 @58.3M | 95.1 | 0.0% |
+| `b30h-gl1-seed8` | gl1 | 2701 | 95.7% | 1880 | 100.0 | 99.9 @90.2M | 92.5 | 0.0% |
+
+<!-- /progress_update: batch b30 -->
+
 <!-- progress_update: batch b29 -->
 ## Batch b29 — the `knob` sweep, 1 values x 8 seeds, 100M, closed 2026-09-11
 
