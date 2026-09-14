@@ -1,0 +1,18 @@
+{
+ "arms": [
+  "b33ay-win300-seed1",
+  "b33az-win300-seed2",
+  "b33ba-win300-seed3",
+  "b33bb-win300-seed4",
+  "b33bc-win1000-seed1",
+  "b33bd-win1000-seed2",
+  "b33be-win1000-seed3",
+  "b33bf-win1000-seed4"
+ ],
+ "batch": "b33",
+ "box": "desktop",
+ "claimed_iso": "2026-09-14T02:09:46",
+ "claimed_ts": 1789376986.7168753,
+ "kind": "wave",
+ "wave": 4
+}
