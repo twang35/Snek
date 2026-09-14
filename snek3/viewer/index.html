@@ -173,7 +173,7 @@
   var PASS = { a: 'training', b: 'stage B', h: 'hof5000', k: 'hof30k' };
   // The candidate cuts, from the manifest (`tools/eta.py`'s HOF_THRESHOLD and HOF30K_THRESHOLD) so the
   // captions say what the passes actually select on; 99.2 / 99.6 as of 2026-09-08.
-  var CUT = {};
+  var CUT;          // declared only: `index()` runs before this line, and `= {}` here would wipe what `cuts()` set
   function cuts() { var c = M.cuts || { h: 99.2, k: 99.6 }; CUT = { h: '≥' + c.h + ' /500', k: '≥' + c.k + ' /5,000' }; }
   function stateOf(a) { return (a.status || {})[state.mode] || null; }
   // How many checkpoints the view's pass would measure for this arm (its candidate cut).
