@@ -23,7 +23,7 @@ import torch
 
 import train
 from env import constants
-from ppo import algo as ppo_algo
+from algos.ppo import algo as ppo_algo
 from tools import arch as arch_tools
 from tools import checkpoints
 from tools import restore
@@ -423,7 +423,7 @@ def test_the_discount_and_lambda_reach_gae_in_that_order(monkeypatch):
 # both ramping linearly over `max_steps` exactly as the entropy coefficient does. Absent means
 # constant, which is every arm before batch b17.
 
-from ppo import schedules as ppo_schedules
+from algos.ppo import schedules as ppo_schedules
 
 
 def test_absent_finals_leave_clip_and_learning_rate_constant(monkeypatch):

@@ -1733,7 +1733,7 @@ ranking is a tie**: peak `best_perfect30` is 98.5 in both batches (b6c, b5h). b5
 best stage-B row in either batch, **100.0%/500** at b5b/184M.
 
 **What would settle it is one batch varying only the network**, at matched epochs and matched budget.
-That arm has still never been run — and since `dqn/net.py` takes the same `fc_layers` config, it is
+That arm has still never been run — and since `algos/dqn/net.py` takes the same `fc_layers` config, it is
 also one arm away for DQN.
 
 **Neither best row is a record claim.** Both are selected highs over thousands of rows; a record needs

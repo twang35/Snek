@@ -1,7 +1,7 @@
 # Running things
 
 `tuned()` is the authoritative knob list and it is read in **two** files — `train.py` for what is not
-algorithm-specific, and the algorithm's own `algo.py` (today only [`dqn/algo.py`](../dqn/algo.py)) for
+algorithm-specific, and the algorithm's own `algo.py` (today only [`algos/dqn/algo.py`](../dqn/algo.py)) for
 the rest. This file is a summary of both.
 
 ```
@@ -140,7 +140,7 @@ launchable at all.
 | `SNEK_PPO_GRADIENT_CLIPPING` | 0.5 | global norm over both towers. 0 disables |
 | `SNEK_PPO_TARGET_KL` | 0 (off) | stops the epoch loop early when `approx_kl` exceeds it — **between epochs, never mid-epoch**, or some samples are used more often than others. `approx_kl` is reported either way |
 | `SNEK_PPO_NORMALIZE_ADV` | 1 | zero-mean, unit-sd per minibatch. What makes the update invariant to the reward scale |
-| `SNEK_PPO_VALUE_LOSS` | `huber` | or `mse`. Huber for the reason `dqn/agent.py` gives: one +100 terminal would dominate a squared error over 256 samples |
+| `SNEK_PPO_VALUE_LOSS` | `huber` | or `mse`. Huber for the reason `algos/dqn/agent.py` gives: one +100 terminal would dominate a squared error over 256 samples |
 
 **A PPO step is one transition is one game move**, so `SNEK_MAX_STEPS` means game moves for a PPO arm
 and four-moves-per-step for a DQN arm at `fork_branches=4`. Read `transitions`, which both write.

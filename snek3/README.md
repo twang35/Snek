@@ -22,7 +22,7 @@ its gates are [`plans/archive/pytorch-port.md`](plans/archive/pytorch-port.md).
 |---|---|
 | [`env/`](env/) | the scalar game — the parity reference, and the only package that may import pygame |
 | [`vectorized/`](vectorized/) | `VecSnake`, N games in lockstep in pure numpy, plus the measurement engine and wave |
-| [`dqn/`](dqn/), [`ppo/`](ppo/) | learning algorithms |
+| [`algos/dqn/`](algos/dqn/), [`algos/ppo/`](algos/ppo/) | learning algorithms |
 | [`tools/`](tools/) | the tools and the libraries behind them |
 | [`desktop/`](desktop/) | the git-bus job queue for `the-claw-den` |
 | [`docs/`](docs/) | the investigation. **[`docs/runs.md`](docs/runs.md) first** |

@@ -14,7 +14,7 @@ import math
 import numpy as np
 import pytest
 
-from ppo import rollout as rollout_module
+from algos.ppo import rollout as rollout_module
 
 
 DISCOUNT = 0.9

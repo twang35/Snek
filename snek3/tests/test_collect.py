@@ -14,9 +14,9 @@ Three properties here are silent when broken and each one corrupts the buffer ra
 import numpy as np
 import pytest
 
-from dqn import collect
-from dqn.agent import SAFETY_RANGE
-from dqn.collect import Collector, ForkConfig
+from algos.dqn import collect
+from algos.dqn.agent import SAFETY_RANGE
+from algos.dqn.collect import Collector, ForkConfig
 from env import constants
 from vectorized import config as C
 from vectorized.vec_env import VecSnake

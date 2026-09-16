@@ -10,7 +10,7 @@ import os
 
 import pytest
 
-from dqn import net as network
+from algos.dqn import net as network
 from tools import checkpoints
 
 

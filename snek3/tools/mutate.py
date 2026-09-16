@@ -21,7 +21,7 @@ The spec is JSON: a list of tests to run and a list of mutations to try.
 
     {"tests": ["tests/test_replay.py"],
      "mutations": [{"desc": "priorities ignore alpha",
-                    "file": "dqn/replay.py",
+                    "file": "algos/dqn/replay.py",
                     "from": "priorities ** self.alpha",
                     "to": "priorities"}]}
 

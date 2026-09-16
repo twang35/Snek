@@ -7,7 +7,7 @@ detail.
 ## 1. A step is a transition, so a PPO step number is a game-move count
 
 `step_granularity` is `collect_envs * ppo_rollout` — 16,384 at the defaults — and `advance()` returns
-that number as *both* the step increment and the transition count. `dqn/algo.py` returns `(1, width)`.
+that number as *both* the step increment and the transition count. `algos/dqn/algo.py` returns `(1, width)`.
 
 The consequence is the one [`../docs/findings.md`](../docs/findings.md) exists to prevent being
 misread: **a PPO step number is directly comparable to a snek2 step number**, and to a snek3 DQN step
@@ -42,10 +42,10 @@ import os
 
 import torch
 
-from ppo import collect
-from ppo import rollout as rollout_module
-from ppo import schedules
-from ppo.agent import PpoAgent
+from algos.ppo import collect
+from algos.ppo import rollout as rollout_module
+from algos.ppo import schedules
+from algos.ppo.agent import PpoAgent
 from vectorized.vec_env import VecSnake
 from tools import checkpoints
 
@@ -213,7 +213,7 @@ class PpoAlgo(object):
         self.rollout = rollout_module.Rollout(config['ppo_rollout'], config['collect_envs'],
                                               arch['obs_len'])
         # **`shaping_discount` is the agent's gamma, and passing it is not optional** — see
-        # `dqn/algo.py` for the full note and the 2.5e-4-a-step bias that leaving it at 1.0 caused.
+        # `algos/dqn/algo.py` for the full note and the 2.5e-4-a-step bias that leaving it at 1.0 caused.
         self.collector = collect.Collector(
             VecSnake(config['collect_envs'], seed=config['seed'],
                      shaping_discount=config['discount']),
@@ -261,7 +261,7 @@ class PpoAlgo(object):
         # The horizon knobs are read at the step the rollout *begins*, before collecting: the shaping
         # reward is discounted as it is banked and GAE runs at the end of the same rollout, so both
         # see one gamma. Constant unless a `_FINAL` is set. The env's `shaping_discount` is the agent's
-        # gamma (`dqn/algo.py` on why), so it moves with it.
+        # gamma (`algos/dqn/algo.py` on why), so it moves with it.
         self.agent.discount = schedules.discount_for(
             self.step, self.config['max_steps'], self.config['discount'],
             self.config['ppo_discount_final'], fraction)

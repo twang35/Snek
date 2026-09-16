@@ -928,7 +928,7 @@ checkpoints in the entire sweep.
 **Why this matters beyond PPO.** `fc 320` is not a tuned snek3 choice — it is snek2's shape, carried
 across so a champion's weights convert, and every batch in both eras has used it. This is the first
 evidence in the project that it is the wrong shape, and it was found by a knob nobody had swept.
-`dqn/net.py` takes the same `fc_layers` config, so **the same test is available to DQN for the price of
+`algos/dqn/net.py` takes the same `fc_layers` config, so **the same test is available to DQN for the price of
 one arm** and has never been run.
 
 The caveat is the usual one: n=1 per shape, and the best30 column spans 2.4 pp across the three best

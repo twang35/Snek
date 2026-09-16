@@ -12,8 +12,8 @@ import numpy as np
 import pytest
 import torch
 
-from dqn import agent as agent_module
-from dqn.agent import DdqnAgent, safe_actions, shielded_choice
+from algos.dqn import agent as agent_module
+from algos.dqn.agent import DdqnAgent, safe_actions, shielded_choice
 from env import constants
 from tools import arch as arch_tools
 
@@ -143,7 +143,7 @@ def test_epsilon_one_still_lets_the_greedy_action_be_drawn():
 
     That is standard epsilon-greedy and it is what the schedule is calibrated against: with three
     actions the effective non-greedy rate is `epsilon * 2/3`. Excluding the greedy action would
-    silently rescale every epsilon in `dqn/schedules.py` by 1.5.
+    silently rescale every epsilon in `algos/dqn/schedules.py` by 1.5.
     """
     agent = make_agent()
     obs = observations(1, [[1, 1, 1]])

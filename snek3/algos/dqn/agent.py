@@ -42,7 +42,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from dqn import net as network
+from algos.dqn import net as network
 from env import constants
 
 # Where "is this move survivable" lives in the observation, read from the layout table rather than
@@ -94,7 +94,7 @@ def shielded_choice(observations, guided, rng, num_actions):
 def build_adam(parameters, learning_rate, epsilon):
     """Adam, fused where the device supports it. Same algorithm, one kernel instead of dozens.
 
-    **Public, and `ppo/agent.py` imports it rather than copying it.** Both halves of this docstring
+    **Public, and `algos/ppo/agent.py` imports it rather than copying it.** Both halves of this docstring
     are measured facts about *this* net shape, and the materialisation below is a trap that a second
     copy would eventually walk into again — see the paragraph on the exhausted generator.
 

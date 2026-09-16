@@ -375,7 +375,7 @@ mistake learned late cannot be unlearned late either, and the schedule is tied t
 |---|---|
 | **clip 0.05, 0.1, 0.15** | tighter: slower onset, fewer collapses; 0.05 possibly never reaches the record region |
 | **clip 0.3, 0.4** | looser: earlier onset, more collapses; 0.4 approaches unclipped policy gradient |
-| **clip 0.2 → 0.02** | steady endgame, fewer late collapses; the record region should be *denser* late in the run. Not to exactly 0 — `ppo/algo.py` refuses a clip outside (0, 1), and a clip of 0 admits no update |
+| **clip 0.2 → 0.02** | steady endgame, fewer late collapses; the record region should be *denser* late in the run. Not to exactly 0 — `algos/ppo/algo.py` refuses a clip outside (0, 1), and a clip of 0 admits no update |
 | **clip 0.1 → 0.02** | the paper's start value |
 | **lr 3e-4 → 0**, **→ 3e-5** | the same shape of effect through the parameters; also cools the critic. Half the run is below 1.5e-4, so expect b3i's onset penalty, mildly. The 3e-5 floor tests whether the last stretch near zero was doing anything |
 | **both** | the Atari recipe. Predicted best late stability of anything in the sweep; the risk is a lower ceiling |
@@ -386,8 +386,8 @@ mistake learned late cannot be unlearned late either, and the schedule is tied t
 **Expected: the anneals win on collapse share, and the question is what they cost on density.**
 
 **Code needed first**: `SNEK_PPO_CLIP_FINAL` and `SNEK_PPO_LEARNING_RATE_FINAL`, both the same linear
-ramp over `SNEK_MAX_STEPS` that `ppo/schedules.entropy_coef_for` already implements, applied in
-`ppo/algo.advance()` beside the entropy coefficient — the clip as `agent.clip`, the lr by setting
+ramp over `SNEK_MAX_STEPS` that `algos/ppo/schedules.entropy_coef_for` already implements, applied in
+`algos/ppo/algo.advance()` beside the entropy coefficient — the clip as `agent.clip`, the lr by setting
 `param_group['lr']` on the one optimiser. Two ramps, a test each, a mutation check, and the smoke
 runs. Until it lands the generator drops the five anneal cells, and **b17 should wait for them rather
 than run its five static cells as a short batch** — the code is a morning's work and can land during

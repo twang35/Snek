@@ -53,7 +53,7 @@ wins that matter most.
 
 import numpy as np
 
-from dqn.agent import SAFETY_RANGE
+from algos.dqn.agent import SAFETY_RANGE
 from vectorized import config as C
 
 # The shortest snake a fork gate can sensibly name: one segment longer than the opening.

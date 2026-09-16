@@ -74,7 +74,7 @@ it is a no-op for an arm with shaping off, which is measured rather than argued.
 
 ### Forking goes, and PPO replaces it for free
 
-`dqn/collect.py`'s fork clones a primary lane with `copy_rows` and forces an action **the policy did
+`algos/dqn/collect.py`'s fork clones a primary lane with `copy_rows` and forces an action **the policy did
 not take**. Its docstring states the problem it solves: at ε≈0.003 the buffer holds the consequence
 of the chosen action and never of the alternative, so `Q(s, a_good)` is never raised and the argmax
 has no reason to flip.
@@ -91,7 +91,7 @@ that refuses), and the 4x step-count artefact it caused disappears with it.
 
 ### The epsilon schedule and the shield go; the finding behind the shield survives
 
-`dqn/schedules.py`' two phases and `dqn/agent.py`'s shield exist together: a mastery-gated ε deadlocks
+`algos/dqn/schedules.py`' two phases and `algos/dqn/agent.py`'s shield exist together: a mastery-gated ε deadlocks
 without the shield, because random endgame moves kill the snake, the buffer fills with trajectories
 that never finish a board, and the perfect rate that drives ε stays 0. Four snek2 arms sat there for
 942k steps.
@@ -121,8 +121,8 @@ stays cheap to add whenever that happens: the mask is derived from the observati
 
 ### PER, the target network, double-Q, n-step windows and the prefill go
 
-All five are off-policy machinery. `dqn/replay.py` (271 lines of sum tree and importance weights) is
-replaced by `ppo/rollout.py`, ~120 lines of preallocated `(T, N)` arrays and a backward GAE pass. The
+All five are off-policy machinery. `algos/dqn/replay.py` (271 lines of sum tree and importance weights) is
+replaced by `algos/ppo/rollout.py`, ~120 lines of preallocated `(T, N)` arrays and a backward GAE pass. The
 target network and the double-Q split have no analogue; the n-step window is what GAE's λ
 generalises; and there is nothing to pre-fill because the first rollout *is* the first batch.
 
@@ -212,8 +212,8 @@ algo.net                                          # what a ckpt holds: the Q net
 algo.state_dict() / load_state_dict()             # what resume.pt holds
 ```
 
-`dqn/algo.py::DqnAlgo` wraps the existing agent + replay + collector + `dqn/schedules`; nothing inside
-those files changes. `ppo/algo.py::PpoAlgo` wraps net + rollout + collector + `ppo/schedules`. The
+`algos/dqn/algo.py::DqnAlgo` wraps the existing agent + replay + collector + `algos/dqn/schedules`; nothing inside
+those files changes. `algos/ppo/algo.py::PpoAlgo` wraps net + rollout + collector + `algos/ppo/schedules`. The
 `Trainer` chooses by `SNEK_ALGO` (default `dqn`) and adds `steps` to `self.step` and `transitions` to
 `self.transitions`.
 
@@ -232,16 +232,16 @@ from.** Two mitigations, both non-negotiable:
 
 ---
 
-## 6. `ppo/`, module by module
+## 6. `algos/ppo/`, module by module
 
 | file | ~lines | contents |
 |---|---:|---|
-| `ppo/net.py` | 110 | `PolicyNet` (30 -> 320 -> 3 logits) and `ValueNet` (30 -> 320 -> 1). `build()` returns the actor. `greedy_policy_fn` = argmax of logits, optionally masked |
-| `ppo/rollout.py` | 120 | the `(T, N)` buffer and the backward GAE pass. Pure numpy; no torch |
-| `ppo/collect.py` | 130 | N lanes, T steps. Samples, stores `(obs, action, logprob, value, reward, done)`. No forking, no windows, no shield |
-| `ppo/agent.py` | 180 | the clipped surrogate, the value loss, the entropy bonus, the epoch/minibatch loop, and the diagnostics |
-| `ppo/schedules.py` | 60 | the entropy coefficient and the optional LR anneal, as pure functions — the same stateless shape as `dqn/schedules.py`, for the same resume reason |
-| `ppo/algo.py` | 120 | the five-method object §5 drives |
+| `algos/ppo/net.py` | 110 | `PolicyNet` (30 -> 320 -> 3 logits) and `ValueNet` (30 -> 320 -> 1). `build()` returns the actor. `greedy_policy_fn` = argmax of logits, optionally masked |
+| `algos/ppo/rollout.py` | 120 | the `(T, N)` buffer and the backward GAE pass. Pure numpy; no torch |
+| `algos/ppo/collect.py` | 130 | N lanes, T steps. Samples, stores `(obs, action, logprob, value, reward, done)`. No forking, no windows, no shield |
+| `algos/ppo/agent.py` | 180 | the clipped surrogate, the value loss, the entropy bonus, the epoch/minibatch loop, and the diagnostics |
+| `algos/ppo/schedules.py` | 60 | the entropy coefficient and the optional LR anneal, as pure functions — the same stateless shape as `algos/dqn/schedules.py`, for the same resume reason |
+| `algos/ppo/algo.py` | 120 | the five-method object §5 drives |
 
 Six decisions inside those worth arguing before they are written.
 
@@ -255,20 +255,20 @@ hold `actor.state_dict()` and `checkpoints.load(..., strict=True)` works with no
 every committed sidecar.
 
 **snek3's initialisers, not orthogonal.** He-normal with Keras' truncation correction on the hidden
-layer and `uniform(-0.03, 0.03)` on the head, from `dqn/net.py`. On a 3-logit head that uniform range
+layer and `uniform(-0.03, 0.03)` on the head, from `algos/dqn/net.py`. On a 3-logit head that uniform range
 gives an almost exactly uniform softmax, which is what PPO's conventional `gain=0.01` head is *for*,
 so the convention is already satisfied. `SNEK_PPO_INIT=orthogonal` exists as a fallback if b3 shows
 the opening policy matters.
 
 **A dedicated seeded generator for the action sample**, and a second for the minibatch shuffle,
-neither shared with the env's food stream — `dqn/collect.py`'s comment on exactly this ("an arm's
+neither shared with the env's food stream — `algos/dqn/collect.py`'s comment on exactly this ("an arm's
 decisions would depend on how many food cells were rejected") applies unchanged.
 
 **Learning rate 3e-4, not DQN's 1e-5.** Reusing 1e-5 is a trap worth naming in the doc: PPO takes
 ~64x fewer gradient steps per transition, so the same LR is ~64x less total parameter movement over
 an arm. 3e-4 is the PPO convention and b3 sweeps it.
 
-**Huber on the value loss, with `SNEK_PPO_VALUE_LOSS=mse` available.** Same argument `dqn/agent.py`
+**Huber on the value loss, with `SNEK_PPO_VALUE_LOSS=mse` available.** Same argument `algos/dqn/agent.py`
 gives for its TD loss: a perfect game pays +100 against a typical step's ~0.001, so one terminal
 return in a minibatch of 256 dominates a squared error. This is a deliberate deviation from textbook
 PPO and it is a knob, not a fact.
@@ -310,7 +310,7 @@ with a named error** under `SNEK_ALGO=ppo`.
 | ~~`SNEK_PPO_EVAL_ROLLOUTS`~~ | — | **not built, and better this way.** `train.py` rounds `SNEK_EVAL_INTERVAL` up to a whole algorithm step, so a 16,384-transition rollout evaluates every rollout with no PPO-specific knob and no second spelling of "how often" |
 | `SNEK_PPO_ENTROPY_COEF_FINAL` | unset (constant) | added: a linear ramp to this value over `SNEK_MAX_STEPS`, for the entropy-collapse row of §8 |
 | `SNEK_PPO_GRADIENT_CLIPPING` | 0.5 | added: global norm over both towers, 0 to disable |
-| `SNEK_PPO_ADAM_EPSILON` | 1e-7 | added: DQN's value, for the same reason `dqn/agent.py` gives |
+| `SNEK_PPO_ADAM_EPSILON` | 1e-7 | added: DQN's value, for the same reason `algos/dqn/agent.py` gives |
 | `SNEK_DISCOUNT` | **0.99** built / 0.9975 for the comparison | shared with DQN. §8, and b3 tries both |
 
 ---
@@ -338,7 +338,7 @@ Per `snek3/CLAUDE.md`: fixtures in the same pass as the logic, and **a passing s
 | fixture | pins |
 |---|---|
 | GAE against a hand-computed 5-step example | the arithmetic, digit for digit |
-| GAE with a `done` in the middle | **no advantage crosses an episode boundary.** The bug `dqn/collect.py` records snek2 shipping in its n-step window |
+| GAE with a `done` in the middle | **no advantage crosses an episode boundary.** The bug `algos/dqn/collect.py` records snek2 shipping in its n-step window |
 | λ=1, γ=1 | advantage == Monte-Carlo return − value |
 | λ=0 | advantage == one-step TD error |
 | **log-prob round trip** | recomputing the log-prob of the stored action with unchanged weights reproduces the stored value exactly, so the first minibatch's ratio is exactly 1.0. **The single best PPO bug detector** |
@@ -367,8 +367,8 @@ is one command each and a later session can re-run rather than re-derive it.
 
 **‡ Two of the fourteen survived their first run, and both for the same reason: the fixture's subject
 was a copy of the line rather than the line.** The clipped-objective fixtures build the surrogate from
-the same three statements `ppo/agent.py` uses, which pins the *arithmetic* — and leaves `min` → `max`
-in the agent itself completely undetected. The bootstrap mutant survived because `ppo/collect.py` had
+the same three statements `algos/ppo/agent.py` uses, which pins the *arithmetic* — and leaves `min` → `max`
+in the agent itself completely undetected. The bootstrap mutant survived because `algos/ppo/collect.py` had
 no test file at all. The fixes are four fixtures that call `agent.update(rollout)` and read the actor's
 parameters, and `tests/test_ppo_collect.py`, which labels every stub observation with the step it came
 from. This is `snek3/CLAUDE.md`'s "a fixture whose subject cannot violate it is not a fixture" in its
@@ -381,7 +381,7 @@ most ordinary costume: 24 passing PPO tests, and the load-bearing line was untes
 | # | phase | gate |
 |---:|---|---|
 | **6a** | the `train.py` seam and `DqnAlgo`. No PPO code | **Met 2026-08-29.** Three fixed-seed arms — the defaults, a `chase_safe` arm and a `free_space` arm at `n_step=3`, `collect_envs=2`, `ratio=0.5` — came out **byte-identical** across the refactor on every eval row, the final weights (SHA-256 of the whole `state_dict`), the step, the transition count, epsilon and the checkpoint set. 743 tests green, 26 of 26 mutants killed. **Not yet deployed to the desktop:** b2 is still training |
-| **6b** | `ppo/` plus the fixtures and the mutant spec | **Met 2026-08-29.** 869 tests green, **14 of 14** mutants killed, and the gate arm reached avg score **79.5 with a 1.2%/500 perfect rate at 508k transitions**, against the **0.9** an untrained policy scores. See below |
+| **6b** | `algos/ppo/` plus the fixtures and the mutant spec | **Met 2026-08-29.** 869 tests green, **14 of 14** mutants killed, and the gate arm reached avg score **79.5 with a 1.2%/500 perfect rate at 508k transitions**, against the **0.9** an untrained policy scores. See below |
 | **6c** | **batch b3 — tuning** | **Closed 2026-08-29 at 15 arms x 10M transitions, not 4 x 2M.** Output: **no winner and no lever among lr, λ, entropy, γ or width** — nine configs inside 0.8 pp. One axis did move: **gradient steps per transition**. See below |
 | **6d** | **seed-matched arms at b2's budget or better** | **Met 2026-08-30 by b5 and b6** — 8 seeds each at 215-271M transitions, ~12-15x b2's 18M, on b2's reward function. The stated bar (one arm ≥90% perfect in a stage-A eval) is cleared by every one of the sixteen: stage-A `best_perfect30` is **97.8-98.5** across both batches. ‡ Not the 4-arm b4 this row specified — see the status note |
 | **6e** | stage B and the comparison | **Met 2026-08-30.** On the pre-registered metric — the ≥98%/500 count — **b6 is 4,661 of 36,272 rows (12.8%) and b5 is 3,329 of 34,581 (9.6%), against b2's four DQN seeds at 5 of 1,135 (0.44%)**: a 29x and 22x density. Both passes complete, status 0. ‡ Read the caveats below before quoting it |
@@ -412,14 +412,14 @@ champion" is a different claim and is not yet supported.
 |---|---|
 | `shaping_discount` passed to the collect env | **the only behaviour change.** Nothing for an arm with shaping off; b2's config now shapes at 0.9975 rather than 1.0 |
 | `transitions` on every eval row and in the summary | additive; `step` unchanged |
-| the fourteen-member algorithm seam, `dqn/algo.py`, `SNEK_ALGO`, intervals rounded to whole algorithm steps | **none, byte-for-byte** |
+| the fourteen-member algorithm seam, `algos/dqn/algo.py`, `SNEK_ALGO`, intervals rounded to whole algorithm steps | **none, byte-for-byte** |
 
 The seam is what 6b writes against, and `tests/test_train.py` asserts it over every entry in
-`train.ALGOS` — so `ppo/algo.py` is covered by the contract fixtures the moment it is registered.
+`train.ALGOS` — so `algos/ppo/algo.py` is covered by the contract fixtures the moment it is registered.
 
 ### What 6b landed, and the one number worth arguing about
 
-`ppo/{net,rollout,collect,agent,schedules,algo}.py`, `train.ALGOS['ppo']`, `restore.ALGORITHMS['ppo']`,
+`algos/ppo/{net,rollout,collect,agent,schedules,algo}.py`, `train.ALGOS['ppo']`, `restore.ALGORITHMS['ppo']`,
 and **122 fixtures** across five files. The gate arm is `ppo-smoke` — 508k transitions at the untuned
 defaults of §7, which is deliberately *not* a batch arm and is not in the p-series.
 
@@ -511,5 +511,5 @@ days. `docs/runs.md`'s backlog already names Munchausen-DQN and SAC-discrete as 
 |---|---|
 | **A PPO actor warm-started from the snek2 champion** | free: the champion's `30 -> 320 -> 3` weights load into `PolicyNet` unchanged, and Q-values of magnitude ~30 make a near-deterministic opening softmax. Answers "can PPO hold a policy DQN found" separately from "can PPO find one" |
 | **Sampled evaluation** | measure π rather than argmax π. A different question, and one line |
-| **Adaptive entropy on the eval history** | the `dqn/schedules.py` pattern applied to the entropy coefficient. Only if b3 shows a fixed coefficient is the binding constraint |
+| **Adaptive entropy on the eval history** | the `algos/dqn/schedules.py` pattern applied to the entropy coefficient. Only if b3 shows a fixed coefficient is the binding constraint |
 | **Wide-and-shallow arms** | PPO's cost is the env, and the env is 196k transitions/s at 1,024 lanes. Nothing in DQN could spend that |

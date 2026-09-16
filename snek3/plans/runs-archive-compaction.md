@@ -43,7 +43,7 @@ So the costs, in order of how much they bite:
 
 ## 3. Who reads what — the schema each reader actually needs
 
-Checked by grep across `tools/`, `viewer/`, `train.py`, `ppo/`, `dqn/` (tests excluded).
+Checked by grep across `tools/`, `viewer/`, `train.py`, `algos/ppo/`, `algos/dqn/` (tests excluded).
 
 | field | in | readers | verdict |
 |---|---|---|---|
@@ -54,7 +54,7 @@ Checked by grep across `tools/`, `viewer/`, `train.py`, `ppo/`, `dqn/` (tests ex
 | `step`, `perfect_percent`, `avg_score` | stage A | `progress_chart` (the arm's graph), `viewer_manifest` (drawdown, ≥98 share, onset), `run_report`, `train.py` on resume | **the core series** |
 | `trailing_avg_score`, `transitions` | stage A | `run_report`, `train.py` | derivable (trailing mean of `avg_score`; `transitions` equals `step` for PPO) |
 | `min_score`, `max_score`, `avg_reward`, `steps_per_second`, `entropy_coef` | stage A | `run_report`, `eta` (`steps_per_second`) | keep; not recomputable |
-| `ppo` block (12 diagnostics: `approx_kl`, `clip_fraction`, `explained_variance`, `value_loss`, `policy_loss`, `entropy`, `epochs_run`, `stopped_early`, `episodes`, `perfect_games`, `rollouts`, plus the four live knob values) | stage A | `ppo/algo.py` log lines while training; nothing offline | **not recomputable and the most interesting diagnostic in the archive** (a collapse's KL and value-loss signature). Keep, but as rounded columns: ~60% of the stage-A file today |
+| `ppo` block (12 diagnostics: `approx_kl`, `clip_fraction`, `explained_variance`, `value_loss`, `policy_loss`, `entropy`, `epochs_run`, `stopped_early`, `episodes`, `perfect_games`, `rollouts`, plus the four live knob values) | stage A | `algos/ppo/algo.py` log lines while training; nothing offline | **not recomputable and the most interesting diagnostic in the archive** (a collapse's KL and value-loss signature). Keep, but as rounded columns: ~60% of the stage-A file today |
 | `summary` block | stage A | `viewer_manifest` (best30, sef, trailing, evals) | keep as is |
 
 Everything the viewer, the site build, the progress tables and the reports need is in the two **bold**

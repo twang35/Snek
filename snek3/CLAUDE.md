@@ -27,7 +27,7 @@ reason.
 |---|---|---|---|
 | `env/` | the scalar game: constants, drawing, `Game`, the reference observation builder | **yes, and only here** | no |
 | `vectorized/` | `VecSnake` (N games in lockstep, pure numpy) plus the measurement engine and wave | no | no |
-| `dqn/`, `ppo/` | learning algorithms: the network, the replay, the agent, the collector | no | yes |
+| `algos/dqn/`, `algos/ppo/` | learning algorithms: the network, the replay, the agent, the collector | no | yes |
 | `tools/` | the tools and the libraries behind them: `arch`, `checkpoints`, `restore`, `eval_plan`, `run_report`, charts | no | yes, for checkpoint I/O |
 | `desktop/` | the git-bus job queue. stdlib only, imports nothing from this project | no | no |
 | `skills/` | the procedures an agent runs often: launching, queueing, stopping, progress updates. Markdown only | | |
@@ -252,28 +252,28 @@ And the training side, which is the other direction — from a knob to an arm:
 | module | does |
 |---|---|
 | `train.py` | the loop, and everything not algorithm-specific: the config, seeding, the sidecar, the checkpoint cadence, stage A and its queue, the chart, the report, the cap |
-| `dqn/algo.py` | **the seam `train.py` drives.** DQN's config, its loop body, its schedules' call sites and its resume state, behind fourteen members `train.py` knows by name |
-| `dqn/net.py` | the Q network and a greedy `policy_fn`. The only file that decides an initialiser |
-| `dqn/agent.py` | double DQN, the target copy, and the exploration shield's action mask |
-| `dqn/replay.py` | prioritised replay over a numpy sum tree, with importance weights |
-| `dqn/schedules.py` | epsilon and the shield fraction, as pure functions of the eval history |
-| `dqn/collect.py` | N lanes in lockstep, n-step windows, and forking. Owns its own loop |
-| `ppo/algo.py` | the same seam, PPO's side. A step **is** a transition, and `step_granularity` is a whole rollout — so `SNEK_EVAL_INTERVAL` rounds up to one. Refuses every DQN knob **by name** |
-| `ppo/net.py` | the actor **is** `dqn/net.py`'s `QNet`, weight for weight, so a champion's converted weights load into it; plus a 1-output critic on a derived seed, and the three categorical operations |
-| `ppo/rollout.py` | the `(T, N)` buffer and GAE. Pure numpy. The `(1 − done)` that gates both the bootstrap and the recursion lives here |
-| `ppo/collect.py` | one rollout: every lane steps T times, storing the value and log-prob the policy actually produced. No forking, no shield, no n-step |
-| `ppo/agent.py` | the clipped surrogate, the value loss, the entropy bonus, and the epoch loop |
-| `ppo/schedules.py` | the entropy coefficient, as a pure function of the step |
+| `algos/dqn/algo.py` | **the seam `train.py` drives.** DQN's config, its loop body, its schedules' call sites and its resume state, behind fourteen members `train.py` knows by name |
+| `algos/dqn/net.py` | the Q network and a greedy `policy_fn`. The only file that decides an initialiser |
+| `algos/dqn/agent.py` | double DQN, the target copy, and the exploration shield's action mask |
+| `algos/dqn/replay.py` | prioritised replay over a numpy sum tree, with importance weights |
+| `algos/dqn/schedules.py` | epsilon and the shield fraction, as pure functions of the eval history |
+| `algos/dqn/collect.py` | N lanes in lockstep, n-step windows, and forking. Owns its own loop |
+| `algos/ppo/algo.py` | the same seam, PPO's side. A step **is** a transition, and `step_granularity` is a whole rollout — so `SNEK_EVAL_INTERVAL` rounds up to one. Refuses every DQN knob **by name** |
+| `algos/ppo/net.py` | the actor **is** `algos/dqn/net.py`'s `QNet`, weight for weight, so a champion's converted weights load into it; plus a 1-output critic on a derived seed, and the three categorical operations |
+| `algos/ppo/rollout.py` | the `(T, N)` buffer and GAE. Pure numpy. The `(1 − done)` that gates both the bootstrap and the recursion lives here |
+| `algos/ppo/collect.py` | one rollout: every lane steps T times, storing the value and log-prob the policy actually produced. No forking, no shield, no n-step |
+| `algos/ppo/agent.py` | the clipped surrogate, the value loss, the entropy bonus, and the epoch loop |
+| `algos/ppo/schedules.py` | the entropy coefficient, as a pure function of the step |
 
 **One `train.py` serves every algorithm, and that is a measurement rule rather than a tidiness one.**
 An arm's numbers are comparable across algorithms only if the same code screened its checkpoints, ran
 the same 100 episodes, wrote the same rows and drew the same chart — so a second algorithm adds a
 module and one entry in `train.ALGOS`, never a second trainer.
-[`dqn/algo.py`](dqn/algo.py) documents the seam; `tests/test_train.py` asserts it over every entry in
-the registry, so `ppo/algo.py` is covered the moment it is added. Two consequences worth knowing:
+[`algos/dqn/algo.py`](algos/dqn/algo.py) documents the seam; `tests/test_train.py` asserts it over every entry in
+the registry, so `algos/ppo/algo.py` is covered the moment it is added. Two consequences worth knowing:
 
 - **`SNEK_ALGO` selects the algorithm** and an unknown value is refused by name. The knob list now
-  spans two files — `train.py` for what is not algorithm-specific, `dqn/algo.py` for the rest — and
+  spans two files — `train.py` for what is not algorithm-specific, `algos/dqn/algo.py` for the rest — and
   `grep 'hyperparameter override:'` is unaffected, because both read through the same `tuned()`.
 - **An eval and a checkpoint land on whole algorithm steps.** DQN's step granularity is 1, so its
   intervals are exactly the constants and **a DQN arm is byte-identical across the seam landing**

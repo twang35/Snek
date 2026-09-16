@@ -22,7 +22,7 @@ import numpy as np
 import pytest
 import torch
 
-from dqn import net as network
+from algos.dqn import net as network
 from tools import import_tf_checkpoint as importer
 
 

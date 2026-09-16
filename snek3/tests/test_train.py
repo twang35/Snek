@@ -21,8 +21,8 @@ import pytest
 
 import train
 from vectorized import config as reward_config
-from dqn import algo as dqn_algo
-from dqn import collect
+from algos.dqn import algo as dqn_algo
+from algos.dqn import collect
 from tools import arch as arch_tools
 from tools import checkpoints
 from tools import eval_queue
@@ -114,7 +114,7 @@ def test_every_config_key_is_its_knob_lowercased():
     """
     import re
     # **Both modules, because the knobs now live in two files.** `train.py` reads what is not
-    # algorithm-specific and `dqn/algo.py` reads the rest; a test that looked at only one would pass
+    # algorithm-specific and `algos/dqn/algo.py` reads the rest; a test that looked at only one would pass
     # while every DQN row in the report was unmatched.
     source = open(train.__file__).read() + open(dqn_algo.__file__).read()
     knobs = {name.lower() for name in re.findall(r"tuned\('([A-Z_]+)'", source)}
@@ -254,7 +254,7 @@ def test_a_control_arm_writes_no_fork_field():
 # hold is not tidiness: a PPO arm's numbers are comparable to a DQN arm's only if the same code
 # screened the checkpoints, ran the same 100 episodes and wrote the same rows — so the file that must
 # never be duplicated for a second algorithm is `train.py`. These fixtures are what a future
-# `ppo/algo.py` is held to.
+# `algos/ppo/algo.py` is held to.
 
 # Every member `train.Trainer` calls on the algorithm object. Listed here rather than discovered, so
 # adding a call site without adding it to the seam is a failing test rather than a surprise for the
@@ -278,7 +278,7 @@ def test_every_algorithm_module_offers_the_whole_seam(name):
 def test_every_algorithm_object_offers_the_whole_seam(name, monkeypatch):
     """Parametrised over the registry rather than written against DQN.
 
-    So `ppo/algo.py` is covered the moment it is added to `ALGOS`, which is the only way a contract
+    So `algos/ppo/algo.py` is covered the moment it is added to `ALGOS`, which is the only way a contract
     test earns its place — one written against the single existing implementation asserts that the
     implementation is itself.
     """

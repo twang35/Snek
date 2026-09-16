@@ -238,7 +238,7 @@ def _plant_arm(tmp_path, policy, width=4):
     skip both halves of that.
     """
     import torch
-    from dqn import net as network
+    from algos.dqn import net as network
     from env import constants
     from tools import arch as arch_tools, checkpoints
 

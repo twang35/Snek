@@ -2924,7 +2924,7 @@ pass. They are the half that found the one axis that moved: `b3q-ep8` at 97.2 an
 
 ### ppo-smoke — the phase-6b PPO gate arm, untuned defaults
 
-Not a batch arm, and not seed-matched to anything: it exists to show `ppo/` learns. Read it against
+Not a batch arm, and not seed-matched to anything: it exists to show `algos/ppo/` learns. Read it against
 b1 at a *matched transition count* (b1's step x 6), not against b1's endpoint.
 
 step 508k transitions · trailing score 62.5 · avg score 79.55/500 eps · perfect 1.2%/500 · ev 0.90 ·

@@ -1,7 +1,7 @@
 """The on-policy rollout buffer and GAE. Pure numpy — no torch, so this is testable on its own.
 
 `(T, N)` preallocated arrays, filled once, read `epochs` times, then overwritten. That is the whole
-difference from `dqn/replay.py`'s 271 lines of sum tree: there is no sampling, no priority, no
+difference from `algos/dqn/replay.py`'s 271 lines of sum tree: there is no sampling, no priority, no
 eviction and no importance weight, because every sample in a PPO update was produced by the policy
 being updated.
 
@@ -12,7 +12,7 @@ being updated.
 
 **`done_t` means "the action at t ended the episode", and it gates both terms.** `VecSnake` auto-
 resets inside `step()`, so `obs[t+1]` on a lane that just died is a *fresh episode's* first state and
-`V(s_{t+1})` is that new episode's value. Multiplying it out is the same trick `dqn/collect.py` uses
+`V(s_{t+1})` is that new episode's value. Multiplying it out is the same trick `algos/dqn/collect.py` uses
 when it stores `discount=0` on a terminal transition, and the same bug snek2 shipped in its n-step
 window when it had no episode check at all. Advantage must not flow across an episode boundary in
 either term: not through the bootstrap, and not through the recursion.
@@ -82,7 +82,7 @@ class Rollout(object):
 
     @property
     def size(self):
-        """Transitions in a full rollout. Also the arm's step increment — see `ppo/algo.py`."""
+        """Transitions in a full rollout. Also the arm's step increment — see `algos/ppo/algo.py`."""
         return self.steps * self.lanes
 
     def add(self, t, obs, actions, log_probs, values, rewards, dones):

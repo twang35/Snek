@@ -13,7 +13,7 @@ import os
 
 import pytest
 
-from dqn import net as network
+from algos.dqn import net as network
 from tools import arch as arch_tools
 from tools import checkpoints
 from tools import eval_plan

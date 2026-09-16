@@ -19,10 +19,10 @@ ordered so that each result changes what the next one is expected to show.
 | the transition is deterministic except the food spawn, and the simulator is exact and cheap | `env/game.py`, `vectorized/` | **planning against the true simulator** is available and a learned world model is the wrong version of it. The fixed-path references (100.00% / 30,000, `hallOfFame/HOF.md`) already show lookahead wins here |
 | the food is always reachable and the tour proves it | the Hamiltonian-cycle reference | there is **no hard-exploration problem**. Intrinsic-reward agents answer a question this game does not ask, and are in the series to confirm that, not to win |
 | two boxes, 8 trainers each, 4 seeds a cell (`docs/protocol.md`) | root `CLAUDE.md` | **sample cost per run** bounds how many rows the series can afford, so the data-efficiency probe runs early |
-| PPO is the incumbent at 98.7% (snek2) and is the snek3 default (`ppo/`) | `hallOfFame/HOF.md` | PPO is the **control** every row is read against, on the same observation, reward and eval protocol |
+| PPO is the incumbent at 98.7% (snek2) and is the snek3 default (`algos/ppo/`) | `hallOfFame/HOF.md` | PPO is the **control** every row is read against, on the same observation, reward and eval protocol |
 
-The value-based side has its own control already: `dqn/` is in snek3 behind the same algo seam as
-`ppo/`, so vanilla DQN is the first row to run, not the first to build.
+The value-based side has its own control already: `algos/dqn/` is in snek3 behind the same algo seam as
+`algos/ppo/`, so vanilla DQN is the first row to run, not the first to build.
 
 ## 2. The rows, grouped by the question each answers
 
@@ -38,7 +38,7 @@ term), **AlphaZero-style MCTS on the real simulator** (the planning row that fit
 
 | order | row | what it isolates, read against the row above it |
 |---|---|---|
-| A1 | **DQN** (double, as `dqn/` already is) | the value-family control on the snek3 observation and reward |
+| A1 | **DQN** (double, as `algos/dqn/` already is) | the value-family control on the snek3 observation and reward |
 | A2 | **C51** | the return distribution itself, on a fixed 51-atom support |
 | A3 | **QR-DQN** | dropping the fixed support: the same distribution fitted by quantile regression |
 | A4 | **IQN** | sampling the quantile fractions each step; and the **risk-sensitive acting** it allows, run as its own arm (act on the low quantiles only) |

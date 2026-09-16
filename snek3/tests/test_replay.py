@@ -8,7 +8,7 @@ unwritten slot is an all-zero observation, which trains the net on a board that 
 import numpy as np
 import pytest
 
-from dqn.replay import PrioritizedReplay, SumTree, normalize_is_weights
+from algos.dqn.replay import PrioritizedReplay, SumTree, normalize_is_weights
 
 
 def filled(capacity=8, obs_len=3, count=None, seed=0, **kwargs):
@@ -334,7 +334,7 @@ def test_set_one_matches_the_vectorised_set_exactly():
     sum tree's defect mode is a *parent* that stops matching its children — the leaf is always
     right and `total` can stay plausible while an interior node is stale.
     """
-    from dqn.replay import SumTree
+    from algos.dqn.replay import SumTree
     vectorised, scalar = SumTree(1024), SumTree(1024)
     rng = np.random.default_rng(11)
     for _ in range(3000):
@@ -351,7 +351,7 @@ def test_set_one_repairs_every_ancestor_not_just_the_root():
 
     So the fixture reads an interior node directly: leaf 0's parent must hold leaves 0 and 1.
     """
-    from dqn.replay import SumTree
+    from algos.dqn.replay import SumTree
     tree = SumTree(8)
     tree.set_one(0, 3.0)
     tree.set_one(1, 4.0)

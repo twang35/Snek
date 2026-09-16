@@ -59,31 +59,31 @@
   },
   {
    "desc": "advance reports one transition per step rather than the lane width",
-   "file": "dqn/algo.py",
+   "file": "algos/dqn/algo.py",
    "from": "        return 1, transitions",
    "to": "        return 1, 1"
   },
   {
    "desc": "the prefill reports no transitions",
-   "file": "dqn/algo.py",
+   "file": "algos/dqn/algo.py",
    "from": "            banked += self.collector.step(1.0)\n        return banked",
    "to": "            self.collector.step(1.0)\n        return 0"
   },
   {
    "desc": "DQN claims a step granularity of four",
-   "file": "dqn/algo.py",
+   "file": "algos/dqn/algo.py",
    "from": "    step_granularity = 1",
    "to": "    step_granularity = 4"
   },
   {
    "desc": "fields reports the schedule's new value rather than what the arm ran under",
-   "file": "dqn/algo.py",
+   "file": "algos/dqn/algo.py",
    "from": "        return {'epsilon': round(float(self.epsilon), 5),\n                'guided_fraction': round(float(self.collector.guided_fraction), 3),\n                'fork':",
    "to": "        return {'epsilon': round(float(self.config['initial_epsilon']), 5),\n                'guided_fraction': round(float(self.collector.guided_fraction), 3),\n                'fork':"
   },
   {
    "desc": "the shield fraction never reaches the collector",
-   "file": "dqn/algo.py",
+   "file": "algos/dqn/algo.py",
    "from": "        self.collector.set_guided_fraction(guided)\n        return {'epsilon':",
    "to": "        return {'epsilon':"
   },

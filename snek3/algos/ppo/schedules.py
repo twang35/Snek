@@ -1,8 +1,8 @@
 """The entropy coefficient, as a pure function of the arm's progress through its cap.
 
-The same stateless shape as `dqn/schedules.py`, for the same two reasons: a resume recomputes the
+The same stateless shape as `algos/dqn/schedules.py`, for the same two reasons: a resume recomputes the
 value from the restored step instead of descending a ladder again, and a schedule with no state cannot
-latch. `dqn/schedules.py` records what latching cost — a one-way ratchet pinned one snek2 arm's
+latch. `algos/dqn/schedules.py` records what latching cost — a one-way ratchet pinned one snek2 arm's
 epsilon at 0.001 while its score collapsed from 64.6 to 8.8.
 
 **But it is driven by the step, not by the eval history, and that is the deliberate difference.** DQN's

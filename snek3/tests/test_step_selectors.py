@@ -11,7 +11,7 @@ import os
 
 import pytest
 
-from dqn import net as network
+from algos.dqn import net as network
 from tools import checkpoints
 from tools import step_selectors as selectors
 

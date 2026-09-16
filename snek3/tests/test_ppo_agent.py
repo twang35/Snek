@@ -16,9 +16,9 @@ import pytest
 import torch
 
 from env import constants
-from ppo import agent as agent_module
-from ppo import net as network
-from ppo import rollout as rollout_module
+from algos.ppo import agent as agent_module
+from algos.ppo import net as network
+from algos.ppo import rollout as rollout_module
 from tools import arch as arch_tools
 
 CLIP = 0.2
@@ -315,8 +315,8 @@ def test_a_resume_restores_both_towers_the_optimiser_and_both_streams():
 
 # **‡ The three fixtures above build the objective from the same three lines the agent uses, and that
 # is a weaker check than it looks.** They pin the *arithmetic* of the clipped surrogate, which is worth
-# pinning, but a `min` changed to a `max` in `ppo/agent.py` leaves every one of them passing — they
-# never call `update`. Measured: the ten-mutant spec for `ppo/` reported the `max` mutant as a
+# pinning, but a `min` changed to a `max` in `algos/ppo/agent.py` leaves every one of them passing — they
+# never call `update`. Measured: the ten-mutant spec for `algos/ppo/` reported the `max` mutant as a
 # survivor until the three fixtures below existed. Each one drives `agent.update(rollout)` and reads
 # the actor's parameters, so its subject is the production line and not a copy of it.
 

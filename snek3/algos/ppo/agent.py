@@ -1,6 +1,6 @@
 """PPO: the clipped surrogate, the value loss, the entropy bonus, and the epoch loop over a rollout.
 
-The same seam shape `dqn/agent.py` sits on, with three methods instead of two because a rollout needs
+The same seam shape `algos/dqn/agent.py` sits on, with three methods instead of two because a rollout needs
 the value and the log-prob at collect time:
 
     agent.act(obs)      -> (actions, log_probs, values)   # (n, OBS_LEN) -> three (n,)
@@ -32,7 +32,7 @@ learning rate is ~64x less total parameter movement over an arm. Reusing DQN's n
 easiest way to conclude "PPO does not work here". Hence a distinct knob name, `SNEK_PPO_LEARNING_RATE`,
 and `SNEK_LEARNING_RATE` is refused rather than ignored.
 
-**Huber on the value loss, not squared error.** The same argument `dqn/agent.py` gives for its TD
+**Huber on the value loss, not squared error.** The same argument `algos/dqn/agent.py` gives for its TD
 loss: a perfect game pays +100 against a typical step's ~0.001, so one terminal return in a minibatch
 of 256 would dominate a squared error. This is a departure from textbook PPO and it is therefore a
 knob, `SNEK_PPO_VALUE_LOSS=mse`.
@@ -57,9 +57,9 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from dqn.agent import build_adam
-from ppo import net as network
-from ppo.rollout import normalise
+from algos.dqn.agent import build_adam
+from algos.ppo import net as network
+from algos.ppo.rollout import normalise
 
 # `approx_kl` estimator. `mean(logp_old - logp)` is the naive one and is *signed* — it can read
 # negative, which is impossible for a KL and makes an early-stop threshold meaningless. This is
@@ -118,7 +118,7 @@ class PpoAgent(object):
                                    float(config['ppo_learning_rate']),
                                    float(config['ppo_adam_epsilon']))
         # The action draw's own stream. Not torch's global generator and not the env's numpy one:
-        # `dqn/collect.py`'s note applies unchanged — an arm's decisions must not depend on how many
+        # `algos/dqn/collect.py`'s note applies unchanged — an arm's decisions must not depend on how many
         # food cells the env rejected.
         self.torch_rng = torch.Generator(device=device)
         if seed is not None:

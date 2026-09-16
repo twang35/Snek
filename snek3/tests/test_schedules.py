@@ -7,7 +7,7 @@ and every function must be stateless, because a resume recomputes epsilon from r
 
 import pytest
 
-from dqn import schedules
+from algos.dqn import schedules
 
 
 def test_bootstrap_halves_once_per_threshold_cleared():

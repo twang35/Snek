@@ -178,7 +178,7 @@ tools -- is committed to master as soon as it is made and its tests pass, togeth
 `snek3/tests/`. The reason is the same as for the viewer pages: these are the project's own instruments, and a
 skill that fails is a bug in the tool that should be fixed and landed in the same pass, not parked. **The
 only-if rule below applies**: the commit qualifies only when it touches nothing outside `snek3/tools/` and
-`snek3/tests/`; a tool change that rides along with a trainer, `env/`, `ppo/` or `desktop/daemon/` change waits
+`snek3/tests/`; a tool change that rides along with a trainer, `env/`, `algos/ppo/` or `desktop/daemon/` change waits
 with that change. Two things this does not change: **the box runs old code until a deploy**, and a deploy is
 still the `desktop-deploy` skill with its own approval; and the summary to the user still names what was
 changed in the tool and why.

@@ -239,7 +239,7 @@ the same trace tooling: the starve count falls and the sealed-food count does no
 | 5 | `tools/arch.py`, `tools/restore.py` | `arch.json` gains `obs_history`; restore sets the env key from it before building the env, and refuses a mismatch with a clear message. Existing sidecars without the field read as 0 — the one time a missing field is allowed, since every committed sidecar is depth 0 |
 | 6 | `docs/environment.md`, `docs/invariants.md` | the table row and the era note |
 
-Two things stay exactly as they are: `dqn/agent.py`'s exploration shield reads `block_ranges()` by
+Two things stay exactly as they are: `algos/dqn/agent.py`'s exploration shield reads `block_ranges()` by
 name and is unaffected by an appended block, and the frozen diagnostic scripts index by position and
 are unaffected for the same reason.
 

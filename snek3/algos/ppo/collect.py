@@ -1,9 +1,9 @@
 """One rollout: every lane steps `T` times, and every step is stored with the value and log-prob the
 policy actually produced.
 
-Much simpler than `dqn/collect.py`, and the deleted parts are the interesting half:
+Much simpler than `algos/dqn/collect.py`, and the deleted parts are the interesting half:
 
-| `dqn/collect.py` has | why PPO does not |
+| `algos/dqn/collect.py` has | why PPO does not |
 |---|---|
 | forking — a cloned state with a forced action | **off-policy by construction.** The clipped ratio `pi(a|s)/pi_old(a|s)` assumes the batch came from `pi_old`, and a forced action came from nothing. PPO gets the fork's benefit for free: it samples, so both actions at a decision point are tried with a correctly attributed log-prob |
 | the exploration shield's `guided` flags | there is no epsilon coin to shield. Exploration is the entropy bonus, a cost term rather than a forced random-action rate |
@@ -74,5 +74,5 @@ class Collector(object):
         return banked
 
     def snapshot(self):
-        """The counters, for the eval row. Same role as `dqn/collect.py`'s fork block."""
+        """The counters, for the eval row. Same role as `algos/dqn/collect.py`'s fork block."""
         return dict(self.counters)

@@ -35,8 +35,8 @@ mutant counts as killed** — the tests noticed.
 
 | spec | mutants | covers |
 |---|---:|---|
-| `tests/mut_ppo.json` | 14 | `ppo/` — GAE's episode gate, `min` vs `max`, the entropy sign, the ratio's direction, γ/λ order, the bootstrap's state |
-| `tests/mut_seam.json` | 15 | the `train.py` algorithm seam and `dqn/algo.py` |
+| `tests/mut_ppo.json` | 14 | `algos/ppo/` — GAE's episode gate, `min` vs `max`, the entropy sign, the ratio's direction, γ/λ order, the bootstrap's state |
+| `tests/mut_seam.json` | 15 | the `train.py` algorithm seam and `algos/dqn/algo.py` |
 | `tests/mut_trans.json` | 8 | the `transitions` column, prefill to summary block |
 | `tests/mut_shaping.json` | 3 | `shaping_discount` reaching the collect env |
 
@@ -52,7 +52,7 @@ the restore afterwards — `git status --porcelain` over the mutated files shoul
 **A survivor names a test-writing mistake, and usually the same one: the fixture's subject was a copy
 of the line rather than the line.** Two PPO mutants survived their first run. The clipped-objective
 fixtures rebuilt the surrogate from the same three statements the agent uses — pinning the arithmetic
-and leaving `min` → `max` *in the agent* undetected — and `ppo/collect.py` had no test file, so a
+and leaving `min` → `max` *in the agent* undetected — and `algos/ppo/collect.py` had no test file, so a
 bootstrap taken off the last stored value instead of the state after it passed 100 tests. **The fix in
 both cases was a fixture that calls the production entry point.**
 

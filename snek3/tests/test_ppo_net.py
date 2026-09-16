@@ -12,9 +12,9 @@ import numpy as np
 import pytest
 import torch
 
-from dqn import net as qnet
+from algos.dqn import net as qnet
 from env import constants
-from ppo import net as network
+from algos.ppo import net as network
 from tools import arch as arch_tools
 
 LN3 = math.log(3.0)
@@ -65,7 +65,7 @@ def test_the_actor_has_one_output_per_action_and_the_critic_has_one():
 def test_the_critic_is_not_a_copy_of_the_actor():
     """A shared seed would make them the same draws, which nobody intended.
 
-    `dqn/net.py` draws from a *local* generator precisely so a seed pins the initialisation — which
+    `algos/dqn/net.py` draws from a *local* generator precisely so a seed pins the initialisation — which
     means two nets built with the same seed are the same net. The critic's seed is derived for that
     reason, and the derivation is what this asserts.
     """

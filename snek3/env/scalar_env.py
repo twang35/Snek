@@ -23,7 +23,7 @@ from env.constants import ACTION_INDEX_TO_NAME, OBS_ERA, OBS_LEN
 from env.game import Game
 
 # The observation layout lives in `env.constants`, beside `OBS_LEN`, so the length and the blocks
-# that sum to it cannot drift apart and so `dqn/` can read a block range without importing pygame.
+# that sum to it cannot drift apart and so `algos/dqn/` can read a block range without importing pygame.
 # Re-exported here because this module is where the observation *spec* is asked for.
 OBS_BLOCKS = constants.OBS_BLOCKS
 observation_length = constants.observation_length

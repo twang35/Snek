@@ -16,8 +16,8 @@ Two of these would be silent in a run:
 import numpy as np
 import pytest
 
-from ppo import collect as collect_module
-from ppo import rollout as rollout_module
+from algos.ppo import collect as collect_module
+from algos.ppo import rollout as rollout_module
 
 OBS_LEN = 3
 DISCOUNT = 0.9

@@ -1,6 +1,6 @@
 # snek3 — the PyTorch port
 
-**Status: CLOSED 2026-08-30. Phases 0-5 all met — the last two by batch `b2`, §10.** Phase 6 (`ppo/`)
+**Status: CLOSED 2026-08-30. Phases 0-5 all met — the last two by batch `b2`, §10.** Phase 6 (`algos/ppo/`)
 is the research this port existed to enable and it has its own plan, [`ppo.md`](ppo.md), and its own
 batches. **§15 is the close-out**: what shipped, what this file got wrong, and what it deliberately
 left parked. Read it before trusting any number in the sections above — five claims here were
@@ -91,9 +91,9 @@ snek3/
     shard.py               one process measuring one slice of one arm
     wave.py                the multiprocess controller
 
-  dqn/                   DDQN
+  algos/dqn/                   DDQN
     net.py  replay.py  agent.py  collect.py  schedules.py
-  ppo/                   later. README only until then
+  algos/ppo/                   later. README only until then
 
   tools/                 the tools and the libraries behind them
     eval_plan.py  run_report.py  arch.py  checkpoints.py
@@ -165,12 +165,12 @@ near-mechanical copies. The table is the whole port.
 | `vectorized/vec_wave.py` + `vec_eval.py` | 945 | `tools/eval_wave.py` + `shard.py` (~450) | drop the 35-line `sys.path` bootstrap duplicated in both, the chart-viewer lock negotiation, the dead protocol fields |
 | `eval_wave.py` | 1328 | `tools/selectors.py` (~120) | keep only the argv layer: `parse_selector`, `resolve_policies`, `arms_for_prefix`, `batch_of`, `describe_selector`. The lane/thread/worker-pool model is what `vectorized/` replaced |
 | `policy_arch.py` | 328 | `tools/arch.py` (~120) | keep `obs_len`, `obs_era`, `num_actions`, the atomic sidecar, `assert_same_network`. Torch's `load_state_dict(strict=True)` covers the shape half; **`obs_era` is the half no shape check can catch** |
-| `self_eval.py` | 177 | `dqn/collect.py` (inline) | one `tf.function` becomes a `torch.no_grad()` call. The fresh-seed-per-eval rule stays |
-| `forking_collector.py` | 330 | `dqn/collect.py` (~250) | day one. It exists because the buffer holds the consequence of the action *taken* at an endgame decision point and never the alternative, so `Q(s, a_good)` for the untaken safe action trains on nothing. Default in snek2 since batch 17; the record holder used 4 branches |
+| `self_eval.py` | 177 | `algos/dqn/collect.py` (inline) | one `tf.function` becomes a `torch.no_grad()` call. The fresh-seed-per-eval rule stays |
+| `forking_collector.py` | 330 | `algos/dqn/collect.py` (~250) | day one. It exists because the buffer holds the consequence of the action *taken* at an endgame decision point and never the alternative, so `Q(s, a_good)` for the untaken safe action trains on nothing. Default in snek2 since batch 17; the record holder used 4 branches |
 | `chart_viewer.py` | 1010 | `tools/chart_viewer.py` (**239**) | see §7 |
-| `training.py` epsilon schedule | ~180 | `dqn/schedules.py` | the two-phase bootstrap/refine schedule ports as pure functions |
-| `shielded_policy.py` | 137 | `dqn/agent.py` (inline, ~30) | a mask over the exploration draw only, never the greedy action |
-| `prioritized_replay_buffer.py` | 176 | `dqn/replay.py` (~150) | **replace cpprb with a numpy sum tree** — cpprb silently ignores `seed=`, which is incompatible with §5 |
+| `training.py` epsilon schedule | ~180 | `algos/dqn/schedules.py` | the two-phase bootstrap/refine schedule ports as pure functions |
+| `shielded_policy.py` | 137 | `algos/dqn/agent.py` (inline, ~30) | a mask over the exploration draw only, never the greedy action |
+| `prioritized_replay_buffer.py` | 176 | `algos/dqn/replay.py` (~150) | **replace cpprb with a numpy sum tree** — cpprb silently ignores `seed=`, which is incompatible with §5 |
 | `desktop/runner/{runner,launch}.py` | 1295 | same (~1,050) | drop `_ensure_viewer` (~150 lines of sticky-PNG-set logic); rewrite `build_command` |
 | `desktop/{README,SETUP}.md` | 978 | `desktop/README.md` (~350) | keep the failure catalogue, drop the TF and eval-engine specifics |
 
@@ -238,8 +238,8 @@ agent.state_dict() / load_state_dict()
 ```
 
 `train.py` owns the parts that are not algorithm-specific: seeding, the arch sidecar, the checkpoint
-cadence, the self-eval, the progress chart, the run report, the step cap. `dqn/collect.py` and later
-`ppo/collect.py` own their own loops, because an on-policy rollout and a replay-driven step do not
+cadence, the self-eval, the progress chart, the run report, the step cap. `algos/dqn/collect.py` and later
+`algos/ppo/collect.py` own their own loops, because an on-policy rollout and a replay-driven step do not
 share one.
 
 ### Collect width, and the knob that actually sets throughput
@@ -672,10 +672,10 @@ Each phase has a pre-registered pass condition. Phase 1 is the one that makes th
 | 0 | The instruction split and the `docs/` skeleton (§14), then `env/` + `vectorized/` + the parity harness. No learning code. | three `CLAUDE.md` files, no stale `snek2/` reference outside `snek2/`; parity harness green — 0 mismatches on all 30 indices over ≥18,000 states, ≥12 hand-made mutants killed. **Met 2026-08-28**: 36,000 states × 30 indices, 0 mismatches, 17 of 17 mutants killed, 167 tests green |
 | 1 | **Import a snek2 champion.** Convert its TF weights to a torch `state_dict`. | `engine.measure` scores `b44a-lowlr7-b29b-ckpt2739000` at **98.7% ± 0.6 pp over 3,000 episodes** (snek2: 98.73%). `watch.py` plays it; `record_gif.py` records it. **Met 2026-08-28**: 98.8% (2964/3000), and the conversion is exact — 12,864 states, max \|ΔQ\| 2.7e-5 on Q ~30.6, argmax identical on every one |
 | 2 | The eval wave, `run_report`, `arch`, charts. | convert **all 3,222** checkpoints of `b45a-lowlr8-b29b` and reproduce snek2's own `_checkpoint_evals_vec.json` row for row within noise. **Met 2026-08-28**: 3,222 rows, mean per-row difference **−0.004 pp** against a 0.041 pp standard error (0.09 SEs), observed spread / predicted spread **1.00**. A second snek3 seed gives +0.028 pp. 14 min on 4 shards |
-| 3 | `dqn/` — DDQN + PER + the epsilon schedule + the forking collector + the shield. **Code and tests done 2026-08-28.** | one arm reaches **≥90% perfect**, and **≥1,500 agent steps/s** on the laptop with the self-eval *off*. Throughput **met 2026-08-28**: 1,512 at `SNEK_COLLECT_ENVS=16`, 809 at the default of 1. Perfect rate **met 2026-08-29 by batch `b2`, and by all four of its arms** — trailing-30 peaks of 93.6 / 95.8 / 95.9 / 96.9%, and 1,135 checkpoints across the batch clearing the stage-A screen. **`b1` did not meet it and was the wrong batch to gate on**: on snek3's bare defaults it never produced one ≥95/100 eval in 3M steps, while b2 ran b29's five knobs and crossed 90% at 324k. Budget ~8 h for a 3M-step arm with stage A on, not the ~2 h this row first claimed |
+| 3 | `algos/dqn/` — DDQN + PER + the epsilon schedule + the forking collector + the shield. **Code and tests done 2026-08-28.** | one arm reaches **≥90% perfect**, and **≥1,500 agent steps/s** on the laptop with the self-eval *off*. Throughput **met 2026-08-28**: 1,512 at `SNEK_COLLECT_ENVS=16`, 809 at the default of 1. Perfect rate **met 2026-08-29 by batch `b2`, and by all four of its arms** — trailing-30 peaks of 93.6 / 95.8 / 95.9 / 96.9%, and 1,135 checkpoints across the batch clearing the stage-A screen. **`b1` did not meet it and was the wrong batch to gate on**: on snek3's bare defaults it never produced one ≥95/100 eval in 3M steps, while b2 ran b29's five knobs and crossed 90% at 324k. Budget ~8 h for a 3M-step arm with stage A on, not the ~2 h this row first claimed |
 | 4 | `desktop/` | a 4-arm batch dispatches, runs its one eval wave, and publishes without a hand touching the box. **Deployed 2026-08-28**: `snek3-runner` replaced `snek-runner` on `the-claw-den`, the three `b1` desktop arms dispatched from one `ops` commit plus a trigger, and 589 tests pass on the box. The publish half closes when b1 does |
 | 5 | A seed-matched b47-class comparison, 4 arms. | a ≥98%/500 region of comparable width on comparable seeds. **Not** a matched point estimate. **Met 2026-08-29 by `b2d`**: five rows ≥98%/500 between 350k and 451k, topping at **99.2%** [98.0, 99.7], out of 1,135 measured checkpoints. The other three arms produced none, which *is* the b47 shape — one carrier arm — and snek2's own b47 re-run of this config never got a region at all, having been frozen at 69-81% of its cap. So the comparison target is `b29b`'s 99.0%/500 and `b44`'s HOF-500s, and 99.2% matches them. **The region is thin and the top row is selected**: a record claim still needs a fresh ≥1,000-episode re-measure of `ckpt-355000` (§11 invariant 9) |
-| 6 | `ppo/` | the actual research. Underway in [`ppo.md`](ppo.md) — the `b3` sweep has run |
+| 6 | `algos/ppo/` | the actual research. Underway in [`ppo.md`](ppo.md) — the `b3` sweep has run |
 
 Phase 2 runs on an **explicit step list**, not the `screen:95` selector — the converted checkpoints
 have no snek3 graph evals to screen on. That is worth keeping as a third selector (`steps:<file>`)
@@ -762,7 +762,7 @@ clock rather than 90% the ceiling on this is ~3x, not ~8x.
 | **A session working in snek3 follows snek2's instructions**, because the root `CLAUDE.md` is 1,283 lines of them and loads every time. | §14, and it is a phase-0 deliverable, not a tidy-up at the end |
 | Translating `vec_env.py` loses the compaction tricks and reads as "vectorisation does not help". | do not translate it (§4). Copy it. The two compaction fixes are worth 5.1x at n=1024 and 8.5x at n=16384, and a naive version costs the same as the scalar path |
 | The self-eval silently becomes 97% of wall clock. | §5. Measure the share on the first real arm and report it, the way snek2 did by sampling `/proc` |
-| Determinism is claimed and not delivered. | cpprb ignores `seed=`; that is why `dqn/replay.py` is a numpy sum tree. Add a fixture: two runs at one seed produce identical eval curves for 50k steps |
+| Determinism is claimed and not delivered. | cpprb ignores `seed=`; that is why `algos/dqn/replay.py` is a numpy sum tree. Add a fixture: two runs at one seed produce identical eval curves for 50k steps |
 | The desktop's two known bugs come across with the port. | §9 |
 | snek2 gets edited by accident. | it is frozen in `snek3/CLAUDE.md` and in the root file's header |
 

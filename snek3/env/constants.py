@@ -110,8 +110,8 @@ OBS_ERA = BASE_OBS_ERA + ('-hist{0}'.format(OBS_HISTORY) if OBS_HISTORY else '')
 # **It lives here, beside `OBS_LEN`, and not in `env/scalar_env.py` where it started.** Two reasons.
 # Keeping the length and the blocks that sum to it in one module is what lets the consistency check
 # below fire at the earliest possible import rather than whenever something happens to touch the
-# scalar env. And `dqn/agent.py` needs one block's range for the exploration shield: `scalar_env`
-# imports `env.game` and therefore pygame, which `dqn/` may not, so reading the layout from there
+# scalar env. And `algos/dqn/agent.py` needs one block's range for the exploration shield: `scalar_env`
+# imports `env.game` and therefore pygame, which `algos/dqn/` may not, so reading the layout from there
 # would have broken the layering invariant `tests/test_module_layering.py` asserts.
 #
 # Kept as data rather than as arithmetic inside a spec function so a test can pin each block to its

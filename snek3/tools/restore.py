@@ -22,16 +22,16 @@ from tools import checkpoints
 def _dqn():
     # Imported here, not at module scope, so `tools/` keeps working for anything that only wants the
     # sidecar or the checkpoint listing. It also means an unknown `algo` fails before torch loads.
-    from dqn import net as network
+    from algos.dqn import net as network
     return network
 
 
 def _ppo():
-    # **A PPO checkpoint holds the actor and nothing else**, and `ppo/net.py`'s `build` returns that
+    # **A PPO checkpoint holds the actor and nothing else**, and `algos/ppo/net.py`'s `build` returns that
     # actor — the same `QNet` DQN trains, read as logits. So this line is all a PPO checkpoint needs
     # to be watchable, recordable and measurable by every eval shard: an argmax over logits and an
     # argmax over Q are the same operation.
-    from ppo import net as network
+    from algos.ppo import net as network
     return network
 
 

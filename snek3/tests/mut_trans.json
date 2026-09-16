@@ -12,7 +12,7 @@
   },
   {
    "desc": "the prefill's moves are not counted",
-   "file": "dqn/algo.py",
+   "file": "algos/dqn/algo.py",
    "from": "            banked += self.collector.step(1.0)",
    "to": "            self.collector.step(1.0); banked += 0"
   },

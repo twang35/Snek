@@ -23,7 +23,7 @@ import sys
 import sysconfig
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PACKAGES = ('env', 'vectorized', 'dqn', 'ppo', 'tools')
+PACKAGES = ('env', 'vectorized', 'algos/dqn', 'algos/ppo', 'tools')
 
 
 def loaded_after_importing(*modules):
@@ -58,17 +58,17 @@ def test_the_game_rules_are_importable_without_a_display():
 
 
 def test_the_learning_code_never_reaches_pygame():
-    """`dqn/` may import torch and may not import pygame.
+    """`algos/dqn/` may import torch and may not import pygame.
 
-    Caught a real violation: `dqn/agent.py` read the exploration shield's observation slice from
+    Caught a real violation: `algos/dqn/agent.py` read the exploration shield's observation slice from
     `env.scalar_env.block_ranges()`, and `scalar_env` imports `env.game` and therefore pygame. The
     only reason anyone noticed was the SDL banner printing during a smoke run. The layout table moved
     to `env.constants`, which is pygame-free by rule, and this assertion exists so the next one is
     caught by the suite instead of by a banner.
     """
-    pygame, torch = loaded_after_importing('dqn.agent', 'dqn.replay', 'dqn.schedules', 'dqn.net')
-    assert not pygame, 'dqn/ reached pygame; a trainer must not open an audio device'
-    assert torch, 'dqn/ is where torch belongs, so not reaching it means this probe is wrong'
+    pygame, torch = loaded_after_importing('algos.dqn.agent', 'algos.dqn.replay', 'algos.dqn.schedules', 'algos.dqn.net')
+    assert not pygame, 'algos/dqn/ reached pygame; a trainer must not open an audio device'
+    assert torch, 'algos/dqn/ is where torch belongs, so not reaching it means this probe is wrong'
 
 
 def test_the_measurement_tools_never_reach_pygame():

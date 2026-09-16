@@ -18,7 +18,7 @@ to the eval wave, row for row, against a file produced by an independent stack.
 
 **The conversion itself is a transpose.** snek2's network is Keras `Dense` layers, whose kernel is
 `(in, out)`; torch's `nn.Linear` holds `(out, in)`. Nothing else changes: the layers are
-`relu`-activated with a bare linear head, no normalisation, no dropout, and `dqn/net.py`
+`relu`-activated with a bare linear head, no normalisation, no dropout, and `algos/dqn/net.py`
 reimplements even the initialisers, so the two networks are the same function of the same weights.
 
 **It takes two interpreters.** snek3's env has no TensorFlow and snek2's has no torch, so the read

@@ -41,7 +41,7 @@ ssh the-claw-den 'Snek/snek3/desktop/deploy'            # fetch, settle runs/ co
 
 then, **typed by the user at the prompt** (an agent's sudo over ssh is refused):
 `! ssh the-claw-den 'sudo systemctl restart snek3-daemon'` — only if `desktop/daemon/*` or the unit changed.
-Arms and passes are fresh processes, so a change under `ppo/`, `train.py`, `tools/closeout.py` is live for
+Arms and passes are fresh processes, so a change under `algos/ppo/`, `train.py`, `tools/closeout.py` is live for
 the next one with no restart. **A change to `tools/scheduler.py` or `tools/window.py` reaches the box only
 when the scheduler is next started**, since the running scheduler is the old code -- and **a pause does not
 restart it**: a paused scheduler blocks inside its wait loop and never exits, and lifting the hold starts a

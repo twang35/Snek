@@ -34,10 +34,10 @@ spellings of the same quantities — what the arm *ran under*, and what this eva
 """
 
 
-from dqn import collect
-from dqn import schedules
-from dqn.agent import DdqnAgent
-from dqn.replay import PrioritizedReplay
+from algos.dqn import collect
+from algos.dqn import schedules
+from algos.dqn.agent import DdqnAgent
+from algos.dqn.replay import PrioritizedReplay
 from tools import checkpoints
 from vectorized.vec_env import VecSnake
 
@@ -296,7 +296,7 @@ class DqnAlgo(object):
         """The net from another arm's checkpoint, and the target copied from it, as at a fresh build.
 
         The schedules, the buffer and the optimiser start fresh: a DQN checkpoint holds the one net,
-        and nothing else of a source arm is meaningful to a new one. See `ppo/algo.py` for the case
+        and nothing else of a source arm is meaningful to a new one. See `algos/ppo/algo.py` for the case
         where more is.
         """
         checkpoint = checkpoints.path(source_dir, step)

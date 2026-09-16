@@ -8,7 +8,7 @@ over logits and an argmax over Q are the same operation; and the snek2 champion'
 load straight into a `PolicyNet`, which is how "can PPO hold a policy DQN found" gets asked
 separately from "can PPO find one".
 
-**‡ `ppo/` imports two things from `dqn/` and that is deliberate.** This module takes the network and
+**‡ `algos/ppo/` imports two things from `algos/dqn/` and that is deliberate.** This module takes the network and
 its initialisers from [`../dqn/net.py`](../dqn/net.py); `agent.py` takes `build_adam` from
 [`../dqn/agent.py`](../dqn/agent.py). Both carry measured facts — Keras' truncation correction, which
 a plain `trunc_normal_` gets 12% wrong, and the exhausted-generator trap that silently trains an
@@ -29,7 +29,7 @@ pay for that.
   would carry a value head — would have needed a new field and invalidated every committed sidecar.
   Stage B measures the policy, and the policy is the actor.
 
-The critic's seed is **derived** from the arm's rather than equal to it. `dqn/net.py` draws from a
+The critic's seed is **derived** from the arm's rather than equal to it. `algos/dqn/net.py` draws from a
 local `torch.Generator`, so two nets built with the same seed are the same network; an actor and a
 critic that opened as transposes of one another would be a coincidence nobody intended.
 """
@@ -37,7 +37,7 @@ critic that opened as transposes of one another would be a coincidence nobody in
 import numpy as np
 import torch
 
-from dqn import net as qnet
+from algos.dqn import net as qnet
 
 # Which sub-stream of the arm's seed the critic takes. The actor takes the seed itself, so an actor's
 # initialisation is identical to the DQN arm's at the same `SNEK_SEED` — which is what makes a

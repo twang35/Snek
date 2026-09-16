@@ -5,7 +5,7 @@
 
 **What lives here is what is not algorithm-specific**: the environment-variable config, seeding, the
 `arch.json` sidecar, the checkpoint cadence, the stage-A self-eval and its queue, the progress chart,
-the run report and the step cap. **The algorithm sits behind the seam `dqn/algo.py` documents** —
+the run report and the step cap. **The algorithm sits behind the seam `algos/dqn/algo.py` documents** —
 fourteen members, of which `advance()` is the whole loop body — so a second algorithm adds a module
 and one entry in `ALGOS` rather than a second copy of this file.
 
@@ -43,13 +43,13 @@ import time
 import numpy as np
 import torch
 
-from dqn import algo as dqn_algo
-from ppo import algo as ppo_algo
+from algos.dqn import algo as dqn_algo
+from algos.ppo import algo as ppo_algo
 # For `trailing_mean` only, which is a plain windowed average over the eval rows and is not about
-# epsilon. It lives beside the epsilon schedule because that is its other caller; when `ppo/` lands
+# epsilon. It lives beside the epsilon schedule because that is its other caller; when `algos/ppo/` lands
 # and needs the same trailing score, it moves somewhere both algorithms can reach without one
 # importing the other.
-from dqn import schedules
+from algos.dqn import schedules
 from env import constants
 from tools import arch as arch_tools
 from tools import checkpoints
