@@ -118,19 +118,20 @@ fixed-path rows in the HOF already carry a "no policy" reference form, so there 
 
 ## 3. The ordering, and why
 
-Reading order is by group above; **running order** is by what each result unlocks and what it costs.
+Reading order is by group above; **running order** keeps each group together and runs a group only once
+the groups it is read against have closed. The order is chosen to make the progression legible, not to
+finish fastest: a row that could run earlier on its dependencies alone still waits for its group.
 
 | phase | rows | why here |
 |---|---|---|
 | 1 | **A1** DQN, **F1** BBF | A1 is already built and is the control for every value row. F1 says how many steps every later row needs. Both are cheap and neither depends on anything |
 | 2 | **A2 → A3 → A4 → A5**, then **A6** | the distributional ladder, one rung at a time, with A2 stabilised on this reward before A3 starts. A4's risk-sensitive arm is the series' most direct test of the diagnosis in §1 |
-| 3 | **D1** recurrent PPO, **C1 → C2** discrete SAC | both are one change to an agent that exists. D1 in particular is the cheapest row with a strong prior behind it, and its result decides how much D2 is worth |
-| 4 | **G1** AlphaZero MCTS | the row most likely to beat the record. It needs the eval-protocol decision in Group G made first, which is why it is not in phase 1 despite being independent of every other row |
-| 5 | **B1 → B2** Rainbow, Beyond the Rainbow | read against A, so they wait for A. B2 also wants A6's Munchausen result |
-| 6 | **D2** R2D2 | waits for D1 (is memory worth a second, heavier form) and B1 (the value stack it is built on) |
-| 7 | **G2 → G3**, **G4** | the learned-model rows wait for G1's number, which is what they are read against |
-| 8 | **E1 → E2** | built on D2; run last among the value rows because the expected result is a null |
-| 9 | **H1** | a reproduction gate first, then the row if it passes |
+| 3 | **C1 → C2** discrete SAC | one change to a value agent that exists, read against A1 and PPO |
+| 4 | **B1 → B2** Rainbow, Beyond the Rainbow | read against A, so they wait for A. B2 also wants A6's Munchausen result |
+| 5 | **D1** recurrent PPO, then **D2** R2D2 | the memory question in one phase. D1 is the cheaper form with the `hist8` prior behind it and is read against PPO; D2 is read against D1 and B1, the value stack it is built on |
+| 6 | **E1 → E2** | built on D2; the expected result is a null, so they run once the value rows they are read against have closed |
+| 7 | **G1**, then **G2 → G3**, **G4** | the planning group in one phase. G1 is the row most likely to beat the record and needs the eval-protocol decision in Group G made first; the learned-model rows are read against G1's number |
+| 8 | **H1** | a reproduction gate first, then the row if it passes |
 
 Two ordering rules that hold across phases: **no row starts until the row it is read against has a
 closed stage-B number** (`docs/protocol.md`), and **a row that fails to stabilise is closed as a
