@@ -1,0 +1,18 @@
+{
+ "arms": [
+  "b34a-zz50-seed1",
+  "b34b-zz50-seed2",
+  "b34c-zz50-seed3",
+  "b34d-zz50-seed4",
+  "b34e-rp50-seed5",
+  "b34f-rp50-seed6",
+  "b34g-rp50-seed7",
+  "b34h-rp50-seed8"
+ ],
+ "batch": "b34",
+ "box": "desktop",
+ "claimed_iso": "2026-09-16T10:24:58",
+ "claimed_ts": 1789579498.7625957,
+ "kind": "wave",
+ "wave": 1
+}
