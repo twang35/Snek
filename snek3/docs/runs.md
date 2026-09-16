@@ -13,9 +13,9 @@ are in git history before 2026-09-10.
 
 ## Open
 
-- **Invariant 6 under PPO.** b33 sweeps the perfect-game reward two decades either side of 100 on the
-  `hist8` base; if 0 or 10 still reach the plateau, the W > 1/(1−γ^k) rule is a DQN-era result and
-  `invariants.md` 6 is rewritten.
+- **What the perfect-game reward's onset effect is made of.** b33 says W below 100 slows the arrival and W above it
+  buys nothing; whether the slow onset at 1000 is the huber critic (δ 1) learning the terminal jump — testable
+  with `mse` at 1000 — or the normalised advantages, is open. The starve/death split stage B does not record.
 - **A clean test of the PPO paper's optimiser schedule**: b29 confounded lr/clip → 0 with removing the
   horizon anneal. The unconfounded arm keeps γ/λ → 0.999 and adds lr/clip → 0 on top.
 - **Warm starts.** b32 is the first batch to start from a checkpoint (`SNEK_INIT_FROM`, step 0). If its
@@ -39,7 +39,7 @@ are in git history before 2026-09-10.
 
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
-| [b33](#b33--the-perfect-game-reward) | `SNEK_PERFECT_GAME_REWARD` 0 / 10 / 30 / 50 / 100 / 200 / 300 / 1000 | pen01 + hist8, anneal final at 25M | 8 × 4 | 50M | registered | — |
+| [b33](#b33--the-perfect-game-reward) | `SNEK_PERFECT_GAME_REWARD` 0 / 10 / 30 / 50 / 100 / 200 / 300 / 1000 | pen01 + hist8, anneal final at 25M | 8 × 4 | 50M | held on 0-300, falsified on 1000 | a monotone onset lever saturating at 100 (density 87.3 → 94.9, then 94.9-96.5); no collapse after 15M in any cell — 1000's drawdowns are a 15M onset; `win0` reaches 99.78 best30 and 9 rows at ≥99.8 /5k, so invariant 6 falls; nothing at 99.8 /30k from any cell at 50M, where b27's 100M had 9 |
 | [b32](#b32--b28s-best-checkpoints-annealed-on-to-a-horizon-of-10) | warm start from b28's eight best /30k checkpoints; γ and λ 0.999 → 1.0 over 50M, held 50M | b28's converged values | 1 × 8 | 100M | falsified (the top moved) | stage B 99.8% in every window from the first eval; `hof30k` 92 full rows, 78 at ≥99.8; **`b32g` @62423040 at 29,967 /30k, the new record** (99.86 on a second seed), from a 61-63M plateau averaging the old ceiling; the other seven arms stayed on it |
 | [b31](#b31--mse-value-loss-on-the-hist8-base) | `SNEK_PPO_VALUE_LOSS` mse | pen01 + hist8 | 1 × 8 | 100M | falsified | worse on this base: onset 51 vs 83% at 0-25M, 88.0% density, nothing reaches 30k at 99.8; only the stability columns keep `mse`'s old gain |
 | [b30](#b30--the-horizon-annealed-to-10) | γ and λ finals 1.0, not 0.999 | pen01 + hist8 | 1 × 8 | 100M | falsified | level with `hist8` at every depth, no collapse; top `b30a` 29,946 /30k, the same 99.82 ceiling as `b28k` |
@@ -107,7 +107,7 @@ at complete separation (Mann-Whitney p=0.029). Details in [`protocol.md`](protoc
 | varies | `SNEK_PERFECT_GAME_REWARD` 0 / 10 / 30 / 50 / 100 / 200 / 300 / 1000 — the bonus paid on the last meal in place of its food reward of 1 |
 | cells × seeds | 8 × 4 (`b33aa`-`b33bf`, seeds 1-4) |
 | control | the batch's own `win100` cell — also the first run of b27's config at 50M; b27's `hist8` cell at 100M is the reference |
-| predicted | registered 2026-09-13 by the agent with the user: 0 and 10 lose density but do not stall as snek2's b33 did, since the step penalty and starvation already charge for dawdling — watch the starve/death split; 30-300 level with 100 at the top, no monotone trend readable at n=4; 1000 the lowest density of the eight through slower onset (the huber critic at δ 1 learns a 1000-point terminal jump slowly, and the value error swamps normalised advantages), few or no collapses; the 30k top of every cell from 30 up within noise of 99.8. The user expects 10 to do poorly and 1000 to be unstable |
+| predicted | registered 2026-09-13 by the agent with the user: 0 and 10 lose density but do not stall as snek2's b33 did, since the step penalty and starvation already charge for dawdling — watch the starve/death split; 30-300 level with 100 at the top, no monotone trend readable at n=4; 1000 the lowest density of the eight through slower onset (the huber critic at δ 1 learns a 1000-point terminal jump slowly, and the value error swamps normalised advantages), few or no collapses; the 30k top of every cell from 30 up within noise of 99.8. The user expects 10 to do poorly and 1000 to be unstable — **held on the mechanism, falsified on 1000's density and on instability**: 0 and 10 at 87% with no stall; 50-300 level with 100; 1000 the *highest* density (96.5%) after a 15M onset, and no eval below 80 after 25M in any cell |
 
 **Why.** At γ 0.999 a meal of delay costs ~1% of the win bonus, so the bonus sets how urgent finishing
 is relative to eating — 0.1 of a food reward at 10, one at 100, ten at 1000. Invariant 6 says progress
@@ -115,6 +115,13 @@ toward the win only raises value when W > 1/(1−γ^k), 84-143 at γ 0.999, so 1
 anything below should fail as snek2's win-10 batch did; yet b30 at γ 1.0 reached the 99.82 ceiling. The
 rule was derived for DQN without a step penalty and is under test for PPO. Two decades either side of
 the default, dense enough to see whether the response is monotone or a plateau.
+
+**Learned.** The reward is a monotone onset lever that saturates at 100: 0-25M density 67.5% at 0, 88-90% from 50 up;
+25-50M 96.0% at 0, 99.1-99.5% from 100 up. Every sub-50 eval in the batch is before 15M and no sub-80 eval after
+25M, so 1000 is slow (15M to arrive against 4M), not unstable. `win0` and `win10` do not decline to finish —
+99.78 / 99.58 best30, `hof5000` rows at ≥99.8 — so invariant 6 was a property of a reward without a step penalty.
+At 30k the 50M cap is the ceiling: no cell ran a full 30,000 at 99.8 (b27's 100M had 9), and the `win100` control
+reaches b27's 50-75M density in its 25-50M window but loses the top. 100 stays.
 
 ## b32 — b28's best checkpoints annealed on to a horizon of 1.0
 

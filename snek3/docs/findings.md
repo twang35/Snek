@@ -17,6 +17,22 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### The perfect-game reward is a monotone onset lever that saturates at 100, no value from 0 to 1000 destabilises the endgame, and a reward of 0 still finishes — invariant 6 does not hold under PPO with a step penalty
+
+b33 (2026-09-14): `SNEK_PERFECT_GAME_REWARD` 0 / 10 / 30 / 50 / 100 / 200 / 300 / 1000 on b27's `hist8` config at 50M with every
+ramp final at 25M, 4 seeds a cell. Stage-B density 87.3 / 87.2 / 92.1 / 94.2 / 94.9 / 95.7 / 94.9 / 96.5%; by window, 0-25M
+67.5 → 88-90% from 50 up and 25-50M 96.0 → 99.1-99.5% from 100 up, so the reward moves how fast the policy arrives and is flat
+above the default. **Every stage-A eval below 50 in the batch is before 15M** (3-4M at 0, 7-10M at 200-300, 13-15M at 1000)
+and none below 80 after 25M in any of the 32 arms: `win1000`'s 9.29% below 50 and `win0`'s 7.72% below 80 are onset length, not
+instability. **`win0` — the last meal worth its food reward and nothing else — reaches 99.78 best30, 124 `hof5000` rows through
+the 99.6 gate and 9 at ≥99.8 /5,000**, `win10` 99.58 / 36 / 2; neither learns to avoid finishing as snek2's win-10 batch did
+(`invariants.md` 6, W > 1/(1−γ^k), 84-143 at γ 0.999). The rule's alternative to finishing was a free lap; with a 0.01
+step penalty and a starve at −0.5 the lap is not free, and the win bonus is an urgency term rather than a necessity. At 30k the
+batch's top is the cap's: no cell ran a full 30,000 at 99.8 except `b33bd-win1000-seed2` @17694720 (29,939) against b27
+`hist8`'s 9 rows from 100M, and the `win100` control shows the compressed anneal keeps the density (99.5% at 25-50M, b27's
+50-75M figure) and loses the top (4 rows at ≥99.8 /5k against 85). Prediction held on 0-300 and on the mechanism at 1000,
+falsified on 1000's density (the highest) and on the user's expectation of instability. 100 stays.
+
 ### On the horizon-anneal + `hist8` base, `mse` slows onset and loses density (88.0% against 95.4), annealing the horizon to 1.0 changes nothing, and the 99.82 /30,000 ceiling was reached a third time
 
 b30 (8 seeds, b28's `hist8` config at 100M with γ and λ annealed to 1.0 instead of 0.999): level with b27 `hist8` at

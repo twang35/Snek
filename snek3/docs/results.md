@@ -22,6 +22,102 @@ whose published artifacts are history, and the daemon's ledger, whose keys are t
 waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
 
 
+<!-- progress_update: batch b33 -->
+## Batch b33 — the `perfect_game_reward` sweep, 8 values x 4 seeds, 50M, closed 2026-09-14
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b27q-hist8-seed17, b27r-hist8-seed18, b27s-hist8-seed19, b27t-hist8-seed20, b27u-hist8-seed21, b27v-hist8-seed22, b27w-hist8-seed23, b27x-hist8-seed24`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| perfect_game_reward | rows | ≥98%/500 | per-seed share | ≥99.2 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| 0 | 4,321 | 87.3% | 84.3 90.9 89.8 83.9 | 1755 | 100.0 | 99.78 (99.6-99.9) | 82.6 | 0.0% | 7.72% | 63.6% |
+| 10 | 4,972 | 87.2% | 86.5 85.7 86.3 90.2 | 1858 | 100.0 | 99.58 (99.4-99.8) | 90.2 | 0.0% | 0.83% | 73.8% |
+| 30 | 5,237 | 92.1% | 93.2 92.7 92.2 90.4 | 2186 | 100.0 | 99.55 (99.5-99.6) | 90.9 | 0.0% | 1.04% | 78.3% |
+| 50 | 5,331 | 94.2% | 93.2 95.8 92.8 94.9 | 2517 | 100.0 | 99.60 (99.5-99.7) | 92.0 | 0.0% | 1.69% | 80.8% |
+| **100** (reference) | 22,192 | 95.4% | 95.7 94.3 95.6 95.6 95.5 95.6 95.1 95.7 | 12479 | 100.0 | 99.79 (99.7-99.9) | 95.5 | 0.0% | 0.68% | 85.4% |
+| 100 | 5,213 | 94.9% | 95.0 95.6 94.2 94.8 | 2612 | 100.0 | 99.65 (99.6-99.8) | 91.7 | 0.0% | 1.3% | 80.0% |
+| 200 | 4,820 | 95.7% | 95.9 95.5 95.7 95.8 | 2888 | 100.0 | 99.75 (99.6-99.9) | 88.8 | 0.29% | 4.07% | 74.8% |
+| 300 | 4,659 | 94.9% | 93.6 95.6 94.8 95.7 | 2516 | 100.0 | 99.72 (99.6-99.8) | 88.7 | 0.38% | 5.19% | 71.3% |
+| 1000 | 4,187 | 96.5% | 96.3 98.5 95.4 95.9 | 2766 | 100.0 | 99.75 (99.7-99.8) | 77.9 | 9.29% | 16.39% | 65.4% |
+
+<!-- reading -->
+b27's `hist8` config at 50M with every ramp final at 25M, the perfect-game reward swept 0 / 10 / 30 / 50 / 100 / 200 / 300 / 1000 at 4 seeds; the reference is b27's `hist8` cell at 100M and the batch's own `win100` cell is the like-for-like control. **Closed 2026-09-14 on the desktop, four waves. The reward is a monotone onset lever that saturates at 100, not a threshold**: stage-B density 87.3 / 87.2 / 92.1 / 94.2 / 94.9 / 95.7 / 94.9 / 96.5%, and by 25M window the shape is clearer — 0-25M 67.5 / 71.8 / 83.9 / 88.0 / 88.4 / 89.5 / 87.2 / 89.5, 25-50M 96.0 / 97.5 / 98.2 / 98.9 / 99.5 / 99.4 / 99.1 / 99.3 — so from 100 up the second half is level at 99.1-99.5 and below 100 both halves fall with the reward. **Nothing collapses after onset in any cell**: every stage-A eval below 50 in the batch lands before 15M (the last one at 3-4M for `win0`, 7-10M for 200 and 300, 13-15M for 1000) and no eval below 80 occurs after 25M anywhere, so the drawdown columns (`win1000` 9.29% below 50, 16.39% below 80, sef 77.9; `win0` 7.72% below 80) are the length of the onset, not instability — 1000 takes ~15M to arrive where 100 takes ~4M, and then trains the same. **Invariant 6 is falsified for this base**: `win0`, where the last meal is worth one food reward and nothing else, reaches 99.78 best30 and puts 124 `hof5000` rows through the 99.6 gate with 9 at ≥99.8 /5,000 (mean 99.6, the joint-highest of the eight cells), and `win10` 36 / 2; neither declines to finish as snek2's b33 did, because the step penalty and the starve already charge for a lap that does not eat. At depth the 50M cap is the ceiling, not the reward: `hof30k` at stop target 99.8 retired every row short of 99.8 and only `b33bd-win1000-seed2` @17694720 ran the full 30,000 (29,939, 99.80), with the best stopped rows at 99.8 in `win0` (`b33ad` @39616512, 27,215 /27,281) and `win50` (`b33ap` @47906816) and 99.7 in 100-300 — against b27 `hist8`'s 9 full rows at 99.8 from 100M. The `win100` control answers the cap question: the compressed anneal reaches b27's 50-75M density in its 25-50M window (99.5 against b27's 95.4 at 25-50M and 99.5 at 50-75M) but produces 4 rows at ≥99.8 /5,000 against 85 and none at 30k, so halving the run keeps the density and loses the top. Predictions: 0 and 10 lose density but do not stall — held; 30-300 level with 100 — held from 50 up, 30 is 2.8 pp short; 1000 the lowest density through slow onset with few collapses — the mechanism held and the density call is falsified (96.5%, the highest); the user's 'unstable at 1000' — falsified, the collapses are all onset. Verdict: 100 stays; the reward buys nothing above it and costs onset below 50. Not measured: the starve/death split, which stage B does not record.
+<!-- /reading -->
+
+### Every arm
+
+| arm | perfect_game_reward | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b33aa-win0-seed1` | 0 | 1116 | 84.3% | 424 | 100.0 | 99.8 @42.8M | 83.1 | 0.0% |
+| `b33ab-win0-seed2` | 0 | 1087 | 90.9% | 454 | 100.0 | 99.8 @42.2M | 84.9 | 0.0% |
+| `b33ac-win0-seed3` | 0 | 1095 | 89.8% | 444 | 100.0 | 99.6 @25.1M | 80.5 | 0.0% |
+| `b33ad-win0-seed4` | 0 | 1023 | 83.9% | 433 | 100.0 | 99.9 @39.1M | 81.9 | 0.0% |
+| `b33ae-win10-seed1` | 10 | 1272 | 86.5% | 411 | 100.0 | 99.5 @38.8M | 89.8 | 0.0% |
+| `b33af-win10-seed2` | 10 | 1220 | 85.7% | 393 | 100.0 | 99.4 @45.3M | 90.2 | 0.0% |
+| `b33ag-win10-seed3` | 10 | 1231 | 86.3% | 482 | 100.0 | 99.8 @44.4M | 90.8 | 0.0% |
+| `b33ah-win10-seed4` | 10 | 1249 | 90.2% | 572 | 100.0 | 99.6 @47.8M | 89.9 | 0.0% |
+| `b33ai-win30-seed1` | 30 | 1325 | 93.2% | 588 | 100.0 | 99.6 @39.6M | 91.9 | 0.0% |
+| `b33aj-win30-seed2` | 30 | 1337 | 92.7% | 613 | 100.0 | 99.6 @31.0M | 92.1 | 0.0% |
+| `b33ak-win30-seed3` | 30 | 1290 | 92.2% | 538 | 100.0 | 99.5 @45.4M | 90.6 | 0.0% |
+| `b33al-win30-seed4` | 30 | 1285 | 90.4% | 447 | 100.0 | 99.5 @49.0M | 88.9 | 0.0% |
+| `b33am-win50-seed1` | 50 | 1330 | 93.2% | 564 | 100.0 | 99.6 @45.9M | 92.3 | 0.0% |
+| `b33an-win50-seed2` | 50 | 1349 | 95.8% | 634 | 100.0 | 99.5 @48.8M | 92.7 | 0.0% |
+| `b33ao-win50-seed3` | 50 | 1339 | 92.8% | 677 | 100.0 | 99.7 @29.9M | 92.5 | 0.0% |
+| `b33ap-win50-seed4` | 50 | 1313 | 94.9% | 642 | 100.0 | 99.6 @43.9M | 90.3 | 0.0% |
+| `b33aq-win100-seed1` | 100 | 1328 | 95.0% | 727 | 100.0 | 99.8 @41.2M | 92.1 | 0.0% |
+| `b33ar-win100-seed2` | 100 | 1305 | 95.6% | 701 | 100.0 | 99.6 @31.1M | 91.9 | 0.0% |
+| `b33as-win100-seed3` | 100 | 1285 | 94.2% | 600 | 100.0 | 99.6 @31.9M | 91.7 | 0.0% |
+| `b33at-win100-seed4` | 100 | 1295 | 94.8% | 584 | 100.0 | 99.6 @43.1M | 91.1 | 0.0% |
+| `b33au-win200-seed1` | 200 | 1201 | 95.9% | 698 | 100.0 | 99.6 @25.3M | 86.6 | 0.65% |
+| `b33av-win200-seed2` | 200 | 1249 | 95.5% | 832 | 100.0 | 99.8 @45.0M | 91.5 | 0.0% |
+| `b33aw-win200-seed3` | 200 | 1182 | 95.7% | 740 | 100.0 | 99.9 @45.6M | 88.6 | 0.14% |
+| `b33ax-win200-seed4` | 200 | 1188 | 95.8% | 618 | 100.0 | 99.7 @39.9M | 88.7 | 0.44% |
+| `b33ay-win300-seed1` | 300 | 1135 | 93.6% | 559 | 100.0 | 99.8 @40.1M | 87.9 | 1.96% |
+| `b33az-win300-seed2` | 300 | 1198 | 95.6% | 743 | 100.0 | 99.8 @37.5M | 91.0 | 0.21% |
+| `b33ba-win300-seed3` | 300 | 1178 | 94.8% | 608 | 100.0 | 99.6 @42.8M | 89.1 | 0.21% |
+| `b33bb-win300-seed4` | 300 | 1148 | 95.7% | 606 | 100.0 | 99.7 @21.2M | 86.8 | 0.55% |
+| `b33bc-win1000-seed1` | 1000 | 1038 | 96.3% | 635 | 100.0 | 99.8 @38.9M | 77.1 | 9.68% |
+| `b33bd-win1000-seed2` | 1000 | 1082 | 98.5% | 815 | 100.0 | 99.8 @18.6M | 78.2 | 11.12% |
+| `b33be-win1000-seed3` | 1000 | 1075 | 95.4% | 678 | 100.0 | 99.7 @19.5M | 80.5 | 8.9% |
+| `b33bf-win1000-seed4` | 1000 | 992 | 95.9% | 638 | 100.0 | 99.7 @48.7M | 75.8 | 4.39% |
+
+<!-- /progress_update: batch b33 -->
+
+<!-- progress_update: batch b32 -->
+## Batch b32 — the `init_from` sweep, 8 values x 1 seeds, 100M, closed 2026-09-13
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b28i-hist8a25-seed9, b28j-hist8a25-seed10, b28k-hist8a25-seed11, b28l-hist8a25-seed12, b28m-hist8a25-seed13, b28n-hist8a25-seed14, b28o-hist8a25-seed15, b28p-hist8a25-seed16`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| init_from | rows | ≥98%/500 | per-seed share | ≥99.2 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| **0.999** (reference) | 46,471 | 97.5% | 97.1 97.7 98.4 96.7 97.1 98.5 96.4 97.8 | 31630 | 100.0 | 99.88 (99.8-99.9) | 97.9 | 0.0% | 0.19% | 91.2% |
+| b28k-hist8a25-seed11@162856960 | 3,039 | 99.8% | 99.8 | 2523 | 100.0 | 99.90 (99.9-99.9) | 100.0 | 0.0% | 0.0% | 97.5% |
+| b28m-hist8a25-seed13@131497984 | 3,040 | 99.7% | 99.7 | 2430 | 100.0 | 99.90 (99.9-99.9) | 100.0 | 0.0% | 0.0% | 97.5% |
+| b28k-hist8a25-seed11@162693120 | 3,035 | 99.7% | 99.7 | 2355 | 100.0 | 99.90 (99.9-99.9) | 100.0 | 0.0% | 0.0% | 97.9% |
+| b28k-hist8a25-seed11@162955264 | 3,036 | 99.7% | 99.7 | 2297 | 100.0 | 99.90 (99.9-99.9) | 100.0 | 0.0% | 0.0% | 97.0% |
+| b28m-hist8a25-seed13@134578176 | 3,036 | 99.5% | 99.5 | 2394 | 100.0 | 99.90 (99.9-99.9) | 100.0 | 0.0% | 0.0% | 97.3% |
+| b28m-hist8a25-seed13@138313728 | 3,038 | 100.0% | 100.0 | 2558 | 100.0 | 99.90 (99.9-99.9) | 100.0 | 0.0% | 0.0% | 98.2% |
+| b28n-hist8a25-seed14@185925632 | 3,039 | 99.8% | 99.8 | 2494 | 100.0 | 99.90 (99.9-99.9) | 100.0 | 0.0% | 0.0% | 97.8% |
+| b28o-hist8a25-seed15@136478720 | 3,036 | 99.8% | 99.8 | 2440 | 100.0 | 99.90 (99.9-99.9) | 100.0 | 0.0% | 0.0% | 97.4% |
+
+<!-- reading -->
+The user's warm-start batch: each arm begins from one of b28's eight best /30k checkpoints (`SNEK_INIT_FROM`, step 0, actor plus the source arm's critic and optimiser) and anneals γ and λ 0.999 → 1.0 over 50M, then holds 50M; the reference row is b28's own arms, the plateau these start on. **The warm start holds from the first eval**: 99.8% stage-B density in every 25M window including 0-25M (b28 read 89.3% there from scratch), 99.5-100.0 per arm, no eval below 80 in any seed, sef 100 on every arm. `hof5000` put 6,859 of 19,491 rows through the 99.6 gate — 828 at ≥99.8 and 71 at 99.9 against b28's 606 / 38 over twice the steps. **`hof30k` (closed 2026-09-13, 92 full rows, 78 at ≥99.8) moved the top**: `b32g` @62423040 at 29,967 /30,000 (99.89), 23 games above the Hall of Fame pair's 29,944, with four more `b32g` rows at 29,961-29,965 on a 61-63M plateau whose 35 full rows average 29,950 — the old ceiling is this arm's basin mean. `b32b` @49709056 (29,958), `b32f` @2293760 (29,957) and `b32c` @86179840 (29,950) are isolated highs that read 29,946 / 29,940 / 29,938 on a second 30,000 at seed 13, where `b32g` read 29,957. **Promoted as the record on 2026-09-13** (`hallOfFame/HOF.md`). Prediction: the arms hold — held; the 30k top stays within noise of 99.82 — falsified. Not settled: whether the gain is the horizon at 1.0 (b30 says it does nothing from scratch) or 100M more of converged training on top of b28's 200M; the other seven arms stayed on the plateau, so it is one arm's basin, not the cell's.
+<!-- /reading -->
+
+### Every arm
+
+| arm | init_from | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b32a-warm-b28k-162857k-seed1` | b28k-hist8a25-seed11@162856960 | 3039 | 99.8% | 2523 | 100.0 | 99.9 @1.0M | 100.0 | 0.0% |
+| `b32b-warm-b28m-131498k-seed2` | b28m-hist8a25-seed13@131497984 | 3040 | 99.7% | 2430 | 100.0 | 99.9 @47.1M | 100.0 | 0.0% |
+| `b32c-warm-b28k-162693k-seed3` | b28k-hist8a25-seed11@162693120 | 3035 | 99.7% | 2355 | 100.0 | 99.9 @85.6M | 100.0 | 0.0% |
+| `b32d-warm-b28k-162955k-seed4` | b28k-hist8a25-seed11@162955264 | 3036 | 99.7% | 2297 | 100.0 | 99.9 @1.0M | 100.0 | 0.0% |
+| `b32e-warm-b28m-134578k-seed5` | b28m-hist8a25-seed13@134578176 | 3036 | 99.5% | 2394 | 100.0 | 99.9 @75.1M | 100.0 | 0.0% |
+| `b32f-warm-b28m-138314k-seed6` | b28m-hist8a25-seed13@138313728 | 3038 | 100.0% | 2558 | 100.0 | 99.9 @2.7M | 100.0 | 0.0% |
+| `b32g-warm-b28n-185926k-seed7` | b28n-hist8a25-seed14@185925632 | 3039 | 99.8% | 2494 | 100.0 | 99.9 @70.9M | 100.0 | 0.0% |
+| `b32h-warm-b28o-136479k-seed8` | b28o-hist8a25-seed15@136478720 | 3036 | 99.8% | 2440 | 100.0 | 99.9 @37.6M | 100.0 | 0.0% |
+
+<!-- /progress_update: batch b32 -->
+
 <!-- progress_update: batch b31 -->
 ## Batch b31 — the `knob` sweep, 1 values x 8 seeds, 100M, closed 2026-09-13
 

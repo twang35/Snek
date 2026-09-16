@@ -100,7 +100,14 @@ At `DISCOUNT=0.9975` and this game's 7-12 steps per meal that is **34-58**. `PER
 clears it by 2-3×. snek2's batch 33 cut the win to 10, missed by 3-6×, and the agents **correctly
 learned to avoid finishing.**
 
-**So lowering the win requires lowering γ to match.**
+**So lowering the win requires lowering γ to match** — for a reward in which a lap that does not eat is free.
+
+**‡ Falsified for PPO with a step penalty (b33, 2026-09-14).** On the `hist8` base with `STEP_PENALTY` 0.01 and the
+starve at −0.5, a win of **0** reaches 99.78 /500 best30 and 9 `hof5000` rows at ≥99.8, and 10 reads 99.58; the
+threshold above (84-143 at the annealed γ 0.999) is not where the agent stops finishing, because the alternative the
+derivation assumes — orbiting for free — costs a penalty per step and ends in a starve. What the win does there is set
+onset speed, saturating at 100 (`docs/findings.md`). The rule stands for a reward without a per-step cost, which is what
+snek2's batch 33 ran.
 
 ## 7. Rendering costs ~5.2 ms a frame, and it is not our drawing code
 
