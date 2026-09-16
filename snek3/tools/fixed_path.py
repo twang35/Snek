@@ -113,6 +113,26 @@ class FixedPath:
         return vec_env.REL[vec.head_dir, new_dir]
 
 
+def scalar_policy(game):
+    """A `policy_fn` for the scalar `env.game.Game`, for `record_gif.py` and `watch.py`.
+
+    Reads the head and its heading off `game` and ignores the observation it is handed, so it plugs
+    into the same `policy_fn(obs) -> actions` seam a checkpoint does. Returns a length-1 array.
+    """
+    tour = cycle()
+    following = {a: b for a, b in zip(tour, tour[1:] + tour[:1])}
+    turn_to = {heading: {new: rel for rel, new in mapping.items()}
+               for heading, mapping in constants.CURRENT_DIRECTION_MAPS.items()}
+    heading_of = {vector: name for name, vector in constants.MOVE_VECTORS.items()}
+
+    def policy_fn(_obs=None):
+        x, y = game.head.tile_pos
+        nx, ny = following[(x, y)]
+        heading = heading_of[(nx - x, ny - y)]
+        return np.array([constants.ACTIONS.index(turn_to[game.head.move_dir][heading])])
+    return policy_fn
+
+
 class Checkpoint:
     """A restored checkpoint as the same interface: greedy over the observation."""
 

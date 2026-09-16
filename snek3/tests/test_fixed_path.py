@@ -82,3 +82,20 @@ def test_an_entry_from_an_earlier_era_is_not_loadable_here(tmp_path):
     (new / 'arch.json').write_text(json.dumps({'obs_era': constants.BASE_OBS_ERA + '-hist8'}))
     assert not fixed_path.loadable_here(str(old))
     assert fixed_path.loadable_here(str(new))
+
+
+def test_the_scalar_policy_plays_a_perfect_game_on_the_reference_game():
+    import os
+    os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
+    os.environ.setdefault('SDL_AUDIODRIVER', 'dummy')
+    import random
+    from env.scalar_env import SnakeEnv
+    env = SnakeEnv(discount=1.0, display=False, limit_fps=False, policy_name='')
+    policy_fn = fixed_path.scalar_policy(env.game)
+    random.seed(5)
+    obs = env.reset()
+    done = False
+    while not done:
+        obs, _, done, info = env.step(int(policy_fn(obs)[0]))
+    assert env.game.perfect_game
+    assert 1000 < env.game.current_step < 3500

@@ -5,6 +5,7 @@
     PYTHONPATH=. python -u record_gif.py hof --seconds 30 --fps 25
     PYTHONPATH=. python -u record_gif.py hallOfFame/<entry> --seed 7 --tile 40
     PYTHONPATH=. python -u record_gif.py --list                    # what is in hallOfFame/
+    PYTHONPATH=. python -u record_gif.py fixed-path                # the Hamiltonian-cycle reference
 
 The obvious way to build this would be to open a window, screen-record it, cut sixty seconds out
 of the recording and transcode that to a GIF. Every one of those steps is avoidable. `Game` draws
@@ -95,6 +96,10 @@ from tools import checkpoints
 # shortcut, not a second source of truth; to record another entry, name its hallOfFame/ directory.
 # Set back to None and `hof` falls back to "the only entry", saying so if there are more.
 HOF_RECORD = 'b9ch-lam999-seed4-ckpt47251456'
+# `record_gif.py fixed-path` records the reference snake from `tools/fixed_path.py` -- one Hamiltonian
+# cycle of the board, every game perfect -- through the same capture path, so its gif in
+# `hallOfFame/gifs/` is directly comparable with the checkpoints'. No checkpoint, so no restore.
+FIXED_PATH = 'fixed-path'
 
 PERFECT_TEXT = 'PERFECT GAME!!!'
 
@@ -498,12 +503,15 @@ def main(argv):
               '--format webp has no such limit.' % (args.fps, 1000.0 / delay_ms, delay_ms))
     target = original_target = target_frame_count(args.seconds, delay_ms)
 
-    ckpt_dir, step, label = resolve_policy(args.policy, args.step)
+    fixed = args.policy == FIXED_PATH
+    if fixed:
+        ckpt_dir, step, label = None, None, FIXED_PATH
+    else:
+        ckpt_dir, step, label = resolve_policy(args.policy, args.step)
 
     # Imported here, not at module scope: torch costs a second to import, and --list and every
     # argument error above should be instant.
     from env.scalar_env import SnakeEnv
-    from tools import restore
 
     disable_display_throttles()
     if not args.no_header:
@@ -513,7 +521,12 @@ def main(argv):
     # empty because the header carries the label; the game's own line would be drawn under the
     # sprites. The discount reaches only the shaping potential, which nothing greedy reads.
     env = SnakeEnv(discount=0.9975, display=True, limit_fps=False, policy_name='')
-    policy_fn, _, _ = restore.restore(ckpt_dir, step)
+    if fixed:
+        from tools import fixed_path
+        policy_fn = fixed_path.scalar_policy(env.game)
+    else:
+        from tools import restore
+        policy_fn, _, _ = restore.restore(ckpt_dir, step)
     print('%s: floor is %d game(s) or %d frames (%.4g fps, %d ms/frame, %.1f s), whichever is longer'
           % (label, args.min_games, target, 1000.0 / delay_ms, delay_ms,
              target * delay_ms / 1000.0))
