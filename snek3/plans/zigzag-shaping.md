@@ -1,6 +1,6 @@
 # Zigzag shaping: charging a left-right or right-left pair
 
-**Status: proposal, 2026-09-16, for review.** Nothing built. The request: a potential-based reward
+**Status: reviewed 2026-09-16, decisions in §6; ready to build.** Nothing built yet. The request: a potential-based reward
 that pays for *not* zigzagging — every step that is not a reversal earns a little, and a reversal (a
 `left` straight after a `right`, or a `right` straight after a `left`) takes it away.
 
@@ -15,9 +15,9 @@ they change the design:
 | a potential-based term **cannot change the optimal policy** (Ng, Harada & Russell 1999); it changes how fast the policy is learned, and b21 found the chase-safe potential a no-op for PPO | `env/constants.py` shaping notes, `docs/runs.md` b21 | if the goal is a converged policy that zigzags less, a pure potential is the wrong tool on paper. Run it as asked, and run the plain penalty beside it, so the batch says which |
 | **zigzagging is not what kills the champions** (reversal rate 2-3 pp above matched perfect games before a starve; the deaths are food-sealed pockets and tail-following orbits) | `docs/findings.md` "Zigzagging is not the mechanism" | the headline metric stays the perfect rate and the stage-B density, and the batch also measures the reversal rate directly, so "it stopped zigzagging and nothing improved" is a legible finding rather than a null |
 
-Recommendation: **build both terms behind two knobs, run a four-cell batch at four seeds on the b33 base,
-and register the prediction that the potential term is level with the control while the plain penalty
-moves the reversal rate.** Details below.
+Agreed in review: **both terms, behind two knobs; adjacent reversals only; window = the observation
+history (8); b27's `hist8` config at 100M as the base; four arms of each term, one dose per term, sized
+from the measurement in §5.**
 
 ## 1. What a reversal is, and where it is read from
 
@@ -112,42 +112,74 @@ Mirrors the free-space term line for line; the vectorised env and the reference 
 Invariant 1 is untouched: nothing here compares a reward to a constant, and the perfect-game counter reads
 score.
 
-## 5. Batch b34
+## 5. The measurement: how much does the champion zigzag?
+
+`b32g` @62423040 (the record, 29,967 /30,000) traced greedily for 5,000 episodes on seed 11
+(`tools.death_trace`; 4,996 perfect, 2 died, 2 starved; `logs/zigzag/b32g-5k-s11.*`, throwaway):
+
+| | per step | per meal (10.43 steps) | per episode |
+|---|---:|---:|---:|
+| turns | 0.298 | 3.11 | ~295 |
+| **adjacent reversals (*k* = 1, the reward's definition)** | **0.0171** | **0.178** | **16.9** |
+| reversals within two steps (*k* = 2, `death_analyze`'s) | 0.0688 | 0.718 | ~68 |
+| U-turns (the same turn twice, the fill pattern) | 0.0822 | 0.86 | ~81 |
+| steps with R₈ > 0 | 9.1% | | |
+
+R₈ is 0 on 91% of steps, 1 on 6.7%, 2 on 1.9%, 3+ on 0.5%; mean 0.119.
+
+**Where the reversals are.** Almost entirely in the open board, and gone before the endgame:
+
+| board fill | 0-9 | 10-19 | 20-29 | 30-39 | 40-49 | 50-59 | 60-69 | 70-79 | 80-99 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| reversal rate, *k* = 1 | 4.2% | 4.2% | 3.8% | 3.5% | 2.2% | 0.5% | 0.12% | 0.03% | 0.02% |
+| turn density | 29% | 28% | 28% | 29% | 31% | 30% | 30% | 30% | 31% |
+
+So the converged policy already lays the crowded half of the board without a single zigzag: **from
+60% fill on, one adjacent reversal in every ~900 steps**, at unchanged turn density (every turn is a
+U-turn or an isolated corner). What either term can act on is the first half of the game, where the
+obs-history plan noted a zigzag costs nothing, and where 17 reversals per episode live. That sharpens
+the prediction in §6 rather than changing the design: the batch now asks whether removing the *early*
+zigzags changes anything downstream.
+
+**Doses, from the numbers.** With 0.178 reversals per meal:
+
+| term | traffic per meal at dose *x* | the reference scale | dose |
+|---|---|---|---|
+| potential, `SNEK_ZIGZAG_SHAPING` | 2 · 0.178 · *c* = 0.36 *c* (a charge and its refund) | chase-safe was sized at ~25% of `FOOD_REWARD` per meal, giving *c* 0.10 at 2.5-3.6 flips/meal | **c = 0.5** — 0.18 per meal, the same order as chase-safe's budget; 0.7 would match it exactly |
+| penalty, `SNEK_REVERSAL_PENALTY` | 0.178 · *p* | the step penalty's flow is 0.104 per meal (10.43 × 0.01) and b26 found that real while a tenth of it did nothing | **p = 0.5** — 0.089 per meal, the step penalty's order; a reversal costs half a meal, ~8.5 per episode against ~49 of step penalty and ~95 of food. *p* 0.1 (0.018 per meal) would sit in b26's dead zone |
+
+## 6. Batch b34
 
 | | |
 |---|---|
-| base | b33's: `hist8`, pen01, preset `b2` (chase-safe 0.1 gate 75, food-distance 0), 50M, `SNEK_PPO_ANNEAL_FRACTION` 0.5 — every ramp final at 25M |
-| cells | **`zz05`** `SNEK_ZIGZAG_SHAPING=0.05`, **`zz20`** `=0.2` (window 8); **`rp01`** `SNEK_REVERSAL_PENALTY=0.01` (one step penalty per reversal), **`rp05`** `=0.05` |
-| seeds | 1-4 pinned to the letter, 16 arms, two desktop waves |
-| control | b33's `win100` cell — the same base, cap and anneal, four seeds, closed 2026-09-14. Saves four arms; the cost is that it ran on a different day, which with pinned seeds and a deterministic env is no cost |
-| judged on | stage-B density and the `hof5000` / `hof30k` gates as every batch; **plus the reversal rate**, from `tools/death_analyze.path_measures` over each cell's top checkpoint at 5,000 episodes (turn density, reversal rate at *k* = 1 and 2, mean straight run, split perfect / collision / starve and by fill bucket — the §3 measures of the obs-history plan, already built) |
+| base | **b27's `hist8` config, verbatim** (`docs/runs.md` b27 has it in full): 100M, `SNEK_PPO_ANNEAL_FRACTION` 0.5 — γ 0.99 → 0.999, λ 0.95 → 0.999, entropy 0.01 → 0.001, all final at 50M and held to 100M; preset `b2`, step penalty 0.01, win 100 |
+| cells | **`zz`** `SNEK_ZIGZAG_SHAPING=0.5` (window 8, the history depth); **`rp`** `SNEK_REVERSAL_PENALTY=0.5` |
+| arms | `b34a`-`b34d` `zz` seeds 1-4; `b34e`-`b34h` `rp` seeds 5-8. One desktop wave |
+| control | b27's `hist8` cell — eight seeds of exactly this config at 100M, plus b28's first 100M (the same arms held on). No control arm of its own |
+| judged on | stage-B density, the `hof5000` / `hof30k` gates and the 30k top against b27's `hist8` table (94-95% density, 99.81 top); **plus the §5 trace** re-run on each cell's top checkpoint at 5,000 episodes on seed 11, so the reversal-rate-by-fill table above is read against the control's |
 
-**Doses.** The chase-safe dose was sized so the shaping budget per meal was ~25% of `FOOD_REWARD`.
-A reversal rate of a few percent per step at ~10 steps per meal is a few tenths of a reversal per
-meal, so c = 0.2 puts a reversal charge at 0.2 and the per-meal shaping traffic near 0.05-0.1 — the same
-order as chase-safe's 0.1 — and c = 0.05 is the quarter-dose. For the penalty, 0.01 makes a reversal cost
-one extra step and 0.05 five; above that the penalty is a tenth of a food reward per reversal, which
-b26's step-penalty cliff (0.01 real, 1e-3 nothing) says is where to look next if 0.05 moves nothing.
-**Before queueing, read the actual reversal rate of `b32g` @62423040 off `death_analyze`** and rescale
-if it is far from a few percent; the numbers above are the plan's assumption, not a measurement.
+**Prediction, registered with the user 2026-09-16 (the agent's).** `zz` is level with `hist8` on
+density and on the 30k top, and its reversal rate by fill is within 1 pp of the table above at every
+decile: the invariance holds, PPO takes nothing from the hint, as b21 found for chase-safe. `rp` cuts the
+early-board (fill < 50) reversal rate by more than half and leaves the endgame's ~0 where it is; its
+density is within noise of `hist8`, since the failures run through sealed pockets and orbits in the
+crowded board where the champion already does not zigzag. The outcome that would matter: a density or
+30k-top gain in `rp`, which would say the open-board path shape carries into the endgame — falsifying
+"not the mechanism" — or a density *loss* in `rp`, which would say the early zigzags are load-bearing
+(a way of buying time to line up the fill) and the penalty removes them at a cost.
 
-**Prediction, to register with the user before queueing** (the agent's, 2026-09-16): the two potential
-cells are level with the control on density and on the 30k top, and their reversal rate is within 1 pp
-of the control's — the invariance holds and PPO gets nothing from the hint, as b21 found for chase-safe.
-`rp05` cuts the *k* = 1 reversal rate by more than half; `rp01` by less. Neither penalty cell raises
-density, because the failures run through sealed pockets and orbits, not zigzags; `rp05` may lose a few
-points of density if straight-line preference makes the endgame fill harder. A density gain in a penalty
-cell would falsify the "not the mechanism" finding and would be the interesting outcome.
+**Order of work.** Build §3 and §4 on the laptop; run the suite and the mutation pass; smoke one arm
+of each cell and read `reward config:` for the new knobs; `desktop-deploy`; then `queue-batch` the
+eight specs (a b34 manifest in `plans/sweep-extra.json` with `requires_code` on both knobs), pinned to
+the desktop. The specs wait for approval as every push to `ops` does.
 
-## 6. Decisions for review
+## 7. Decisions taken in review (2026-09-16)
 
-1. **Both terms, or the potential alone?** Recommended: both. The potential alone can, by theorem, only
-   tie or lose against the control on the converged policy, and a batch whose best outcome is a tie is
-   worth pairing with the arm that can win.
-2. **Adjacent only (*k* = 1)** for the reward, as asked; the diagnostic reports *k* = 2 too. Or *k* = 2
-   in the reward, charging `left, forward, right` as well.
-3. **Window = the observation history (8)**, or the whole body.
-4. **Doses** 0.05 / 0.2 and 0.01 / 0.05, pending the `b32g` reversal-rate read.
-5. **Control**: reuse b33's `win100`, or a fifth cell of four.
-6. **Base and cap**: b33's 50M with the half-length anneal, or b27's 100M `hist8` for direct comparison
-   with the b27/b28 tables at the cost of double the wall time.
+| question | decision |
+|---|---|
+| both terms, or the potential alone | both |
+| reversal definition | adjacent only (*k* = 1); the diagnostic keeps reporting *k* = 2 |
+| window | 8, the observation history |
+| doses | one per term, sized from §5: 0.5 and 0.5 |
+| control | none of its own; b27's `hist8` cell, the base itself, is the control |
+| base and cap | b27's config at 100M, anneal fraction 0.5 (finals at 50M, held to 100M) |
