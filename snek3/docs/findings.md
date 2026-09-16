@@ -17,6 +17,36 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### A fixed Hamiltonian cycle wins every game in 2,330 steps; the record policies finish in 986-1,039, 2.3x faster, and the undiscounted `b10ck` was slower than not thinking at all
+
+`tools/fixed_path.py` (2026-09-16): a snake that follows one closed tour of all 100 cells -- column 0 as the spine, the other nine
+columns in boustrophedon rows, laid so the opening body already sits on it -- can neither collide nor starve (the food is at most
+99 cells ahead on the tour, inside the 100-step starve floor), so **1,000 of 1,000 games on seed 7 were perfect**. It pays for that
+by never taking a shortcut: with the snake at length L the food is uniform over the 100 - L cells ahead on the tour, so a meal costs
+(101 - L) / 2 steps and a game sums to **2,327.5** in closed form; the measurement read 2,330.1 (median 2,332, range 1,809-2,807, p90
+2,522), which is also the check that the driver plays the game the engine plays. The three hall-of-fame entries this checkout can
+load, measured by the same tool on the same seed and episode count (`runs/fixed-path.json`):
+
+| policy | perfect /1,000 | steps a perfect game: mean | median | min | max | p90 | per meal |
+|---|---|---|---|---|---|---|---|
+| `b32g` @62423040 (the record) | 999 | **986** | 985 | 752 | 1,230 | 1,083 | 10.4 |
+| `b27t` @85065728 | 997 | 1,017 | 1,012 | 781 | 1,275 | 1,122 | 10.7 |
+| `b27k` @77889536 | 997 | 1,039 | 1,038 | 800 | 1,454 | 1,150 | 10.9 |
+| **fixed path** | **1,000** | 2,330 | 2,332 | 1,809 | 2,807 | 2,522 | 24.5 |
+
+Three readings. **The learned policies route**: they finish in 42-45% of the tour's steps, 10.4-10.9 steps a meal against the
+tour's 24.5, and the record is also the fastest of the three (`b32g`'s 986 against `b27t`'s 1,017, sd ~100 a game, so the gap is
+real at n = 999), consistent with the gif note that its anneal to gamma 1.0 "kept the routes". A loose floor for any policy is the
+Manhattan distance to each meal, ~6.6 steps on a 10x10 board for a random pair of cells, or ~630 a game; the records sit at 1.6x
+that floor and 0.42x the tour. **The six older entries cannot be measured here** -- `b5h`, `b6b`, `b9ch`, both `b10ck` and `b17cl`
+are on the 30-value era and refuse to load under `obs26-20260907` -- but their gifs in `hallOfFame/HOF.md` put the discounted ones
+at 1,081-1,329 steps a game and **`b10ck` at 2,774-3,727, above the tour**: the undiscounted policy that held the record from
+2026-09-03 to 2026-09-09 was winning 99.65% of its games by circling *longer* than a snake with no policy at all, which is what
+"safe circuits" cost. **The tour is 100% and the records are 99.9%**, so a policy that fell back to the cycle whenever it could not
+see a safe route would close the last 0.1 pp at a step cost; the ~1.9x between 986 and the tour's 2,330 is the budget such a
+hybrid has to spend. Rerun with `PYTHONPATH=. python -m tools.fixed_path --hof --episodes 1000 --seed 7`; per-game step counts are
+not in any eval row (the HOF gif captions already asked for `avg_steps`), so this tool is where the number comes from.
+
 ### The perfect-game reward is a monotone onset lever that saturates at 100, no value from 0 to 1000 destabilises the endgame, and a reward of 0 still finishes — invariant 6 does not hold under PPO with a step penalty
 
 b33 (2026-09-14): `SNEK_PERFECT_GAME_REWARD` 0 / 10 / 30 / 50 / 100 / 200 / 300 / 1000 on b27's `hist8` config at 50M with every

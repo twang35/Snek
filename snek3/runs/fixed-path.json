@@ -1,0 +1,67 @@
+{
+ "episodes": 1000,
+ "seed": 7,
+ "rows": [
+  {
+   "name": "fixed-path",
+   "episodes": 1000,
+   "perfect_games": 1000,
+   "perfect_percent": 100.0,
+   "starved": 0,
+   "died": 0,
+   "steps_mean": 2330.1,
+   "steps_median": 2331.5,
+   "steps_std": 156.0,
+   "steps_min": 1809,
+   "steps_max": 2807,
+   "steps_p90": 2522.0,
+   "steps_per_food": 24.53,
+   "steps_expected": 2327.5
+  },
+  {
+   "name": "b27k-hist4-seed11-ckpt77889536 @77889536",
+   "episodes": 1000,
+   "perfect_games": 997,
+   "perfect_percent": 99.7,
+   "starved": 2,
+   "died": 1,
+   "steps_mean": 1039.2,
+   "steps_median": 1038.0,
+   "steps_std": 90.2,
+   "steps_min": 800,
+   "steps_max": 1454,
+   "steps_p90": 1150.0,
+   "steps_per_food": 10.94
+  },
+  {
+   "name": "b27t-hist8-seed20-ckpt85065728 @85065728",
+   "episodes": 1000,
+   "perfect_games": 997,
+   "perfect_percent": 99.7,
+   "starved": 2,
+   "died": 1,
+   "steps_mean": 1017.0,
+   "steps_median": 1012.0,
+   "steps_std": 78.8,
+   "steps_min": 781,
+   "steps_max": 1275,
+   "steps_p90": 1122.0,
+   "steps_per_food": 10.71
+  },
+  {
+   "name": "b32g-warm-b28n-185926k-seed7-ckpt62423040 @62423040",
+   "episodes": 1000,
+   "perfect_games": 999,
+   "perfect_percent": 99.9,
+   "starved": 0,
+   "died": 1,
+   "steps_mean": 986.4,
+   "steps_median": 985.0,
+   "steps_std": 76.2,
+   "steps_min": 752,
+   "steps_max": 1230,
+   "steps_p90": 1083.0,
+   "steps_per_food": 10.38
+  }
+ ]
+}

@@ -245,6 +245,7 @@ The tools behind those entry points, in the order a measurement passes through t
 | `tools/import_tf_checkpoint.py` | a snek2 TF checkpoint, or a whole arm, converted to torch |
 | `tools/prune_runs.py` | reclaims disk from finished work: a merged pass's duplicate shard files, the two dead per-episode arrays, and a closed arm's checkpoints below a stage-B threshold. Dry run by default |
 | `tools/mutate.py` | mutation testing. Use it rather than the shell version — see the four hazards above |
+| `tools/fixed_path.py` | **the step-count floor**: a snake that follows one Hamiltonian cycle of the board, so every game is perfect and costs the whole tour per meal (closed form 2,327.5 steps a game). `--hof` measures every loadable `hallOfFame/` entry's steps per perfect game beside it, one subprocess each; the eval rows carry no step count, this is where to get one. `docs/findings.md`, 2026-09-16 |
 
 And the training side, which is the other direction — from a knob to an arm:
 
