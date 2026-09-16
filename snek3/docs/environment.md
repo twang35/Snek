@@ -35,9 +35,11 @@ A score of 95 *is* a filled board. That has been misread as a near-miss.
 | `FOOD_DISTANCE_REWARD` | 0.001, off in every recent arm | subtracted on an ordinary move that *increases* Manhattan distance to the food |
 | `CHASE_SAFE_SHAPING` | `c`, potential-based, gated on snake length | head, food and tail in one region |
 | `FREE_SPACE_SHAPING` | `c`, potential-based, gated on snake length | `1 / open-region-count` |
+| `ZIGZAG_SHAPING` | `c`, potential-based, no gate; b34 runs 0.5 | Φ = −(reversal pairs among the last `ZIGZAG_WINDOW` moves the body shows; the window is the observation history depth by default). A reversal is a `left` straight after a `right` or the converse -- a U-turn (the same turn twice, the fill pattern) is not one. Read off the body like the history block, so nothing is buffered or snapshotted. `plans/zigzag-shaping.md` |
+| `REVERSAL_PENALTY` | `p`, plain; b34 runs 0.5 | subtracted on every step whose move reverses the one before, terminal steps included, as `STEP_PENALTY` is. The non-invariant twin of the term above |
 
 **A reward is a sum of terms**, which is why nothing may identify a perfect game by comparing the
-final reward with `PERFECT_GAME_REWARD`. Both shaping terms are potential-based, so they pay `−c·Φ(s)`
+final reward with `PERFECT_GAME_REWARD`. The three shaping terms are potential-based, so they pay `−c·Φ(s)`
 at a terminal step — which is exactly how snek2 silenced every perfect-game counter for 300k steps.
 
 **`PERFECT_GAME_REWARD` and `DISCOUNT` are coupled** and cannot be tuned independently:

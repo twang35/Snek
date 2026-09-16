@@ -480,14 +480,51 @@ def test_both_shaping_terms_together_are_in_parity():
     assert run.reward_mismatches == [], run.reward_mismatches[0]
 
 
+def test_zigzag_shaping_parity():
+    """The third potential term, read off the body rather than the grid (plans/zigzag-shaping.md).
+    The endgame board matters here too: a coiled length-88 body shows eight moves of real history."""
+    for label, kwargs in (('growth', {'seed': 17}),
+                          ('endgame', {'seed': 18,
+                                       'board': lambda r: _coiled_snapshot(r, 88)})):
+        run = _with_shaping({'ZIGZAG_SHAPING': 0.5, 'ZIGZAG_WINDOW': 8}, kwargs)
+        assert run.reward_mismatches == [], (
+            '{0}: zigzag shaping disagreed on {1} of {2} steps; first: {3}'.format(
+                label, len(run.reward_mismatches), run.steps, run.reward_mismatches[0]))
+        assert run.obs_mismatches == [], '{0}: observations disagreed under shaping'.format(label)
+
+
+def test_reversal_penalty_parity():
+    """The plain charge, on every step whose move reverses the one before, terminal steps included."""
+    for label, kwargs in (('growth', {'seed': 19}),
+                          ('endgame', {'seed': 20,
+                                       'board': lambda r: _coiled_snapshot(r, 88)})):
+        run = _with_shaping({'REVERSAL_PENALTY': 0.5}, kwargs)
+        assert run.reward_mismatches == [], (
+            '{0}: the reversal penalty disagreed on {1} of {2} steps; first: {3}'.format(
+                label, len(run.reward_mismatches), run.steps, run.reward_mismatches[0]))
+
+
+def test_all_three_potential_terms_and_both_penalties_together_are_in_parity():
+    run = _with_shaping({'CHASE_SAFE_SHAPING': 0.1, 'CHASE_SAFE_GATE': 10,
+                         'FREE_SPACE_SHAPING': 0.05, 'FREE_SPACE_GATE': 10,
+                         'ZIGZAG_SHAPING': 0.5, 'ZIGZAG_WINDOW': 8,
+                         'REVERSAL_PENALTY': 0.5, 'STEP_PENALTY': 0.01},
+                        {'seed': 21})
+    assert run.reward_mismatches == [], run.reward_mismatches[0]
+
+
 def test_the_shaping_tests_would_notice_if_shaping_were_silently_off():
-    """Guards the guard: if forcing the coefficients on did not actually change any reward, the two
+    """Guards the guard: if forcing the coefficients on did not actually change any reward, the
     tests above would pass against a vec env that ignored shaping entirely."""
     plain = _Lockstep(seed=11).run(1200)
     shaped = _with_shaping({'CHASE_SAFE_SHAPING': 0.1, 'CHASE_SAFE_GATE': 10},
                            {'seed': 11}, states=1200)
     assert plain.reward_sum != shaped.reward_sum, (
         'forcing chase-safe shaping on changed no reward, so the parity tests are vacuous')
+    zigzag = _with_shaping({'ZIGZAG_SHAPING': 0.5, 'ZIGZAG_WINDOW': 8}, {'seed': 11}, states=1200)
+    assert plain.reward_sum != zigzag.reward_sum, 'forcing zigzag shaping on changed no reward'
+    penalised = _with_shaping({'REVERSAL_PENALTY': 0.5}, {'seed': 11}, states=1200)
+    assert plain.reward_sum != penalised.reward_sum, 'forcing the reversal penalty on changed no reward'
 
 
 # ------------------------------------------------------------------- L3: mutation

@@ -185,6 +185,9 @@ class Game:
         # The free-space potential's own cache, same lifecycle. A separate flood fill from the one
         # above: chase-safety keeps the tail occupied, this one frees it, so they cannot share.
         self.free_space_potential = 0.0
+        # The zigzag potential's cache, same lifecycle. -(reversal pairs in the last ZIGZAG_WINDOW
+        # moves), read off the body, so no flood fill and no gate (plans/zigzag-shaping.md).
+        self.zigzag_potential = 0.0
         # show screen
         self.screen = pygame.display.set_mode(R.SCREENSIZE, 0, 0, R.SCREEN_TO_DISPLAY, 0)
 
@@ -286,6 +289,7 @@ class Game:
         # episode's discounted shaping telescope to exactly 0.
         self.chase_safe_potential = self._chase_safe_potential()
         self.free_space_potential = self._free_space_potential()
+        self.zigzag_potential = self._zigzag_potential()
 
     def _chase_safe_potential(self):
         """Phi(s) for the current board: chase-safety, gated by snake length. 0.0 when shaping is off.
@@ -318,6 +322,15 @@ class Game:
         if len(self.snake_group) < FREE_SPACE_GATE:
             return 0.0
         return free_space_pieces(self.grid, self.tail.tile_pos)
+
+    def _zigzag_potential(self):
+        """Phi(s) for the current body: minus the reversal pairs among its last ZIGZAG_WINDOW moves.
+        0.0 when the term is off. Bounded (|Phi| <= window - 1), so the invariance theorem holds with
+        no gate; the opening body is straight and reads 0, which is what makes the telescope exactly 0.
+        """
+        if not ZIGZAG_SHAPING:
+            return 0.0
+        return -float(reversal_count(self.snake.get_positions(), ZIGZAG_WINDOW))
 
     def get_observation(self):
         # Each segment lands on the cell its predecessor just left, so the tail's next cell is
@@ -411,6 +424,7 @@ class Game:
         # the value and it leaves GameSnapshot, validate_snapshot and test_game_snapshot alone.
         self.chase_safe_potential = self._chase_safe_potential()
         self.free_space_potential = self._free_space_potential()
+        self.zigzag_potential = self._zigzag_potential()
 
     def _build_snake(self, body, head_move_dir, tail_last_move_dir):
         """Builds a snake of arbitrary shape from ordered body cells, head first.
@@ -585,6 +599,12 @@ class Game:
             reward = STARVE_REWARD
         # A per-step cost on every transition, terminal ones included. 0 unless SNEK_STEP_PENALTY.
         reward -= STEP_PENALTY
+        # The plain reversal charge, applied the same way: on every step whose move reverses the one
+        # before (a left after a right, or a right after a left), terminal steps included. The pair is
+        # read off the new body -- cells 0..3 behind the head -- so it needs no memory of the actions.
+        # 0 unless SNEK_REVERSAL_PENALTY. plans/zigzag-shaping.md.
+        if REVERSAL_PENALTY and reversal_count(self.snake.get_positions(), 2):
+            reward -= REVERSAL_PENALTY
 
         # Distance shaping, and only for an ordinary move. Skipped when this step ate,
         # because `old_moves_to_food` measures the food that was just consumed while
@@ -630,6 +650,16 @@ class Game:
             reward += FREE_SPACE_SHAPING * (self.shaping_discount * new_free_space
                                             - self.free_space_potential)
             self.free_space_potential = new_free_space
+
+        # The third PBRS term, on the body's recent shape rather than the grid: a reversal made this
+        # step lowers Phi by one (about -c), and the pair leaving the window ZIGZAG_WINDOW steps later
+        # raises it back (about +c). Same position, same `Phi(terminal) = 0` branch, same additivity
+        # argument as the two above.
+        if ZIGZAG_SHAPING:
+            new_zigzag = 0.0 if self.finished else self._zigzag_potential()
+            reward += ZIGZAG_SHAPING * (self.shaping_discount * new_zigzag
+                                        - self.zigzag_potential)
+            self.zigzag_potential = new_zigzag
 
         return self.finished, reward
 

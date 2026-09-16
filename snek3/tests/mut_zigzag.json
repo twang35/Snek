@@ -1,0 +1,111 @@
+{
+ "tests": [
+  "tests/test_move_history.py",
+  "tests/test_reward_shaping.py",
+  "tests/test_vec_parity.py"
+ ],
+ "mutations": [
+  {
+   "desc": "reference: any two turns in a row count as a reversal (a U-turn would be charged)",
+   "file": "env/observations.py",
+   "from": "if (a == 'left' and b == 'right') or (a == 'right' and b == 'left'))",
+   "to": "if a != 'forward' and b != 'forward')"
+  },
+  {
+   "desc": "reference: only left-then-right counts, not right-then-left",
+   "file": "env/observations.py",
+   "from": "if (a == 'left' and b == 'right') or (a == 'right' and b == 'left'))",
+   "to": "if (a == 'left' and b == 'right'))"
+  },
+  {
+   "desc": "reference: the window is one move too long",
+   "file": "env/observations.py",
+   "from": "    moves = recent_moves(body_positions, window)\n    return sum(",
+   "to": "    moves = recent_moves(body_positions, window + 1)\n    return sum("
+  },
+  {
+   "desc": "reference: the potential's sign flipped",
+   "file": "env/game.py",
+   "from": "return -float(reversal_count(self.snake.get_positions(), ZIGZAG_WINDOW))",
+   "to": "return float(reversal_count(self.snake.get_positions(), ZIGZAG_WINDOW))"
+  },
+  {
+   "desc": "reference: Phi(terminal) not zeroed",
+   "file": "env/game.py",
+   "from": "new_zigzag = 0.0 if self.finished else self._zigzag_potential()",
+   "to": "new_zigzag = self._zigzag_potential()"
+  },
+  {
+   "desc": "reference: the discount dropped from the zigzag term",
+   "file": "env/game.py",
+   "from": "reward += ZIGZAG_SHAPING * (self.shaping_discount * new_zigzag\n                                        - self.zigzag_potential)",
+   "to": "reward += ZIGZAG_SHAPING * (new_zigzag\n                                        - self.zigzag_potential)"
+  },
+  {
+   "desc": "reference: the zigzag cache not advanced",
+   "file": "env/game.py",
+   "from": "            self.zigzag_potential = new_zigzag\n",
+   "to": "            pass\n"
+  },
+  {
+   "desc": "reference: the snapshot restore does not recompute the zigzag potential",
+   "file": "env/game.py",
+   "from": "        # the value and it leaves GameSnapshot, validate_snapshot and test_game_snapshot alone.\n        self.chase_safe_potential = self._chase_safe_potential()\n        self.free_space_potential = self._free_space_potential()\n        self.zigzag_potential = self._zigzag_potential()\n",
+   "to": "        # the value and it leaves GameSnapshot, validate_snapshot and test_game_snapshot alone.\n        self.chase_safe_potential = self._chase_safe_potential()\n        self.free_space_potential = self._free_space_potential()\n"
+  },
+  {
+   "desc": "reference: the reversal penalty reads a window of 3 (left, forward, right would be charged)",
+   "file": "env/game.py",
+   "from": "if REVERSAL_PENALTY and reversal_count(self.snake.get_positions(), 2):",
+   "to": "if REVERSAL_PENALTY and reversal_count(self.snake.get_positions(), 3):"
+  },
+  {
+   "desc": "reference: the reversal penalty skipped on terminal steps",
+   "file": "env/game.py",
+   "from": "if REVERSAL_PENALTY and reversal_count(self.snake.get_positions(), 2):",
+   "to": "if REVERSAL_PENALTY and not self.finished and reversal_count(self.snake.get_positions(), 2):"
+  },
+  {
+   "desc": "vectorised: any two turns count",
+   "file": "vectorized/vec_env.py",
+   "from": "return (((a == 0) & (b == 1)) | ((a == 1) & (b == 0))).sum(axis=1)",
+   "to": "return ((a != 2) & (b != 2)).sum(axis=1)"
+  },
+  {
+   "desc": "vectorised: pairs read one move off (columns 1: against 0:-1 swapped to 0:-2 and 2:)",
+   "file": "vectorized/vec_env.py",
+   "from": "a, b = rel[:, :-1], rel[:, 1:]",
+   "to": "a, b = rel[:, :-2], rel[:, 2:]"
+  },
+  {
+   "desc": "vectorised: the potential's sign flipped",
+   "file": "vectorized/vec_env.py",
+   "from": "return -reversal_counts(self.body, self.hp, self.length, C.ZIGZAG_WINDOW).astype(np.float64)",
+   "to": "return reversal_counts(self.body, self.hp, self.length, C.ZIGZAG_WINDOW).astype(np.float64)"
+  },
+  {
+   "desc": "vectorised: Phi(terminal) not zeroed",
+   "file": "vectorized/vec_env.py",
+   "from": "new = np.where(finished, 0.0, self._zigzag_now())",
+   "to": "new = self._zigzag_now()"
+  },
+  {
+   "desc": "vectorised: reset does not refresh the zigzag potential",
+   "file": "vectorized/vec_env.py",
+   "from": "        if C.ZIGZAG_SHAPING:\n            self.zigzag_potential[idx] = self._zigzag_now()[idx]\n",
+   "to": "        if False:\n            self.zigzag_potential[idx] = self._zigzag_now()[idx]\n"
+  },
+  {
+   "desc": "vectorised: the penalty charges the count rather than the presence of a reversal",
+   "file": "vectorized/vec_env.py",
+   "from": "reversal_counts(self.body, self.hp, self.length, 2) > 0)",
+   "to": "reversal_counts(self.body, self.hp, self.length, 3) > 0)"
+  },
+  {
+   "desc": "vectorised: the history bits read the wrong column parity",
+   "file": "vectorized/vec_env.py",
+   "from": "    out[:, 0::2] = rel == 0\n    out[:, 1::2] = rel == 1",
+   "to": "    out[:, 0::2] = rel == 1\n    out[:, 1::2] = rel == 0"
+  }
+ ]
+}

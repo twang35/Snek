@@ -42,7 +42,7 @@ one function, which is why the split cost the grep nothing. The reward and shapi
 `env/constants.py` **at import**, before the trainer's config exists, so they print no override line
 — `SNEK_CHASE_SAFE_SHAPING`, `SNEK_CHASE_SAFE_GATE`, `SNEK_FREE_SPACE_*`,
 `SNEK_FOOD_DISTANCE_REWARD`, `SNEK_STEP_PENALTY`, `SNEK_PERFECT_GAME_REWARD`, `SNEK_ZERO_OBS`,
-`SNEK_OBS_HISTORY`. For those, grep
+`SNEK_OBS_HISTORY`, `SNEK_ZIGZAG_*`, `SNEK_REVERSAL_PENALTY`. For those, grep
 **`reward config:`**, one line printed at startup from `vectorized/config.describe()`. Before it
 existed, b2's shaping dose had to be confirmed by reading `/proc/<pid>/environ` on the desktop.
 
@@ -153,7 +153,9 @@ step no checkpoint exists at is the one thing the protocol cannot tolerate.
 
 `SNEK_PERFECT_GAME_REWARD` (100), `SNEK_FOOD_DISTANCE_REWARD` (0.001), `SNEK_STEP_PENALTY` (0, subtracted on every step -- b26's knob), `SNEK_OBS_HISTORY` (0; N appends 2N values of move history to the observation and `-histN` to the era -- b27's knob; **one depth per wave**, since a shared eval worker serves one width),
 `SNEK_CHASE_SAFE_SHAPING` + `SNEK_CHASE_SAFE_GATE` (0, 85),
-`SNEK_FREE_SPACE_SHAPING` + `SNEK_FREE_SPACE_GATE` (0, 85).
+`SNEK_FREE_SPACE_SHAPING` + `SNEK_FREE_SPACE_GATE` (0, 85),
+`SNEK_ZIGZAG_SHAPING` + `SNEK_ZIGZAG_WINDOW` (0; the window defaults to `SNEK_OBS_HISTORY`, or 8 when history is off -- a potential-based term, Φ = −(reversal pairs among the last `window` moves), a reversal being a left straight after a right or the converse; b34's knob, `plans/zigzag-shaping.md`),
+`SNEK_REVERSAL_PENALTY` (0; subtracted on every step whose move reverses the one before, terminal steps included, as the step penalty is -- b34's other knob).
 
 **Changing any of these changes the objective**, so they are the loudest thing an arm can carry.
 `SNEK_PERFECT_GAME_REWARD` cannot be moved without re-deriving `SNEK_DISCOUNT` — see

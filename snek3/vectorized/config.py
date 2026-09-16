@@ -66,6 +66,9 @@ CHASE_SAFE_SHAPING = _c.CHASE_SAFE_SHAPING
 CHASE_SAFE_GATE = _c.CHASE_SAFE_GATE
 FREE_SPACE_SHAPING = _c.FREE_SPACE_SHAPING
 FREE_SPACE_GATE = _c.FREE_SPACE_GATE
+ZIGZAG_SHAPING = _c.ZIGZAG_SHAPING
+ZIGZAG_WINDOW = _c.ZIGZAG_WINDOW
+REVERSAL_PENALTY = _c.REVERSAL_PENALTY
 
 ZERO_OBS_INDICES = tuple(_c.ZERO_OBS_INDICES)
 
@@ -93,7 +96,9 @@ def describe():
     checkpoint can legitimately produce different `avg_reward`.
     """
     return ('grid {0}x{0}, max score {1}, obs {12} (history {13}), food {2}, death {3}, starve {4}, '
-            'perfect {5}, step {11}, dist {6}, chase_safe c={7} gate={8}, free_space c={9} gate={10}'.format(
+            'perfect {5}, step {11}, dist {6}, chase_safe c={7} gate={8}, free_space c={9} gate={10}, '
+            'zigzag c={14} window={15}, reversal p={16}'.format(
                 PLAY, MAX_POSSIBLE_SCORE, FOOD_REWARD, DEATH_REWARD, STARVE_REWARD,
                 PERFECT_GAME_REWARD, FOOD_DISTANCE_REWARD, CHASE_SAFE_SHAPING, CHASE_SAFE_GATE,
-                FREE_SPACE_SHAPING, FREE_SPACE_GATE, STEP_PENALTY, OBS_LEN, OBS_HISTORY))
+                FREE_SPACE_SHAPING, FREE_SPACE_GATE, STEP_PENALTY, OBS_LEN, OBS_HISTORY,
+                ZIGZAG_SHAPING, ZIGZAG_WINDOW, REVERSAL_PENALTY))

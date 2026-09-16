@@ -303,7 +303,8 @@ COILED_AROUND_FOOD_FOOD = (1, 1)
 COILED_AROUND_FOOD_FACING = 'left'  # the neck (2,0) is right of the head, so it entered moving left
 
 
-def build_chase_game(c, gate=0, distance_shaping=0.0, free_space=0.0, free_space_gate=0):
+def build_chase_game(c, gate=0, distance_shaping=0.0, free_space=0.0, free_space_gate=0,
+                     zigzag=0.0, zigzag_window=8, reversal_penalty=0.0):
     """A fresh `Snake` module whose chase-safe knobs are `c` and `gate`.
 
     Reloaded rather than assigned, for the reason `build_game` documents: `env/game.py` does
@@ -320,12 +321,16 @@ def build_chase_game(c, gate=0, distance_shaping=0.0, free_space=0.0, free_space
     """
     previous = {name: os.environ.get(name) for name in
                 ('SNEK_CHASE_SAFE_SHAPING', 'SNEK_CHASE_SAFE_GATE', 'SNEK_FOOD_DISTANCE_REWARD',
-                 'SNEK_FREE_SPACE_SHAPING', 'SNEK_FREE_SPACE_GATE')}
+                 'SNEK_FREE_SPACE_SHAPING', 'SNEK_FREE_SPACE_GATE',
+                 'SNEK_ZIGZAG_SHAPING', 'SNEK_ZIGZAG_WINDOW', 'SNEK_REVERSAL_PENALTY')}
     os.environ['SNEK_CHASE_SAFE_SHAPING'] = repr(c)
     os.environ['SNEK_CHASE_SAFE_GATE'] = str(gate)
     os.environ['SNEK_FOOD_DISTANCE_REWARD'] = repr(distance_shaping)
     os.environ['SNEK_FREE_SPACE_SHAPING'] = repr(free_space)
     os.environ['SNEK_FREE_SPACE_GATE'] = str(free_space_gate)
+    os.environ['SNEK_ZIGZAG_SHAPING'] = repr(zigzag)
+    os.environ['SNEK_ZIGZAG_WINDOW'] = str(zigzag_window)
+    os.environ['SNEK_REVERSAL_PENALTY'] = repr(reversal_penalty)
     try:
         from env import constants as snake_constants
         from env import game as Snake
@@ -337,6 +342,9 @@ def build_chase_game(c, gate=0, distance_shaping=0.0, free_space=0.0, free_space
         assert Snake.CHASE_SAFE_GATE == gate, Snake.CHASE_SAFE_GATE
         assert Snake.FREE_SPACE_SHAPING == free_space, Snake.FREE_SPACE_SHAPING
         assert Snake.FREE_SPACE_GATE == free_space_gate, Snake.FREE_SPACE_GATE
+        assert Snake.ZIGZAG_SHAPING == zigzag, Snake.ZIGZAG_SHAPING
+        assert Snake.ZIGZAG_WINDOW == zigzag_window, Snake.ZIGZAG_WINDOW
+        assert Snake.REVERSAL_PENALTY == reversal_penalty, Snake.REVERSAL_PENALTY
         return Snake
     finally:
         for name, value in previous.items():
@@ -818,6 +826,145 @@ def test_the_two_shaping_terms_add():
         assert abs(reward - 2 * 0.1 * (GAMMA - 1.0)) < 1e-12, reward
     finally:
         restore()
+
+
+# ------------------------------------------------------------ the zigzag terms (plans/zigzag-shaping.md)
+
+# Heading right, then left (up), right, left, right: the diagonal staircase, three reversal pairs,
+# with two straight cells behind it so the body (7 cells, 5 moves) still shows all of them after one
+# more move -- the body is the memory, and a 6-cell body would forget the oldest pair as a new one forms.
+STAIRCASE = ((4, 3), (3, 3), (3, 4), (2, 4), (2, 5), (1, 5), (0, 5))
+STAIRCASE_FACING = 'right'
+STAIRCASE_FOOD = (9, 9)
+
+
+def test_the_zigzag_terms_default_to_off():
+    from env import constants as snake_constants
+    importlib.reload(snake_constants)
+    assert snake_constants.ZIGZAG_SHAPING == 0.0
+    assert snake_constants.REVERSAL_PENALTY == 0.0
+    assert snake_constants.ZIGZAG_WINDOW == (snake_constants.OBS_HISTORY or 8)
+
+
+def test_the_zigzag_window_follows_the_observation_history_by_default():
+    saved = {k: os.environ.get(k) for k in ('SNEK_OBS_HISTORY', 'SNEK_ZIGZAG_WINDOW')}
+    try:
+        os.environ['SNEK_OBS_HISTORY'] = '4'
+        os.environ.pop('SNEK_ZIGZAG_WINDOW', None)
+        from env import constants as snake_constants
+        importlib.reload(snake_constants)
+        assert snake_constants.ZIGZAG_WINDOW == 4
+        os.environ['SNEK_ZIGZAG_WINDOW'] = '6'
+        importlib.reload(snake_constants)
+        assert snake_constants.ZIGZAG_WINDOW == 6, 'an explicit window wins over the history depth'
+        os.environ.pop('SNEK_ZIGZAG_WINDOW', None)
+        os.environ['SNEK_OBS_HISTORY'] = '1'
+        importlib.reload(snake_constants)
+        assert snake_constants.ZIGZAG_WINDOW == 2, 'a depth-1 history must import: the window floors at a pair'
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        restore()
+
+
+def test_the_zigzag_potential_is_minus_the_reversal_count_and_zero_when_off():
+    module = build_chase_game(0.0, zigzag=0.5, zigzag_window=8)
+    try:
+        game = restored(module, STAIRCASE, STAIRCASE_FOOD, STAIRCASE_FACING)
+        assert game.zigzag_potential == -3.0
+        assert game.zigzag_potential == module.Game._zigzag_potential(game)
+    finally:
+        restore()
+    module = build_chase_game(0.0, zigzag=0.0)
+    try:
+        game = restored(module, STAIRCASE, STAIRCASE_FOOD, STAIRCASE_FACING)
+        assert game.zigzag_potential == 0.0, 'the term off must skip the read, as the other two do'
+    finally:
+        restore()
+
+
+def test_a_reversal_costs_about_c_and_the_pair_leaving_the_window_refunds_it():
+    """On the staircase (facing right, last move a right turn), a left turn makes a fourth pair:
+    Phi -3 -> -4, F = c * (gamma * -4 + 3). With a window of 2 the same move both makes a pair and
+    drops the previous one: Phi -1 -> -1, F = c * (1 - gamma) -- a held *negative* potential pays a
+    little, the leak the plan's table calls "positive, and small"."""
+    module = build_chase_game(0.0, zigzag=0.5, zigzag_window=8)
+    try:
+        game = restored(module, STAIRCASE, STAIRCASE_FOOD, STAIRCASE_FACING)
+        finished, reward = game.step('left')
+        assert not finished
+        assert game.zigzag_potential == -4.0
+        assert abs(reward - 0.5 * (GAMMA * -4.0 + 3.0)) < 1e-12, reward
+    finally:
+        restore()
+    module = build_chase_game(0.0, zigzag=0.5, zigzag_window=2)
+    try:
+        game = restored(module, STAIRCASE, STAIRCASE_FOOD, STAIRCASE_FACING)
+        assert game.zigzag_potential == -1.0
+        finished, reward = game.step('left')
+        assert game.zigzag_potential == -1.0
+        assert abs(reward - 0.5 * (1.0 - GAMMA)) < 1e-12, reward
+        finished, reward = game.step('forward')
+        assert game.zigzag_potential == 0.0, 'the pair has left a two-move window'
+        assert abs(reward - 0.5 * 1.0) < 1e-12, reward
+    finally:
+        restore()
+
+
+def play_zigzag(c, actions, seed=7, penalty=0.0, discount=GAMMA):
+    module = build_chase_game(0.0, zigzag=c, zigzag_window=8, reversal_penalty=penalty)
+    try:
+        game = module.Game(display=False, discount=discount)
+        random.seed(seed)
+        game.reset()
+        steps = []
+        for action in actions:
+            finished, reward = game.step(action)
+            steps.append({'reward': round(reward, 12), 'finished': finished,
+                          'food': (game.current_food.position
+                                   if game.current_food != 'no food' else None)})
+            if finished:
+                break
+        return steps
+    finally:
+        restore()
+
+
+ZIGZAG_ACTIONS = ['forward', 'left', 'right', 'left', 'forward', 'right', 'right', 'forward',
+                  'left', 'right', 'forward', 'forward'] * 2
+
+
+def test_the_zigzag_shaping_telescopes_to_zero_on_a_real_episode():
+    """-c * Phi(s0), and the opening body is straight, so exactly 0 whatever the policy did."""
+    for seed in (1, 5, 9):
+        plain = play_zigzag(0.0, ZIGZAG_ACTIONS, seed=seed)
+        shaped = play_zigzag(0.5, ZIGZAG_ACTIONS, seed=seed)
+        assert len(plain) == len(shaped)
+        assert [s['food'] for s in plain] == [s['food'] for s in shaped]
+        telescope = sum((GAMMA ** i) * (shaped[i]['reward'] - plain[i]['reward'])
+                        for i in range(len(shaped)))
+        assert abs(telescope) < 1e-9, (seed, telescope)
+        assert any(abs(shaped[i]['reward'] - plain[i]['reward']) > 1e-6 for i in range(len(shaped))), (
+            'the shaping must have moved some reward, or the telescope is vacuous')
+
+
+def test_the_reversal_penalty_fires_on_exactly_the_reversal_steps():
+    """A step is charged iff its action is left after right or right after left; the first move,
+    a turn after forward, and the same turn twice are free. The sequence wanders into a wall part
+    way through, which is wanted: the terminal step is charged like any other, as the step penalty is."""
+    plain = play_zigzag(0.0, ZIGZAG_ACTIONS, seed=3)
+    charged = play_zigzag(0.0, ZIGZAG_ACTIONS, seed=3, penalty=0.5)
+    n = len(plain)
+    assert n == len(charged) and n >= 8, n
+    expected = [i > 0 and {ZIGZAG_ACTIONS[i - 1], ZIGZAG_ACTIONS[i]} == {'left', 'right'}
+                for i in range(n)]
+    assert any(expected) and not all(expected)
+    for i, is_reversal in enumerate(expected):
+        delta = charged[i]['reward'] - plain[i]['reward']
+        assert abs(delta - (-0.5 if is_reversal else 0.0)) < 1e-12, (i, ZIGZAG_ACTIONS[i], delta)
 
 
 def test_step_penalty_is_subtracted_from_an_ordinary_move_in_the_reference():

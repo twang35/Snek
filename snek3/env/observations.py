@@ -204,13 +204,14 @@ def _direction_of_step(from_pos, to_pos):
     return None
 
 
-def move_history_obs(body_positions, depth):
-    """2 values per past move, most recent first: [turned left, turned right]; forward is (0, 0).
+def recent_moves(body_positions, depth):
+    """The last `depth` relative actions, most recent first, read off the body.
 
     `body_positions` is the body head first, as `SnakeHead.get_positions()` gives it. The move made
     j steps ago turned the snake from the direction of body[j+1] -> body[j] to that of body[j] ->
     body[j-1], so the last `depth` moves need `depth + 2` cells; any move the body cannot show reads
-    forward, which is also what the straight opening body reads. Descriptive, not "1 is good".
+    'forward', which is also what the straight opening body reads. The one reader of the body's
+    shape as a move sequence: the history block and the zigzag terms both derive from it.
     """
     out = []
     cells = list(body_positions) if body_positions is not None else []
@@ -221,8 +222,27 @@ def move_history_obs(body_positions, depth):
             action = turn_between(prev_dir, new_dir) if prev_dir and new_dir else 'forward'
         else:
             action = 'forward'
+        out.append(action)
+    return out
+
+
+def move_history_obs(body_positions, depth):
+    """2 values per past move, most recent first: [turned left, turned right]; forward is (0, 0).
+    Descriptive, not "1 is good". See `recent_moves` for how the body is read."""
+    out = []
+    for action in recent_moves(body_positions, depth):
         out.extend([1 if action == 'left' else 0, 1 if action == 'right' else 0])
     return out
+
+
+def reversal_count(body_positions, window):
+    """Reversal pairs among the last `window` moves: adjacent moves of which one is 'left' and the
+    other 'right'. 0 <= count <= window - 1. A U-turn (the same turn twice) is not a reversal, and
+    neither is `left, forward, right`; the zigzag proper is what this counts (plans/zigzag-shaping.md).
+    """
+    moves = recent_moves(body_positions, window)
+    return sum(1 for a, b in zip(moves, moves[1:])
+               if (a == 'left' and b == 'right') or (a == 'right' and b == 'left'))
 
 
 def following_tail_obs(head_pos, tail_pos, head_move_dir):

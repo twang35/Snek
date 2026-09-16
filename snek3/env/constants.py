@@ -267,6 +267,30 @@ DEFAULT_FREE_SPACE_GATE = 85
 FREE_SPACE_SHAPING = _num('FREE_SPACE_SHAPING', DEFAULT_FREE_SPACE_SHAPING)
 FREE_SPACE_GATE = _num('FREE_SPACE_GATE', DEFAULT_FREE_SPACE_GATE, int)
 
+# **Zigzag shaping, two terms, both off by default** (plans/zigzag-shaping.md, batch b34). A *reversal*
+# is a `left` straight after a `right` or a `right` straight after a `left` -- adjacent moves only, so a
+# U-turn (the same turn twice, the pattern every perfect fill is made of) is not one. Both are read off
+# the body the way the move-history block is (`env.observations.reversal_count`), so neither needs a
+# buffer, a reset or a snapshot field.
+#
+# `ZIGZAG_SHAPING` is the potential-based term, Phi(s) = -(reversal pairs among the last ZIGZAG_WINDOW
+# moves the body shows), F = c * (gamma * Phi(s') - Phi(s)), the same form as the two above. Policy-
+# invariant, so it can only change how fast the policy is learned; a reversal costs ~c when made and
+# is refunded ~c when the pair leaves the window. The window defaults to the observation history depth
+# so Phi is a function of what the policy sees (indices 26- under `SNEK_OBS_HISTORY`); 8 when history
+# is off, and never below 2 (a pair needs two moves, and a depth-1 history must still import). A body
+# shorter than the window simply shows fewer moves, so no gate is needed.
+#
+# `REVERSAL_PENALTY` is the plain charge: subtracted on every step whose move reverses the one before,
+# terminal steps included, exactly as STEP_PENALTY is applied. Not invariant -- it changes the objective,
+# which is what the comparison arm is for.
+ZIGZAG_SHAPING = _num('ZIGZAG_SHAPING', 0.0)
+ZIGZAG_WINDOW = _num('ZIGZAG_WINDOW', max(OBS_HISTORY, 2) if OBS_HISTORY else 8, int)
+if ZIGZAG_WINDOW < 2:
+    raise ValueError('SNEK_ZIGZAG_WINDOW must be >= 2 (a reversal is a pair of moves), got {0}'.format(
+        ZIGZAG_WINDOW))
+REVERSAL_PENALTY = _num('REVERSAL_PENALTY', 0.0)
+
 # ----------------------------------------------------------------- checkpoints
 #
 # Below this average score no checkpoint is written. 40 is well clear of anything useful: across

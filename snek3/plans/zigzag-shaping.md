@@ -1,6 +1,6 @@
 # Zigzag shaping: charging a left-right or right-left pair
 
-**Status: reviewed 2026-09-16, decisions in §6; ready to build.** Nothing built yet. The request: a potential-based reward
+**Status: built 2026-09-16** (`SNEK_ZIGZAG_SHAPING` / `SNEK_ZIGZAG_WINDOW` / `SNEK_REVERSAL_PENALTY` in both engines, parity and telescope tests, 17 mutants killed by `tests/mut_zigzag.json`); b34's eight specs drafted, awaiting the deploy and the push. The request: a potential-based reward
 that pays for *not* zigzagging — every step that is not a reversal earns a little, and a reversal (a
 `left` straight after a `right`, or a `right` straight after a `left`) takes it away.
 

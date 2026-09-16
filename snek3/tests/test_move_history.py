@@ -10,7 +10,7 @@ import sys
 
 import numpy as np
 
-from env.observations import move_history_obs, turn_between
+from env.observations import move_history_obs, recent_moves, reversal_count, turn_between
 from tools import sidecar_env
 from vectorized import vec_env as V
 
@@ -83,6 +83,63 @@ def test_move_history_bits_agrees_with_the_reference_on_driven_lanes():
     assert bits[0].tolist() == [0.0] * 8, 'four forwards'
     assert bits[1].tolist() == [1, 0] * 4, 'four lefts'
     assert bits[2].tolist() == [0, 1, 1, 0, 0, 1, 0, 0], 'zigzag; the oldest move is off the body'
+
+
+# ------------------------------------------------------------- reversals (plans/zigzag-shaping.md)
+
+# Heading right, then left (up), right, left, right: the diagonal staircase, read head first.
+STAIRCASE = [(4, 3), (3, 3), (3, 4), (2, 4), (2, 5), (1, 5)]
+# Heading right, then two lefts in a row: a tight U-turn, the fill pattern.
+U_TURN = [(2, 4), (3, 4), (3, 5), (2, 5), (1, 5)]
+STRAIGHT = [(5, 3), (4, 3), (3, 3), (2, 3), (1, 3)]
+
+
+def test_recent_moves_reads_the_staircase_as_alternating_turns():
+    assert recent_moves(STAIRCASE, 4) == ['right', 'left', 'right', 'left']
+    assert recent_moves(STAIRCASE, 6) == ['right', 'left', 'right', 'left', 'forward', 'forward']
+    assert recent_moves(U_TURN, 3) == ['left', 'left', 'forward']
+
+
+def test_a_staircase_counts_every_adjacent_pair_and_a_u_turn_counts_none():
+    """The mutant that matters: 'any two turns in a row' would charge the U-turn every perfect fill is
+    made of. Only left-then-right or right-then-left is a reversal."""
+    assert reversal_count(STAIRCASE, 4) == 3
+    assert reversal_count(STAIRCASE, 8) == 3, 'the moves the body cannot show read forward and add nothing'
+    assert reversal_count(U_TURN, 8) == 0
+    assert reversal_count(STRAIGHT, 8) == 0
+    assert reversal_count(None, 8) == 0
+
+
+def test_a_window_shorter_than_the_staircase_counts_only_the_pairs_inside_it():
+    assert reversal_count(STAIRCASE, 2) == 1
+    assert reversal_count(STAIRCASE, 3) == 2
+
+
+def test_left_forward_right_is_not_a_reversal():
+    # Heading right, left (up), forward, right (right): a one-cell jog, adjacent-only says no.
+    jog = [(4, 3), (3, 3), (3, 4), (3, 5), (2, 5), (1, 5)]
+    assert recent_moves(jog, 3) == ['right', 'forward', 'left']
+    assert reversal_count(jog, 8) == 0
+
+
+def test_reversal_counts_agrees_with_the_reference_on_driven_lanes():
+    """Lanes driven through `VecSnake` with a zigzag, a U-turn spiral and a straight run; the buffer
+    read back as positions for the reference, and the counts asserted outright as well."""
+    env = V.VecSnake(4, seed=1)
+    seqs = [[2, 2, 2, 2, 2], [0, 0, 0, 2, 2], [0, 1, 0, 1, 0], [2, 0, 1, 2, 2]]
+    for t in range(5):
+        env.step(np.array([s[t] for s in seqs]), autoreset=False)
+    for window in (2, 4, 8):
+        counts = V.reversal_counts(env.body, env.hp, env.length, window)
+        for lane in range(4):
+            L, hp = int(env.length[lane]), int(env.hp[lane])
+            cells = [int(env.body[lane, (hp - k) % V.CAP]) for k in range(L)]
+            positions = [(c % V.GRID, c // V.GRID) for c in cells]
+            assert int(counts[lane]) == reversal_count(positions, window), (lane, window)
+    counts = V.reversal_counts(env.body, env.hp, env.length, 8)
+    # The body is the memory: at the opening length of 5 it shows only the last three moves, so the
+    # five-move zigzag reads L, R, L (two pairs) and lane 3's early L, R has already left the body.
+    assert counts.tolist() == [0, 0, 2, 0], counts.tolist()
 
 
 def test_move_history_bits_is_zero_width_at_depth_zero():

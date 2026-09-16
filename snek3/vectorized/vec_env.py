@@ -61,16 +61,17 @@ for _d, _delta in enumerate(DELTA):
     DIRCODE[int(_delta) + GRID] = _d
 
 
-def move_history_bits(body, hp, length, depth):
-    """`(n, 2 * depth)` float32: [turned left, turned right] for each of the last `depth` moves, most
-    recent first, read off the circular body buffer. The vectorised `env.observations.move_history_obs`.
+def recent_rel_moves(body, hp, length, depth):
+    """`(n, depth)` int64: the relative action (0 left, 1 right, 2 forward) of each of the last `depth`
+    moves, most recent first, read off the circular body buffer. The vectorised
+    `env.observations.recent_moves`, and the one reader both the history block and the zigzag terms use.
 
     Cell k behind the head is `body[hp - k]`; the move j steps ago turned the heading of cell j+1 ->
-    cell j into that of cell j -> cell j-1, so it needs cells 0..j+1 and reads forward, (0, 0),
-    wherever the body is shorter than that -- the straight opening body reads all forward too.
+    cell j into that of cell j -> cell j-1, so it needs cells 0..j+1 and reads forward (2) wherever
+    the body is shorter than that -- the straight opening body reads all forward too.
     """
     n = body.shape[0]
-    out = np.zeros((n, 2 * depth), dtype=np.float32)
+    out = np.full((n, max(depth, 0)), 2, dtype=np.int64)
     if depth <= 0:
         return out
     rows = np.arange(n)
@@ -82,10 +83,31 @@ def move_history_bits(body, hp, length, depth):
     for j in range(1, depth + 1):
         valid = have[:, j + 1] & (dirs[:, j] >= 0) & (dirs[:, j - 1] >= 0)
         rel = REL[np.where(valid, dirs[:, j], 0), np.where(valid, dirs[:, j - 1], 0)]
-        rel = np.where(valid, rel, 2)
-        out[:, 2 * (j - 1)] = rel == 0
-        out[:, 2 * (j - 1) + 1] = rel == 1
+        out[:, j - 1] = np.where(valid, rel, 2)
     return out
+
+
+def move_history_bits(body, hp, length, depth):
+    """`(n, 2 * depth)` float32: [turned left, turned right] for each of the last `depth` moves, most
+    recent first. The vectorised `env.observations.move_history_obs`; see `recent_rel_moves`.
+    """
+    rel = recent_rel_moves(body, hp, length, depth)
+    out = np.zeros((body.shape[0], 2 * max(depth, 0)), dtype=np.float32)
+    if depth <= 0:
+        return out
+    out[:, 0::2] = rel == 0
+    out[:, 1::2] = rel == 1
+    return out
+
+
+def reversal_counts(body, hp, length, window):
+    """`(n,)` int64: reversal pairs among the last `window` moves -- adjacent moves of which one is left
+    and the other right. The vectorised `env.observations.reversal_count`. A U-turn (the same turn
+    twice) and `left, forward, right` are not reversals.
+    """
+    rel = recent_rel_moves(body, hp, length, window)
+    a, b = rel[:, :-1], rel[:, 1:]
+    return (((a == 0) & (b == 1)) | ((a == 1) & (b == 0))).sum(axis=1)
 
 _yy, _xx = np.divmod(np.arange(NCELL), GRID)
 PLAYABLE = np.zeros(PAD, dtype=bool)
@@ -271,7 +293,8 @@ def _enumerate(pk, head_nb, tail_nb, food_bit, max_regions=NCELL):
 # board that never existed, stored as if it had. `tests/test_vec_env.py` checks this tuple against
 # the arrays `__init__` actually creates, so adding a field without adding it here fails the suite.
 STATE_FIELDS = ('body', 'hp', 'length', 'head_dir', 'food', 'step_count', 'last_food_step',
-                'score', 'open_', 'chase_safe_potential', 'free_space_potential')
+                'score', 'open_', 'chase_safe_potential', 'free_space_potential',
+                'zigzag_potential')
 
 
 class VecSnake:
@@ -311,6 +334,7 @@ class VecSnake:
         # Game.restore_snapshot, which recomputes it.
         self.chase_safe_potential = np.zeros(n, dtype=np.float64)
         self.free_space_potential = np.zeros(n, dtype=np.float64)
+        self.zigzag_potential = np.zeros(n, dtype=np.float64)
         self.episodes_started = 0
         self.reset_all()
 
@@ -557,9 +581,15 @@ class VecSnake:
                       + np.abs(new_head // GRID - food_now // GRID))
         reward[shaped & (dist_after > dist_before)] -= C.FOOD_DISTANCE_REWARD
 
+        # --- the plain reversal charge: every step whose move reverses the one before, terminal steps
+        # included, as the step penalty is applied. Read off the new body (the last two moves).
+        if C.REVERSAL_PENALTY:
+            reward -= C.REVERSAL_PENALTY * (
+                reversal_counts(self.body, self.hp, self.length, 2) > 0)
+
         # --- potential-based shaping, F = c * (gamma * Phi(s') - Phi(s)), measured on the post-move
         # board with the replacement food already placed, and Phi(terminal) = 0 as the theory needs.
-        if C.CHASE_SAFE_SHAPING or C.FREE_SPACE_SHAPING:
+        if C.CHASE_SAFE_SHAPING or C.FREE_SPACE_SHAPING or C.ZIGZAG_SHAPING:
             reward += self._shaping_reward(finished)
 
         info = {'done': finished, 'ate': ate, 'died': died,
@@ -579,6 +609,8 @@ class VecSnake:
             self.chase_safe_potential[idx] = self._chase_safe_now()[idx]
         if C.FREE_SPACE_SHAPING:
             self.free_space_potential[idx] = self._free_space_now()[idx]
+        if C.ZIGZAG_SHAPING:
+            self.zigzag_potential[idx] = self._zigzag_now()[idx]
 
     def _shaping_reward(self, finished):
         out = np.zeros(self.n, dtype=np.float64)
@@ -592,7 +624,16 @@ class VecSnake:
             out += C.FREE_SPACE_SHAPING * (self.shaping_discount * new
                                            - self.free_space_potential)
             self.free_space_potential = new
+        if C.ZIGZAG_SHAPING:
+            new = np.where(finished, 0.0, self._zigzag_now())
+            out += C.ZIGZAG_SHAPING * (self.shaping_discount * new
+                                       - self.zigzag_potential)
+            self.zigzag_potential = new
         return out
+
+    def _zigzag_now(self):
+        """`Game._zigzag_potential`, vectorised: minus the reversal pairs in the last ZIGZAG_WINDOW moves."""
+        return -reversal_counts(self.body, self.hp, self.length, C.ZIGZAG_WINDOW).astype(np.float64)
 
     def _packed(self, open_=None):
         src = self.open_ if open_ is None else open_
