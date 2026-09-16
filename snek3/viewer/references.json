@@ -310,5 +310,20 @@
   "label": "reference: b27's hist8 cell at 100M with the default perfect-game reward 100 -- b33 sweeps the reward at 50M with the anneal final at 25M; b33's own win100 cell is the like-for-like control",
   "after": "win100",
   "value": "100"
+ },
+ "b34": {
+  "arms": [
+   "b27q-hist8-seed17",
+   "b27r-hist8-seed18",
+   "b27s-hist8-seed19",
+   "b27t-hist8-seed20",
+   "b27u-hist8-seed21",
+   "b27v-hist8-seed22",
+   "b27w-hist8-seed23",
+   "b27x-hist8-seed24"
+  ],
+  "label": "reference: b27's hist8 cell at 100M -- b34's base, verbatim; the two b34 cells add a zigzag potential (zz) or a per-reversal penalty (rp) to it",
+  "after": "rp50",
+  "value": "0"
  }
 }

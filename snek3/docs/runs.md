@@ -39,6 +39,7 @@ are in git history before 2026-09-10.
 
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
+| [b34](#b34--zigzag-shaping-a-reversal-potential-beside-a-reversal-penalty) | `SNEK_ZIGZAG_SHAPING` 0.5 (potential, window 8) / `SNEK_REVERSAL_PENALTY` 0.5 (plain) | b27's `hist8`, verbatim | 2 × 4 | 100M | registered | — |
 | [b33](#b33--the-perfect-game-reward) | `SNEK_PERFECT_GAME_REWARD` 0 / 10 / 30 / 50 / 100 / 200 / 300 / 1000 | pen01 + hist8, anneal final at 25M | 8 × 4 | 50M | held on 0-300, falsified on 1000 | a monotone onset lever saturating at 100 (density 87.3 → 94.9, then 94.9-96.5); no collapse after 15M in any cell — 1000's drawdowns are a 15M onset; `win0` reaches 99.78 best30 and 9 rows at ≥99.8 /5k, so invariant 6 falls; nothing at 99.8 /30k from any cell at 50M, where b27's 100M had 9 |
 | [b32](#b32--b28s-best-checkpoints-annealed-on-to-a-horizon-of-10) | warm start from b28's eight best /30k checkpoints; γ and λ 0.999 → 1.0 over 50M, held 50M | b28's converged values | 1 × 8 | 100M | falsified (the top moved) | stage B 99.8% in every window from the first eval; `hof30k` 92 full rows, 78 at ≥99.8; **`b32g` @62423040 at 29,967 /30k, the new record** (99.86 on a second seed), from a 61-63M plateau averaging the old ceiling; the other seven arms stayed on it |
 | [b31](#b31--mse-value-loss-on-the-hist8-base) | `SNEK_PPO_VALUE_LOSS` mse | pen01 + hist8 | 1 × 8 | 100M | falsified | worse on this base: onset 51 vs 83% at 0-25M, 88.0% density, nothing reaches 30k at 99.8; only the stability columns keep `mse`'s old gain |
@@ -98,6 +99,24 @@ evals below 50% and 80%), then best30. `hof5000` re-measures the top rows at 5,0
 at complete separation (Mann-Whitney p=0.029). Details in [`protocol.md`](protocol.md).
 
 ---
+
+## b34 — zigzag shaping: a reversal potential beside a reversal penalty
+
+| | |
+|---|---|
+| base | b27's `hist8` config, verbatim (its entry below has every knob): 100M, `SNEK_PPO_ANNEAL_FRACTION` 0.5, so γ, λ and entropy reach their finals at 50M and hold to 100M |
+| varies | the reward, two ways. **`zz`**: `SNEK_ZIGZAG_SHAPING=0.5`, potential-based, Φ = −(reversal pairs among the last 8 moves the body shows -- the observation history depth), F = c·(γΦ(s′) − Φ(s)). **`rp`**: `SNEK_REVERSAL_PENALTY=0.5`, subtracted on every step whose move is a `left` straight after a `right` or the converse. A reversal is adjacent moves only; a U-turn (the same turn twice, the fill pattern) is not one. [`../plans/zigzag-shaping.md`](../plans/zigzag-shaping.md) |
+| cells × seeds | 2 × 4 (`b34a`-`b34d` `zz` seeds 1-4, `b34e`-`b34h` `rp` seeds 5-8) |
+| control | b27's `hist8` cell (`b27q`-`b27x`), the base itself: 94-95% density, 99.81 /30k |
+| predicted | registered 2026-09-16 by the agent with the user: `zz` level with `hist8` on density and the 30k top, and its reversal rate by board fill within 1 pp of the champion's -- the invariance holds and PPO takes nothing from the hint, as b21 found for chase-safe. `rp` cuts the early-board (fill < 50%) reversal rate by more than half, leaves the endgame's ~0 where it is, and sits within noise of `hist8` on density. A density or 30k gain in `rp` falsifies "zigzagging is not the mechanism"; a density loss says the early zigzags are load-bearing |
+
+**Why.** The move-history plan deferred this as its "fifth arm": b27 showed that letting the policy
+*see* its turn sequence was the largest lever found, and whether *charging* for zigzags does anything
+has never run. Measured before queueing, the record checkpoint reverses on 1.7% of steps (0.178 per
+meal, 17 per episode), almost all below 50% board fill and one in ~900 steps from 60% on -- so both
+terms act on the open early board. The doses are sized from that: 0.5 puts the potential's traffic at
+0.18 per meal (chase-safe's order) and the penalty at 0.089 per meal (the step penalty's flow, which
+b26 found real where a tenth of it did nothing).
 
 ## b33 — the perfect-game reward
 
