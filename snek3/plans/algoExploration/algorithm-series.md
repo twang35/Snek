@@ -1,7 +1,9 @@
 # The algorithm series: which learning algorithms to test against Snake, and in what order
 
-**Status: agreed 2026-09-16, nothing built.** This is the ordering and the reasoning only. Each row
-becomes its own design plan when its turn comes; implementation is not in scope here.
+**Status: agreed 2026-09-16, nothing built.** This is the ordering and the reasoning only. Each group has
+its implementation plan beside this file -- [`README.md`](README.md) indexes them and holds the conventions
+every plan leans on: `a-return-tail.md`, `b-value-stack.md`, `c-entropy.md`, `d-memory.md`,
+`e-exploration.md`, `f-data-efficiency.md`, `g-planning.md`, `h-gdi.md`.
 
 The question behind the series is not "which algorithm has the highest Atari score". Atari
 human-normalised scores mix three regimes -- 200M-frame single-agent runs, 100k-step data-efficiency

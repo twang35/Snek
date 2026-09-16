@@ -1,0 +1,191 @@
+# Group A: the return tail -- DQN, C51, QR-DQN, IQN, FQF, Munchausen
+
+**Status: planned 2026-09-16, nothing built.** Group A of [`algorithm-series.md`](algorithm-series.md);
+conventions in [`README.md`](README.md). Phase 1 (A1) and phase 2 (A2-A6) of the running order.
+
+The question: does modelling the *distribution* of the return, rather than its mean, help a game whose
+champions die of one rare fatal move late in a long game? The ladder is one knob per rung -- the
+distribution itself (C51), then dropping the fixed support (QR-DQN), then sampling the fractions
+(IQN), then learning them (FQF), and finally an entropy-regularised bootstrap laid over the best
+(Munchausen). **A4's risk-sensitive arm is the row this group exists for**: acting on the low quantiles
+is the one thing a scalar critic cannot do, and it is the most direct test of the diagnosis in
+`docs/findings.md` that the failures are rare fatal moves, not noisy returns.
+
+## 1. What the group shares
+
+All six rows are value-based agents on replay. They reuse `algos/dqn/` for everything that is not the
+head or the loss: `replay.py` (prioritised, numpy sum tree), `collect.py` (lanes, n-step, the fork),
+`schedules.py` (epsilon and the shield fraction off the eval history), and `agent.py`'s exploration
+shield and `build_adam`. **The rungs differ in three places and only three**: the head, the loss, and
+how a greedy action is read off the head.
+
+| shared piece | decision |
+|---|---|
+| package | one package, `algos/dist/`, holding the distributional heads and losses, with one `algo.py` per rung registering `NAME`s `c51`, `qrdqn`, `iqn`, `fqf`. Four thin `algo.py` files over one `heads.py` and one `losses.py`, rather than four packages that each copy the replay wiring. `algos/dqn/algo.py` stays the DQN row's |
+| the agent | a `DistAgent` with the same `update`/`target` shape as `DdqnAgent`, parameterised by a head object that answers `q_values(logits) -> (m, actions)` for the greedy read and `loss(online, target, batch)`. Double-DQN action selection is kept on every rung (argmax of the online mean, evaluated on the target), so A2-A5 differ from A1 only in the head |
+| the sidecar | `arch.json` gains `head`: `{"type": "c51", "atoms": 51, "v_min": -10, "v_max": 110}`, `{"type": "quantile", "n": 200}`, `{"type": "iqn", "embedding": 64, "n_tau": 64}`, `{"type": "fqf", "n": 32, "embedding": 64}`. The signature includes it. A DQN sidecar has no `head` and the restore path treats absence as the scalar head, so every existing checkpoint still loads |
+| restore | `tools/restore.ALGORITHMS` gains the four names; each returns a module whose greedy policy is argmax over the head's **mean**. The risk-sensitive read (A4) is a second policy the sidecar does not select -- it is chosen by the eval, §5 |
+| knobs | `SNEK_DIST_*` for what the group owns (`SNEK_DIST_ATOMS`, `SNEK_DIST_V_MIN`, `SNEK_DIST_V_MAX`, `SNEK_DIST_QUANTILES`, `SNEK_DIST_TAU_SAMPLES`, `SNEK_DIST_EMBEDDING`, `SNEK_DIST_KAPPA` for the Huber threshold, `SNEK_DIST_FRACTION_LR` for FQF's proposal net). Everything DQN already names (`SNEK_LEARNING_RATE`, `SNEK_BATCH_SIZE`, `SNEK_N_STEP_UPDATE`, `SNEK_TARGET_UPDATE_*`, the fork, the replay, epsilon) keeps its name and default, because it means the same thing. PPO's knobs are refused by name |
+| the step | DQN's: `step_granularity` 1, one `collector.step()`, four game moves at the default fork. The x-axis is DQN's, so A2-A6 read directly against A1 |
+| the reward scale | the support and the Huber threshold are set from the reward configuration the batch runs under, not from Atari's. With win 100, food 1, death −5 and γ 0.99 the discounted return lies in roughly [−6, 110]; **C51's `v_min`/`v_max` must bracket that**, and this is the first thing the smoke checks (§4) |
+
+**Why not fold the heads into `algos/dqn/agent.py`.** The DQN row is the control for everything above
+it, and A1 is scheduled to run *before* any head exists. A control whose code changed between its run
+and the rows read against it is not a control. `algos/dqn/` does not change in this group.
+
+## 2. The rows
+
+### A1 -- DQN (double, prioritised, forking; `algos/dqn/`)
+
+Already built. Nothing to implement; the row's work is the batch. This is the first run of `dqn` on the
+26-value observation with the current reward preset and the `hist8` history, and the last DQN batches
+(`b1`, `b2`, snek3's phase-3 gates) ran under the 30-value observation and the `b2` preset. It also has
+to answer whether DQN's step budget is right: `docs/runs.md` b2 crossed 90% at 324k counted steps; the
+cap here is chosen from that and F1's answer once F1 has one.
+
+### A2 -- C51 (Bellemare, Dabney & Munos 2017)
+
+A categorical distribution over a fixed support of 51 atoms per action; the Bellman target is projected
+back onto the support and the loss is the cross-entropy. What it isolates against A1 is the
+distribution itself. snek2 ran C51 (`categorical_agent.py`, b38) and found it unstable enough that a
+win-reward shrink was tried and falsified, so **the first C51 batch is a stability batch, not a
+comparison**: two doses of `v_max` (110 and 200) at two seeds each, judged on whether the perfect rate
+holds once reached. Only a stable pair proceeds to the four-seed comparison against A1.
+
+| module | contents |
+|---|---|
+| `algos/dist/heads.py::Categorical` | the `(m, actions, atoms)` logits, softmax, the support, `q_values` as the expectation, the projection of a shifted and scaled target distribution onto the support |
+| `algos/dist/losses.py::categorical_ce` | cross-entropy against the projected target, per-sample so PER's importance weights apply |
+| `algos/dist/algo.py` (`c51`) | `build_config` adds atoms and support; `describe` names them; `fields`/`on_eval` are DQN's |
+
+Tests: the projection on a hand-worked three-atom support (a reward that lands between atoms splits its
+mass in the documented proportion; a target beyond `v_max` clips to the top atom); the expectation of a
+one-hot distribution is its atom; a batch where every target equals the online distribution has zero
+loss. Mutants: the projection's floor/ceil swap, the `(1 − done)` on the target, the support's sign.
+
+### A3 -- QR-DQN (Dabney, Rowland, Bellemare & Munos 2018)
+
+N quantile values per action at fixed fractions τ_i = (2i − 1) / 2N, fitted by the quantile Huber loss;
+no support to pick. What it isolates against A2 is dropping the support -- and it is the rung that says
+whether A2's instability, if any, was the projection.
+
+| module | contents |
+|---|---|
+| `heads.py::Quantile` | `(m, actions, n)` values; `q_values` is the mean over quantiles |
+| `losses.py::quantile_huber` | the asymmetric Huber over every (online τ_i, target τ_j) pair, threshold κ, per-sample |
+
+Tests: the quantile Huber at κ → 0 reduces to the pinball loss on a two-point example; the loss is
+zero when online and target quantiles coincide; the mean of sorted quantiles equals the sample mean.
+Mutants: the asymmetry weight `|τ − 1[u < 0]|` dropped, κ's role in the two branches swapped, the mean
+over the wrong axis.
+
+### A4 -- IQN (Dabney, Ostrovski, Silver & Munos 2018)
+
+The quantile function itself is the network: τ is sampled each step, embedded with a cosine basis,
+multiplied into the trunk, and the same quantile Huber fits it. What it isolates against A3 is
+sampling the fractions. **And it adds the risk-sensitive arm**: acting on the mean of quantiles drawn
+from τ ∈ [0, 0.25] (a CVaR policy) rather than from [0, 1].
+
+| module | contents |
+|---|---|
+| `heads.py::Implicit` | the cosine embedding of τ, the Hadamard product with the trunk, `q_values(obs, taus)`; `taus` default to N uniform draws, and a `risk` argument maps them through a distortion (`cvar`: τ ← α·τ) |
+| `algo.py` (`iqn`) | `build_config` adds the embedding width, `n_tau` for the online and target samples, and `SNEK_DIST_RISK_ALPHA` (1.0 = neutral); the training policy uses neutral τ, the greedy `policy_fn` uses the configured α |
+
+**The trunk is `QNet`'s hidden layers.** `algos/ppo/net.py` reuses `algos/dqn/net.py`'s `QNet` weight for
+weight; the implicit head does the same for the hidden stack and replaces only the head, so an IQN arm
+can `SNEK_INIT_FROM` a DQN or PPO checkpoint's trunk if that is ever wanted.
+
+Tests: the cosine embedding at τ = 0 is all ones; with `risk_alpha` = 1 the policy equals the neutral
+mean; with α → 0 the greedy action follows the lowest quantile on a hand-built two-action example whose
+means tie and whose tails differ. Mutants: the distortion applied to the target τ (it must apply to the
+acting τ only), the embedding's `π` dropped.
+
+**The eval question this row raises** is in §5: a risk-sensitive `policy_fn` is a second greedy policy
+over the same checkpoint, and the batch runs both.
+
+### A5 -- FQF (Yang, Zhao, Du, Wei & Liu 2019)
+
+A second network proposes the fractions themselves, trained on the 1-Wasserstein gradient with respect
+to the fractions; the quantile network is IQN's. What it isolates against A4 is learning where the
+quantiles go, which should matter most when the distribution is bimodal -- a perfect game against a
+fatal move is exactly that shape.
+
+| module | contents |
+|---|---|
+| `heads.py::FractionProposal` | a linear layer on the trunk feature producing N logits, softmax, cumsum to τ_1..τ_{N−1}, midpoints τ̂; its own optimiser at `SNEK_DIST_FRACTION_LR` (default 2.5e-9 as in the paper, scaled to this trunk in the smoke) and an entropy bonus `SNEK_DIST_FRACTION_ENTROPY` |
+| `losses.py::fraction_loss` | the closed-form gradient `2 F(τ_i) − F(τ̂_i) − F(τ̂_{i−1})`, detached from the quantile net |
+
+Tests: fractions are monotone in (0, 1) with τ_0 = 0 and τ_N = 1 by construction; the fraction gradient
+is zero when the quantile function is linear (equal spacing is optimal); the proposal update leaves the
+quantile network's parameters untouched. Mutants: the detach dropped, the cumsum replaced by the raw
+softmax, the midpoint index off by one.
+
+### A6 -- Munchausen (Vieillard, Pietquin & Geist 2020)
+
+Not a new head: a log-policy term added to the reward and a soft (log-sum-exp) target, applied to any
+of A1-A5. So it is **two knobs on `algos/dqn/` and `algos/dist/`, not a package**: `SNEK_MUNCHAUSEN_ALPHA`
+(0 = off, 0.9 in the paper), `SNEK_MUNCHAUSEN_TAU` (the entropy temperature, 0.03), and the log-policy
+clip `SNEK_MUNCHAUSEN_L0` (−1). With α = 0 and τ → 0 every algorithm is exactly what it was, and the
+test says so byte for byte. The two arms: M-DQN on A1, then M-IQN on whichever of A2-A5 has the best
+stage-B density.
+
+**This does change `algos/dqn/agent.py` after the A1 control has run.** The change is behind a knob
+whose default reproduces the old arithmetic exactly (a fixture asserts the target tensor is identical
+with the knob at its default), so A1's numbers still stand. The `algos/dqn/` freeze in §1 is for the
+duration of A2-A5; A6 is the point at which it lifts, and only for this.
+
+Tests: with α = 0 the target equals the double-DQN target to the bit; the log-policy term is clipped
+at `l0`; the soft target at τ → 0 recovers the max. Mutants: the clip's sign, the α applied to the
+bootstrap instead of the reward, the temperature dropped from the log-softmax.
+
+## 3. The batches, in order
+
+| batch | arms | base | read against | judged on |
+|---|---|---|---|---|
+| A1 | 4 seeds of `dqn` | the current PPO reference's reward preset, `SNEK_OBS_HISTORY=8`, `SNEK_FC_LAYERS=320`, DQN's own defaults; cap from `b2`'s onset (3M counted steps first, raised if the curve is still rising at the cap) | PPO's `hist8` table (`docs/runs.md` b27) | stage-B density, `hof5000`, `hof30k`, drawdown count |
+| A2 stability | 2 × 2: `v_max` 110 / 200, seeds 1-2 each | A1's config | -- | does the perfect rate hold after onset; `zero_since` never >200 evals after 80% |
+| A2 | 4 seeds at the stable support | A1's config | A1 | as A1 |
+| A3 | 4 seeds, N = 200 | A1's config | A2 | as A1 |
+| A4 | 4 seeds neutral, **plus** the same four checkpoints measured under CVaR α = 0.25 in stage B (§5) | A1's config | A3 | as A1; and the neutral-vs-CVaR delta on the *same* checkpoints |
+| A5 | 4 seeds, N = 32 | A1's config | A4 | as A1 |
+| A6 | 4 seeds M-DQN, 4 seeds M-best | A1's config; the best of A2-A5 | A1; that rung | as A1 |
+
+Each row waits for the one above to close. Every arm is a `train` spec on the shared queue with
+`SNEK_ALGO` naming the rung; `SNEK_OBS_HISTORY=8` is one depth per wave, as the queue rule requires.
+
+## 4. Smoke and stability gates before a batch is queued
+
+1. `PYTHONPATH=. SNEK_ALGO=<rung> SNEK_MAX_STEPS=5000 ... train.py smoke` runs, checkpoints, and the
+   checkpoint restores through `evaluate.py smoke one` and `watch.py`.
+2. For C51: `reward config:` is read off the log and the support brackets the discounted return range
+   it implies; the smoke asserts no target mass clips to the end atoms on the prefill batch.
+3. The mutation spec kills every mutant.
+4. A 500k-step laptop arm reaches a non-zero perfect rate. A rung that cannot is not queued and the
+   plan is revisited; the tuning budget for that is one laptop wave.
+
+## 5. The eval decision this group needs: two greedy policies per checkpoint
+
+A4's risk-sensitive read is a second greedy policy over the same weights. The eval protocol measures
+"the checkpoint", and every shard loads through `restore.policy_fn_for(arch, net)`. The decision:
+
+- **`arch.json` describes the network, not the acting rule.** The neutral policy is the default read of
+  an `iqn`/`fqf` sidecar, so watching, recording and stage A behave as for any checkpoint.
+- **A pass names the read.** `tools/closeout` and `evaluate.py` gain `--policy-variant cvar:0.25`,
+  threaded to `restore.policy_fn_for(arch, net, variant=...)`; a result file carries `variant` in its
+  header and `tools/results.py` names the file `<policy>_<pass>_cvar25.json` so it sits beside the
+  neutral one and nothing overwrites it. The HOF row for a risk-sensitive result carries the variant.
+- Stage A stays neutral. The training policy is neutral by definition, and stage A is what the epsilon
+  schedule reads; changing it would change the training.
+
+This is the same shape as the "no policy" reference form the fixed-path rows already use in the HOF,
+and it is what G1's search-versus-network decision (`g-planning.md` §5) reuses.
+
+## 6. What would change the plan
+
+- **A2 cannot be made stable within its stability batch.** Then A3 runs as the base of the ladder and
+  the finding is written; QR-DQN has no support to mis-set and is the usual modern default anyway.
+- **A4's CVaR read beats its own neutral read on the 30k top.** That is the group's headline and it
+  changes B2 (Beyond the Rainbow acts neutrally; the plan would add the CVaR read to it) and the
+  ordering (the CVaR read would be measured on every later value row).
+- **The whole ladder is level with A1.** The distribution is not the lever, the tail diagnosis stands
+  unexplained by value modelling, and Group D (memory) and Group G (planning) become the candidates.
