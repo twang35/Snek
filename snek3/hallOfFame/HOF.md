@@ -26,15 +26,23 @@ entries) on 2026-09-09, `b32g` (the first warm start) on 2026-09-13. Add one wit
 | **`b9ch-lam999-seed4-ckpt47251456`** | PPO, `fc 320`, 4 epochs, **λ 0.999** | **99.30%** (29790) | [99.2, 99.4] | 99.40 /5000 | −0.10 pp |
 | `b5h-ep8-seed8-ckpt9027584` | PPO, `fc 320`, 8 epochs | **98.96%** (29687) | [98.84, 99.07] | 99.20 /5000 | −0.24 pp |
 | `b6b-fc200x100-seed2-ckpt133120000` | PPO, `fc 200,100`, 4 epochs | **98.73%** (29619) | [98.60, 98.85] | 99.10 /5000 | −0.37 pp |
+| *reference:* `shortcut-path` ([`tools/fixed_path.py`](../tools/fixed_path.py)) | **no policy** -- the same cycle, jumping ahead along it toward the food while the snake is under 50 long | **100.00%** (30000) | [100.0, 100.0] | -- | -- |
 | *reference:* `fixed-path` ([`tools/fixed_path.py`](../tools/fixed_path.py)) | **no policy** -- one Hamiltonian cycle of the board, followed forever | **100.00%** (30000) | [100.0, 100.0] | -- | -- |
 
-**The last row is not an entry.** It is the snake that cannot lose: a closed tour of all 100 cells, so it never collides and
-never starves (the food is at most 99 cells ahead, inside the 100-step starve floor), 30,000 of 30,000 on seed 7. It is here as
-the reference the learned rows are read against, on the one axis the table does not carry: **steps a perfect game**. The tour
-costs 2,327.5 in closed form (2,327.7 measured, sd 155, range 1,763-2,953), 24.5 steps a meal; the three entries this checkout
-can load measured 986 (`b32g`), 1,017 (`b27t`) and 1,039 (`b27k`) on the same seed and 1,000 games -- 2.3x faster, 10.4-10.9 a
-meal -- and `b10ck`'s gifs below put the undiscounted record-holder at 2,774-3,727, slower than the tour. The finding and the
-command are in [`docs/findings.md`](../docs/findings.md) (2026-09-16); the measurement is `runs/fixed-path.json`.
+**The last two rows are not entries.** They are the snakes that cannot lose, here as the reference the learned rows are read
+against on the one axis the table does not carry: **steps a perfect game**. `fixed-path` walks a closed tour of all 100 cells,
+so it never collides and never starves (the food is at most 99 cells ahead, inside the 100-step starve floor); the tour costs
+2,327.5 steps a game in closed form (2,327.7 measured over 30,000 on seed 7, sd 155, range 1,763-2,953), 24.5 a meal.
+`shortcut-path` follows the same tour but steps to whichever neighbour is furthest ahead on it without passing the food or the
+tail -- every body cell lies between the tail and the head in tour order, so every cell ahead of the head and up to the tail is
+safe -- and stops doing so at length 50, because shortcuts scatter the body over the tour and a scattered body leaves the free
+cells scattered too (unbounded, it was 13 steps a meal at length 5 but 35 at length 85, and only 4% faster overall; the gate
+is the minimum of a sweep). It costs **1,415.6** a game (30,000 of 30,000, sd 89, range 1,092-1,745), 14.9 a meal. The three
+entries this checkout can load measured 986 (`b32g`), 1,017 (`b27t`) and 1,039 (`b27k`) on the same seed over 1,000 games:
+10.4-10.9 a meal, 0.42x the tour and 0.70x the shortcut snake, so the learned policies are ahead of both scripted ones and the
+distance to the shortcut reference is the part of their speed that is not explained by "jump ahead when it is safe".
+`b10ck`'s gifs below put the undiscounted record-holder at 2,774-3,727, slower than either. The finding and the commands are in
+[`docs/findings.md`](../docs/findings.md) (2026-09-16); the measurement is `runs/fixed-path.json`.
 
 `b32g` @62423040 leads `b27t` @85065728 by 0.08 pp (z = 2.4, p = 0.015) and `b27k` @77889536 by 0.08 pp (z = 2.6, p = 0.009) — a modest margin on the one count, carried by its basin (its section, below) and by a second 30,000 on seed 13 that read 29,957. `b27t` @85065728 and `b27k` @77889536 are **not distinguishable from each other** (z = 0.19, p = 0.85): two arms, two
 history depths, one rate, admitted as a pair. Each leads `b10ck` @30523392 by 0.16 pp (`b27t` z = 3.9, p < 1e-4; `b27k`
@@ -226,7 +234,7 @@ Captured with [`record_gif.py`](../record_gif.py) straight off the offscreen sur
 game step at 50 fps, snek2's settings (`--tile 20 --colors 32`, game seeds 1, 2, 3), so the two eras'
 folders read alike. **The number under each is its confirmed rate from the table above, not anything
 the recording shows** — three games settle nothing about a rate. 200x247, 61-202 s, 1.5-5.3 MB
-(**26.2 MB for the section**, the reference included), reproducible: the policy is greedy and food placement is the only
+(**28.5 MB for the section**, the two references included), reproducible: the policy is greedy and food placement is the only
 randomness, so the same command gives the same bytes.
 
 ```
@@ -244,6 +252,7 @@ PYTHONPATH=. python -u record_gif.py hallOfFame/<entry> --tile 20 --colors 32 --
 | ![b9ch](gifs/b9ch-lam999-seed4-ckpt47251456.gif)<br>**`b9ch-lam999-seed4`** @47251456<br>**99.30% /30,000** | The λ 0.999 record it displaced, from the same `fc 320` / 4-epoch / λ-and-γ family. Direct routes to the food, 1,081-1,177 steps a game — a third of `b10ck`'s length at 0.35 pp lower rate. |
 | ![b5h](gifs/b5h-ep8-seed8-ckpt9027584.gif)<br>**`b5h-ep8-seed8`** @9027584<br>**98.96% /30,000** | The first snek3 entry to beat snek2's champion on a matched measurement, and the earliest peak in the folder: 9M transitions, 3.5% of its arm's budget. 8 epochs where every later entry uses 4. |
 | ![b6b](gifs/b6b-fc200x100-seed2-ckpt133120000.gif)<br>**`b6b-fc200x100-seed2`** @133120000<br>**98.73% /30,000** | The only two-layer network here (`fc 200,100`, snek2's shape widened) and the latest peak, at 58% of a 230M budget. It ties snek2's published champion figure exactly, on 30,000 episodes where that figure was 3,000. |
+| ![shortcut-path](gifs/shortcut-path.gif)<br>**`shortcut-path`** — the reference with shortcuts<br>**100.00% /30,000**, no policy | **The tour, jumping ahead while it is safe.** While the snake is under 50 long the head takes whichever neighbour is furthest ahead on the tour without passing the food or the tail, so the early game darts across the board and the body reads as scattered blocks; at length 50 it reverts to the plain tour and, within one lap, the body is a solid block again and the endgame is `fixed-path`'s. Three games of 1,398-1,492 steps -- 40% under the tour, 40% over `b32g`. Recorded with `record_gif.py shortcut-path`. |
 | ![fixed-path](gifs/fixed-path.gif)<br>**`fixed-path`** — the reference<br>**100.00% /30,000**, no policy | **What a perfect game costs when nothing is decided.** The snake follows one closed tour -- down column 0, then the other nine columns row by row -- so the body is always a solid block of consecutive tour cells and the food is always somewhere ahead on the same line. Three games of 2,264-2,336 steps, twice `b27t`'s and `b32g`'s and under `b10ck`'s: every learned entry above it is either routing (finishing faster than this) or circling (slower). Recorded with `record_gif.py fixed-path`, the same seeds and settings. |
 
 ## Running an entry

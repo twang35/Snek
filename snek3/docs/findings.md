@@ -17,7 +17,23 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
-### A fixed Hamiltonian cycle wins every game in 2,330 steps; the record policies finish in 986-1,039, 2.3x faster, and the undiscounted `b10ck` was slower than not thinking at all
+### A fixed Hamiltonian cycle wins every game in 2,330 steps and the same cycle with safe shortcuts in 1,416; the record policies finish in 986-1,039, ahead of both, and the undiscounted `b10ck` was slower than not thinking at all
+
+**Addendum, the shortcut reference (same day).** `shortcut-path` follows the tour but steps to whichever neighbour is furthest
+ahead on it, bounded by the food's tour distance (never pass the food) and the tail's (never pass the tail). The bound on the tail
+is what makes it safe: every body cell lies between the tail and the head in tour order, so every cell in (head, tail] is empty or
+the vacating tail -- and it is *not* implied by the food bound, because once a shortcut has been taken the body's tour range is
+sparse and the food can sit on a skipped cell behind the tail; the first version had only the food bound and ran into its own
+body at step 135 of its first game. Bounded correctly it is 30,000 of 30,000 on seed 7. Unbounded in length it is barely faster
+than the tour (2,251 against 2,344 at 300 games): 13 steps a meal at length 5 against the tour's 48, but 35 at length 85 against 8,
+because a scattered body leaves the free cells scattered around the whole loop instead of directly ahead. **A length gate fixes
+that**: shortcuts off from length 50, the tour re-compacts the body within a lap, and the sweep over the gate at 400 games on
+seed 3 is a clean bowl -- 2,344 (gate 0, the tour) / 1,852 (20) / 1,621 (30) / 1,470 (40) / **1,418 (50)** / 1,450 (60) / 1,575
+(70) / 1,792 (80) / 2,257 (no gate). At 30,000 games on seed 7: **1,415.6 a game, sd 89, range 1,092-1,745, 14.9 a meal**. So the
+records at 986-1,039 are 0.70x the shortcut snake: "jump ahead when it is provably safe" accounts for the tour-to-1,416 part of
+their speed and something else -- routing through cells the invariant would forbid -- for the rest. `runs/fixed-path.json`
+carries both references; `record_gif.py shortcut-path` is its recording.
+
 
 `tools/fixed_path.py` (2026-09-16): a snake that follows one closed tour of all 100 cells -- column 0 as the spine, the other nine
 columns in boustrophedon rows, laid so the opening body already sits on it -- can neither collide nor starve (the food is at most

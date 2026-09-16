@@ -19,6 +19,21 @@
    "steps_expected": 2327.5
   },
   {
+   "name": "shortcut-path",
+   "episodes": 1000,
+   "perfect_games": 1000,
+   "perfect_percent": 100.0,
+   "starved": 0,
+   "died": 0,
+   "steps_mean": 1412.4,
+   "steps_median": 1412.0,
+   "steps_std": 85.1,
+   "steps_min": 1153,
+   "steps_max": 1672,
+   "steps_p90": 1521.0,
+   "steps_per_food": 14.87
+  },
+  {
    "name": "b27k-hist4-seed11-ckpt77889536 @77889536",
    "episodes": 1000,
    "perfect_games": 997,
