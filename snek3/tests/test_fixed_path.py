@@ -99,3 +99,64 @@ def test_the_scalar_policy_plays_a_perfect_game_on_the_reference_game():
         obs, _, done, info = env.step(int(policy_fn(obs)[0]))
     assert env.game.perfect_game
     assert 1000 < env.game.current_step < 3500
+
+
+def test_the_shortcut_snake_wins_every_game_in_fewer_steps_than_the_tour():
+    plain = fixed_path.play(fixed_path.FixedPath(), 40, seed=3, needs_obs=False)
+    short = fixed_path.play(fixed_path.ShortcutPath(), 40, seed=3, needs_obs=False)
+    assert short['perfect'].all()
+    assert not short['died'].any() and not short['starved'].any()
+    # Same seed, same food streams at the start; on average a shortcut game is far shorter.
+    assert short['steps'].mean() < 0.8 * plain['steps'].mean()
+
+
+def test_a_shortcut_never_jumps_past_the_tail_when_the_food_is_behind_it():
+    # The state the first version died in: body sparse on the tour after shortcuts, the food on a
+    # skipped cell behind the tail. From head 83 with the tail at 85, only 84 and the tail are
+    # ahead; index 98 is a body cell 15 ahead on the tour and must not be taken.
+    tour = fixed_path.cycle()
+    body_idx = [83, 80, 65, 62, 47, 46, 5, 4, 3, 2, 1, 0, 99, 98, 97, 96, 85]     # head first
+    body = [vec_env.flat(*tour[i]) for i in body_idx]
+    vec = VecSnake(1, seed=0)
+    heading = vec_env.DIRCODE[body[0] - body[1] + vec_env.GRID]
+    vec.set_state([body], [len(body)], [int(heading)], [vec_env.flat(*tour[64])], [135], [130],
+                  [12])
+    actor = fixed_path.ShortcutPath()
+    a = actor.actions(vec)
+    new_head = body[0] + vec_env.DELTA[vec_env.TURN[vec.head_dir[0], a[0]]]
+    assert int(actor.index[new_head]) in (84, 85)
+    _, _, done, info = vec.step(a, autoreset=False, observe=False)
+    assert not info['died'][0]
+
+
+def test_the_shortcut_never_passes_the_food_or_leaves_the_open_interval():
+    # Head at (5, 3) facing right on a fresh board; the tour runs row 3 left to right, so 'up' to
+    # (5, 2) is 15 cells ahead on the tour (row 2 runs right to left) and 'down' to (5, 4) is 76
+    # cells behind... unless the food is between. Put the food 3 cells ahead: only forward qualifies.
+    vec = VecSnake(1, seed=0)
+    index = fixed_path.tour_index_table()
+    head = int(vec.heads()[0])
+    ahead3 = int(np.flatnonzero(index == (index[head] + 3) % 100)[0])
+    vec.food[:] = ahead3
+    assert fixed_path.ShortcutPath().actions(vec)[0] == constants.ACTIONS.index('forward')
+    # Food far ahead, past (5, 2): the shortcut takes the jump up instead.
+    far = int(np.flatnonzero(index == (index[head] + 40) % 100)[0])
+    vec.food[:] = far
+    assert fixed_path.ShortcutPath().actions(vec)[0] == constants.ACTIONS.index('left')
+
+
+def test_the_scalar_shortcut_plays_a_perfect_game_and_agrees_with_the_vector_rule():
+    import os
+    os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
+    os.environ.setdefault('SDL_AUDIODRIVER', 'dummy')
+    import random
+    from env.scalar_env import SnakeEnv
+    env = SnakeEnv(discount=1.0, display=False, limit_fps=False, policy_name='')
+    policy_fn = fixed_path.scalar_policy(env.game, shortcut=True)
+    random.seed(5)
+    obs = env.reset()
+    done = False
+    while not done:
+        obs, _, done, info = env.step(int(policy_fn(obs)[0]))
+    assert env.game.perfect_game
+    assert env.game.current_step < 2000

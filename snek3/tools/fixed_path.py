@@ -1,6 +1,7 @@
 """A snake that never thinks: one Hamiltonian cycle over the 10x10 board, followed forever.
 
-    PYTHONPATH=. python -m tools.fixed_path                         # the cycle alone, 2000 games
+    PYTHONPATH=. python -m tools.fixed_path                         # both references, 2000 games
+    PYTHONPATH=. python -m tools.fixed_path --reference shortcut-path --episodes 30000 --json
     PYTHONPATH=. python -m tools.fixed_path --hof --episodes 1000   # and every hallOfFame/ entry
     PYTHONPATH=. python -m tools.fixed_path --policy hallOfFame/<entry> --episodes 500
 
@@ -22,6 +23,14 @@ ahead of the head on the tour, the food is uniform over them, so the meal costs 
 average; summed over L = 5 .. 99 that is 2,327.5. `expected_steps()` computes it and the CLI prints it
 beside the measurement, which is how the driver below is checked against the game it drives.
 
+**The shortcut variant, `shortcut-path`.** Number the cells by tour position. Every body cell lies
+between the tail and the head in tour order (the invariant the tour gives for free and a shortcut
+keeps), so every cell strictly ahead of the head and before the tail is empty. A neighbour of the head
+that is ahead on the tour, and not past the food, is therefore always safe, and the variant takes the
+one furthest ahead each step -- so it never pays more for a meal than the tour and usually much less,
+still cannot collide, and still cannot starve (the tour distance to the food falls by at least one a
+step). `ShortcutPath` is the vectorised form, `scalar_policy(game, shortcut=True)` the scalar one.
+
 **Every checkpoint measures in its own process.** `SNEK_OBS_HISTORY` is read once at import and the
 hall of fame mixes history depths, so `--hof` runs one subprocess per entry (with the sidecar adopted,
 as every other entry point does) and gathers their JSON. The fixed path itself needs no observation
@@ -35,7 +44,8 @@ import subprocess
 import sys
 
 from tools import sidecar_env  # noqa: E402  -- must precede anything that imports env.constants
-sidecar_env.adopt_from_argv(sys.argv)
+if __name__ == '__main__':
+    sidecar_env.adopt_from_argv(sys.argv)
 
 import numpy as np
 
@@ -113,24 +123,98 @@ class FixedPath:
         return vec_env.REL[vec.head_dir, new_dir]
 
 
-def scalar_policy(game):
+def scalar_policy(game, shortcut=False, gate=None):
     """A `policy_fn` for the scalar `env.game.Game`, for `record_gif.py` and `watch.py`.
 
     Reads the head and its heading off `game` and ignores the observation it is handed, so it plugs
     into the same `policy_fn(obs) -> actions` seam a checkpoint does. Returns a length-1 array.
+    `shortcut=True` is `ShortcutPath`'s rule on the scalar game, same words as its docstring.
     """
     tour = cycle()
-    following = {a: b for a, b in zip(tour, tour[1:] + tour[:1])}
+    cells = len(tour)
+    index = {cell: i for i, cell in enumerate(tour)}
+    gate = SHORTCUT_GATE if gate is None else int(gate)
     turn_to = {heading: {new: rel for rel, new in mapping.items()}
                for heading, mapping in constants.CURRENT_DIRECTION_MAPS.items()}
-    heading_of = {vector: name for name, vector in constants.MOVE_VECTORS.items()}
 
     def policy_fn(_obs=None):
         x, y = game.head.tile_pos
-        nx, ny = following[(x, y)]
-        heading = heading_of[(nx - x, ny - y)]
-        return np.array([constants.ACTIONS.index(turn_to[game.head.move_dir][heading])])
+        at = index[(x, y)]
+        food = game.current_food
+        to_food = ((index[tuple(food.position)] - at) % cells) if food != 'no food' else 1
+        to_tail = (index[tuple(game.tail.tile_pos)] - at) % cells
+        limit = min(to_food, to_tail) if shortcut and len(game.snake_group) < gate else 1
+        best_d, best_heading = 0, game.head.move_dir
+        for heading, (dx, dy) in constants.MOVE_VECTORS.items():
+            cell = (x + dx, y + dy)
+            if cell not in index:
+                continue
+            d = (index[cell] - at) % cells
+            if 1 <= d <= limit and d > best_d:
+                best_d, best_heading = d, heading
+        return np.array([constants.ACTIONS.index(turn_to[game.head.move_dir][best_heading])])
     return policy_fn
+
+
+# Snake length from which `ShortcutPath` stops taking shortcuts and walks the tour. Shortcuts scatter
+# the body over the tour, and a scattered body leaves the free cells scattered too, so late in the game
+# the head has to lap the whole board for a meal that a compact body would find a few cells ahead:
+# unbounded, the variant measured 13 steps a meal at length 5 against the tour's 48 but 35 at length
+# 85 against 8, and finished only ~4% faster overall. Above the gate the tour re-compacts the body
+# within one lap. The value is the minimum of a sweep (`docs/findings.md`, 2026-09-16).
+SHORTCUT_GATE = 50
+
+
+def tour_index_table():
+    """`index[flat cell] -> position on the tour`, -1 off it (the wall ring)."""
+    table = np.full(C.PAD, -1, dtype=np.int64)
+    for position, cell in enumerate(cycle()):
+        table[vec_env.flat(*cell)] = position
+    return table
+
+
+class ShortcutPath:
+    """`actions(vec) -> (n,)`: the tour, except that a neighbour further ahead on it -- and not past
+    the food -- is taken when there is one.
+
+    Safe because every body cell sits between the tail and the head in tour order, so every cell in
+    the open interval (head, tail) is empty, and the tail's own cell vacates on the step the head
+    arrives. A neighbour at tour distance 1 <= d <= d(tail) is therefore safe, and d <= d(food) keeps
+    the head from passing the food. **Both bounds are needed**: the body's tour range is sparse once
+    a shortcut has been taken, so the food can sit on a skipped cell *behind* the tail, where d(food)
+    alone would allow a jump past the tail into the body (the first version did exactly that, at
+    step 135 of its first game). The forward tour cell always qualifies (d = 1), so there is always a
+    move; with no food (the winning step has been taken) the lane is finished and any action will do.
+    """
+
+    name = 'shortcut-path'
+
+    def __init__(self, gate=None):
+        self.index = tour_index_table()
+        self.cells = PLAY * PLAY
+        self.gate = SHORTCUT_GATE if gate is None else int(gate)
+
+    def actions(self, vec):
+        head = vec.heads()
+        at = self.index[head]
+        food_at = np.where(vec.food >= 0, self.index[np.maximum(vec.food, 0)], -1)
+        to_food = np.where(food_at >= 0, (food_at - at) % self.cells, 1)
+        tail, _ = vec.tail_cells()
+        to_tail = (self.index[tail] - at) % self.cells
+        limit = np.where(vec.length < self.gate, np.minimum(to_food, to_tail), 1)
+        best_d = np.zeros(vec.n, dtype=np.int64)
+        best_dir = vec.head_dir.copy()
+        for direction in range(4):
+            cell = head + vec_env.DELTA[direction]
+            inside = vec_env.PLAYABLE[np.clip(cell, 0, C.PAD - 1)] & (at >= 0)
+            d = (self.index[np.clip(cell, 0, C.PAD - 1)] - at) % self.cells
+            ok = inside & (d >= 1) & (d <= limit) & (d > best_d)
+            best_d = np.where(ok, d, best_d)
+            best_dir = np.where(ok, direction, best_dir)
+        return vec_env.REL[vec.head_dir, best_dir]
+
+
+REFERENCES = {FixedPath.name: FixedPath, ShortcutPath.name: ShortcutPath}
 
 
 class Checkpoint:
@@ -270,6 +354,8 @@ def main(argv=None):
     parser.add_argument('--width', type=int, default=None)
     parser.add_argument('--policy', default=None,
                         help='measure this checkpoint directory instead of the fixed path')
+    parser.add_argument('--reference', action='append', choices=sorted(REFERENCES), default=None,
+                        help='which reference snakes to measure (default: all of them)')
     parser.add_argument('--hof', action='store_true',
                         help='also measure every hallOfFame/ entry, one subprocess each')
     parser.add_argument('--json', action='store_true', help='print one JSON row and nothing else')
@@ -285,16 +371,20 @@ def main(argv=None):
             print(json.dumps(rows[0]))
             return 0
     else:
-        actor = FixedPath()
-        sample = play(actor, args.episodes, seed=args.seed, width=args.width, needs_obs=False)
-        row = summarise(sample, actor.name)
-        row['steps_expected'] = expected_steps()
-        rows.append(row)
+        for name in (args.reference or REFERENCES):
+            actor = REFERENCES[name]()
+            sample = play(actor, args.episodes, seed=args.seed, width=args.width, needs_obs=False)
+            row = summarise(sample, actor.name)
+            if name == FixedPath.name:
+                row['steps_expected'] = expected_steps()
+                print('fixed path: {0} games, {1} perfect, mean {2} steps against a closed-form '
+                      '{3:.1f}'.format(row['episodes'], row['perfect_games'], row.get('steps_mean'),
+                                       row['steps_expected']), file=sys.stderr)
+            rows.append(row)
         if args.json:
-            print(json.dumps(row))
+            for row in rows:
+                print(json.dumps(row))
             return 0
-        print('fixed path: {0} games, {1} perfect, mean {2} steps against a closed-form {3:.1f}'.format(
-            row['episodes'], row['perfect_games'], row.get('steps_mean'), row['steps_expected']))
         if args.hof:
             for entry in hof_entries():
                 if not loadable_here(entry):

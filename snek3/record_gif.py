@@ -6,6 +6,7 @@
     PYTHONPATH=. python -u record_gif.py hallOfFame/<entry> --seed 7 --tile 40
     PYTHONPATH=. python -u record_gif.py --list                    # what is in hallOfFame/
     PYTHONPATH=. python -u record_gif.py fixed-path                # the Hamiltonian-cycle reference
+    PYTHONPATH=. python -u record_gif.py shortcut-path             # the same cycle with shortcuts
 
 The obvious way to build this would be to open a window, screen-record it, cut sixty seconds out
 of the recording and transcode that to a GIF. Every one of those steps is avoidable. `Game` draws
@@ -96,10 +97,12 @@ from tools import checkpoints
 # shortcut, not a second source of truth; to record another entry, name its hallOfFame/ directory.
 # Set back to None and `hof` falls back to "the only entry", saying so if there are more.
 HOF_RECORD = 'b9ch-lam999-seed4-ckpt47251456'
-# `record_gif.py fixed-path` records the reference snake from `tools/fixed_path.py` -- one Hamiltonian
-# cycle of the board, every game perfect -- through the same capture path, so its gif in
-# `hallOfFame/gifs/` is directly comparable with the checkpoints'. No checkpoint, so no restore.
+# `record_gif.py fixed-path` / `shortcut-path` record the reference snakes from `tools/fixed_path.py`
+# -- one Hamiltonian cycle of the board, plain or with shortcuts, every game perfect -- through the
+# same capture path, so their gifs in `hallOfFame/gifs/` are directly comparable with the
+# checkpoints'. No checkpoint, so no restore. The names are `fixed_path.REFERENCES`.
 FIXED_PATH = 'fixed-path'
+SHORTCUT_PATH = 'shortcut-path'
 
 PERFECT_TEXT = 'PERFECT GAME!!!'
 
@@ -503,9 +506,9 @@ def main(argv):
               '--format webp has no such limit.' % (args.fps, 1000.0 / delay_ms, delay_ms))
     target = original_target = target_frame_count(args.seconds, delay_ms)
 
-    fixed = args.policy == FIXED_PATH
+    fixed = args.policy in (FIXED_PATH, SHORTCUT_PATH)
     if fixed:
-        ckpt_dir, step, label = None, None, FIXED_PATH
+        ckpt_dir, step, label = None, None, args.policy
     else:
         ckpt_dir, step, label = resolve_policy(args.policy, args.step)
 
@@ -523,7 +526,7 @@ def main(argv):
     env = SnakeEnv(discount=0.9975, display=True, limit_fps=False, policy_name='')
     if fixed:
         from tools import fixed_path
-        policy_fn = fixed_path.scalar_policy(env.game)
+        policy_fn = fixed_path.scalar_policy(env.game, shortcut=args.policy == SHORTCUT_PATH)
     else:
         from tools import restore
         policy_fn, _, _ = restore.restore(ckpt_dir, step)
