@@ -79,19 +79,14 @@ its parts. If it beats it by more, the trunk or the collection is doing work wor
 D2 is R2D2 the algorithm -- recurrent replay with stored states and burn-in -- not R2D2 the 256-actor
 deployment. Run it at the actor count the box has.
 
-### Group E -- does planning with the true simulator win outright
+### Group E -- does exploration machinery matter when there is no exploration problem
 
 | order | row | what it isolates |
 |---|---|---|
-| E1 | **AlphaZero-style MCTS on the real `Game`** | search with an exact model, a learned policy and value prior. This is the row most likely to beat 98.7%, and the row whose result the fixed-path references most nearly predict |
-| E2 | **MuZero** | the same search with a *learned* model. Read against E1: what learning the model costs when the true one was free |
-| E3 | **EfficientZero V2** | MuZero's data-efficient form. Read against E2 and F1: whether the search or the sample-efficiency tricks carry it at low step counts |
-| E4 | **Muesli** | the policy-gradient relative: MuZero's model used for a regularised policy update instead of search at act time. Whether the model helps the *update* even when there is no search at play time |
+| E1 | **NGU** | episodic-novelty intrinsic reward on R2D2. Kept in the series to *confirm* it changes nothing, and to see whether the intrinsic term hurts a game where the shortest route is already the right one |
+| E2 | **Agent57** | NGU plus a meta-controller over the exploration/exploitation family. Read against E1 and D2: whether the meta-controller recovers what NGU's intrinsic term costs |
 
-E1 has a wrinkle the others do not: **the eval protocol measures a policy network, and E1's agent is a
-search**. The plan for E1 has to decide whether the reported number is the network acting alone (the
-distilled policy), the search acting with a fixed budget, or both, and the HOF has to say which. The
-fixed-path rows in the HOF already carry a "no policy" reference form, so there is a precedent.
+Both are built on D2, so they cannot run before it.
 
 ### Group F -- how much compute does any of this need
 
@@ -101,14 +96,19 @@ fixed-path rows in the HOF already carry a "no policy" reference form, so there 
 
 F1 is early in the ordering (§3) because its answer sizes every later row's budget.
 
-### Group G -- does exploration machinery matter when there is no exploration problem
+### Group G -- does planning with the true simulator win outright
 
 | order | row | what it isolates |
 |---|---|---|
-| G1 | **NGU** | episodic-novelty intrinsic reward on R2D2. Kept in the series to *confirm* it changes nothing, and to see whether the intrinsic term hurts a game where the shortest route is already the right one |
-| G2 | **Agent57** | NGU plus a meta-controller over the exploration/exploitation family. Read against G1 and D2: whether the meta-controller recovers what NGU's intrinsic term costs |
+| G1 | **AlphaZero-style MCTS on the real `Game`** | search with an exact model, a learned policy and value prior. This is the row most likely to beat 98.7%, and the row whose result the fixed-path references most nearly predict |
+| G2 | **MuZero** | the same search with a *learned* model. Read against G1: what learning the model costs when the true one was free |
+| G3 | **EfficientZero V2** | MuZero's data-efficient form. Read against G2 and F1: whether the search or the sample-efficiency tricks carry it at low step counts |
+| G4 | **Muesli** | the policy-gradient relative: MuZero's model used for a regularised policy update instead of search at act time. Whether the model helps the *update* even when there is no search at play time |
 
-Both are built on D2, so they cannot run before it.
+G1 has a wrinkle the others do not: **the eval protocol measures a policy network, and G1's agent is a
+search**. The plan for G1 has to decide whether the reported number is the network acting alone (the
+distilled policy), the search acting with a fixed budget, or both, and the HOF has to say which. The
+fixed-path rows in the HOF already carry a "no policy" reference form, so there is a precedent.
 
 ### Group H -- the outlier
 
@@ -125,11 +125,11 @@ Reading order is by group above; **running order** is by what each result unlock
 | 1 | **A1** DQN, **F1** BBF | A1 is already built and is the control for every value row. F1 says how many steps every later row needs. Both are cheap and neither depends on anything |
 | 2 | **A2 → A3 → A4 → A5**, then **A6** | the distributional ladder, one rung at a time, with A2 stabilised on this reward before A3 starts. A4's risk-sensitive arm is the series' most direct test of the diagnosis in §1 |
 | 3 | **D1** recurrent PPO, **C1 → C2** discrete SAC | both are one change to an agent that exists. D1 in particular is the cheapest row with a strong prior behind it, and its result decides how much D2 is worth |
-| 4 | **E1** AlphaZero MCTS | the row most likely to beat the record. It needs the eval-protocol decision in Group E made first, which is why it is not in phase 1 despite being independent of every other row |
+| 4 | **G1** AlphaZero MCTS | the row most likely to beat the record. It needs the eval-protocol decision in Group G made first, which is why it is not in phase 1 despite being independent of every other row |
 | 5 | **B1 → B2** Rainbow, Beyond the Rainbow | read against A, so they wait for A. B2 also wants A6's Munchausen result |
 | 6 | **D2** R2D2 | waits for D1 (is memory worth a second, heavier form) and B1 (the value stack it is built on) |
-| 7 | **E2 → E3**, **E4** | the learned-model rows wait for E1's number, which is what they are read against |
-| 8 | **G1 → G2** | built on D2; run last among the value rows because the expected result is a null |
+| 7 | **G2 → G3**, **G4** | the learned-model rows wait for G1's number, which is what they are read against |
+| 8 | **E1 → E2** | built on D2; run last among the value rows because the expected result is a null |
 | 9 | **H1** | a reproduction gate first, then the row if it passes |
 
 Two ordering rules that hold across phases: **no row starts until the row it is read against has a
@@ -143,7 +143,7 @@ Each row is measured under the standing protocol so the rows are comparable to e
 the same 26-value observation, the same reward configuration as the current PPO reference, the same
 stage-A and stage-B evals, 4 seeds a cell, the true perfect rate at depth and the number of drawdowns
 as the deciding numbers rather than the best single eval. Each row's design plan adds only what is
-specific to it: E1's search-versus-network decision, A4's risk-sensitive acting arm, H1's reproduction
+specific to it: G1's search-versus-network decision, A4's risk-sensitive acting arm, H1's reproduction
 gate.
 
 The series' own summary lives in `docs/findings.md` when rows close, one line per row against PPO; this
