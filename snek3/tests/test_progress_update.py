@@ -13,13 +13,13 @@ def _arm(policy, rows=None, best30=97.0, sef=80.0, evals=None):
         'policy': policy, 'batch': viewer_manifest.batch_of(policy), 'knob': viewer_manifest.knob_of(policy),
         'seed': viewer_manifest.seed_of(policy), 'stage_b_png': bool(rows), 'rows': len(rows or []),
         'density98': (100.0 * sum(r >= 98 for r in rows) / len(rows)) if rows else 0.0,
-        'cands99': sum(r >= 99 for r in rows or []), 'best_row': max(rows) if rows else None,
+        'cands': sum(r >= 99.2 for r in rows or []), 'best_row': max(rows) if rows else None,
         'best30': best30, 'best30_step': 40e6, 'sef': sef, 'drawdown50': 1.0, 'drawdown80': 5.0,
         'stage_a_98': 20.0, 'onset_step': 3e6, 'evals': 100,
     }
 
 
-ARMS = [_arm('b20aa-k1-seed1', [97, 98, 99]), _arm('b20ab-k1-seed2', [96, 96]),
+ARMS = [_arm('b20aa-k1-seed1', [97, 98, 99.2]), _arm('b20ab-k1-seed2', [96, 96]),
         _arm('b20ac-k2-seed1', [98, 98, 98, 99]), _arm('b20ad-k2-seed2', []),
         _arm('b19zz-ref-seed1', [98, 97], best30=98.0)]
 ENVS = {'b20aa-k1-seed1': {'SNEK_KNOB': '0.5', 'SNEK_SEED': '1', 'SNEK_OTHER': 'x', '_max_steps': 5e7},
@@ -42,7 +42,7 @@ def test_batch_table_groups_by_spec_value_pools_rows_and_slots_the_reference_num
     assert [g['reference'] for g in table['groups']] == [False, True, False]
     k1 = table['groups'][0]
     assert k1['rows'] == 5 and k1['density98'] == 40.0          # 2 of 5 rows, pooled not averaged
-    assert k1['per_seed'] == '66.7 0.0' and k1['cands99'] == 1 and k1['best_row'] == 99
+    assert k1['per_seed'] == '66.7 0.0' and k1['cands'] == 1 and k1['best_row'] == 99.2
     k2 = table['groups'][2]
     assert k2['per_seed'] == '100.0 –' and k2['rows'] == 4       # the rowless seed shows as a dash
 

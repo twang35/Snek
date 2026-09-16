@@ -34,6 +34,7 @@ import sys
 
 from env import constants
 from tools import batch_state
+from tools.eta import HOF_THRESHOLD
 from tools import claims
 from tools import publish_pages
 from tools import viewer_manifest
@@ -335,7 +336,7 @@ def group_row(value, arms, reference=False):
     return {
         'value': value, 'reference': reference, 'n': len(arms), 'rows': rows,
         'density98': round(pooled, 1) if pooled is not None else None, 'per_seed': per_seed,
-        'cands99': sum(a['cands99'] or 0 for a in arms),
+        'cands': sum(a['cands'] or 0 for a in arms),
         'best_row': max([a['best_row'] for a in with_rows if a['best_row'] is not None], default=None),
         'best30_mean': round(statistics.mean(best30), 2) if best30 else None,
         'best30_min': min(best30) if best30 else None, 'best30_max': max(best30) if best30 else None,
@@ -390,14 +391,14 @@ def knob_label(key):
 
 
 def group_table_md(table):
-    head = ('| {0} | rows | ≥98%/500 | per-seed share | ≥99 (`hof5000` cands) | best row | best30 (mean, range) '
-            '| sef | drawdown < 50% | < 80% | stage-A ≥98% |').format(knob_label(table['key']))
+    head = ('| {0} | rows | ≥98%/500 | per-seed share | ≥{1} (`hof5000` cands) | best row | best30 (mean, range) '
+            '| sef | drawdown < 50% | < 80% | stage-A ≥98% |').format(knob_label(table['key']), HOF_THRESHOLD)
     lines = [head, '|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|']
     for g in table['groups']:
         name = '**{0}** (reference)'.format(g['value']) if g['reference'] else str(g['value'])
         rng = '' if g['best30_min'] is None else ' ({0}-{1})'.format(g['best30_min'], g['best30_max'])
         lines.append('| {0} | {1:,} | {2} | {3} | {4} | {5} | {6}{7} | {8} | {9} | {10} | {11} |'.format(
-            name, g['rows'], _fmt(g['density98'], '%'), g['per_seed'], g['cands99'], _fmt(g['best_row']),
+            name, g['rows'], _fmt(g['density98'], '%'), g['per_seed'], g['cands'], _fmt(g['best_row']),
             _fmt(g['best30_mean'], digits=2), rng, _fmt(g['sef']), _fmt(g['drawdown50'], '%'),
             _fmt(g['drawdown80'], '%'), _fmt(g['stage_a_98'], '%')))
     return '\n'.join(lines) + '\n'
@@ -412,7 +413,7 @@ def arm_table_md(table):
         for a in g['arms']:
             step = '' if a['best30_step'] is None else ' @{0:.1f}M'.format(a['best30_step'] / 1e6)
             lines.append('| `{0}` | {1} | {2} | {3} | {4} | {5} | {6}{7} | {8} | {9} |'.format(
-                a['policy'], g['value'], _fmt(a['rows']), _fmt(a['density98'], '%'), _fmt(a['cands99']),
+                a['policy'], g['value'], _fmt(a['rows']), _fmt(a['density98'], '%'), _fmt(a['cands']),
                 _fmt(a['best_row']), _fmt(a['best30']), step, _fmt(a['sef']), _fmt(a['drawdown50'], '%')))
     return '\n'.join(lines) + '\n'
 
