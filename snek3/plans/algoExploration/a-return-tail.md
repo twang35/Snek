@@ -23,15 +23,52 @@ how a greedy action is read off the head.
 |---|---|
 | package | one package, `algos/dist/`, holding the distributional heads and losses, with one `algo.py` per rung registering `NAME`s `c51`, `qrdqn`, `iqn`, `fqf`. Four thin `algo.py` files over one `heads.py` and one `losses.py`, rather than four packages that each copy the replay wiring. `algos/dqn/algo.py` stays the DQN row's |
 | the agent | a `DistAgent` with the same `update`/`target` shape as `DdqnAgent`, parameterised by a head object that answers `q_values(logits) -> (m, actions)` for the greedy read and `loss(online, target, batch)`. Double-DQN action selection is kept on every rung (argmax of the online mean, evaluated on the target), so A2-A5 differ from A1 only in the head |
-| the sidecar | `arch.json` gains `head`: `{"type": "c51", "atoms": 51, "v_min": -10, "v_max": 110}`, `{"type": "quantile", "n": 200}`, `{"type": "iqn", "embedding": 64, "n_tau": 64}`, `{"type": "fqf", "n": 32, "embedding": 64}`. The signature includes it. A DQN sidecar has no `head` and the restore path treats absence as the scalar head, so every existing checkpoint still loads |
+| the sidecar | `arch.json` gains `head`: `{"type": "c51", "atoms": 51, "v_min": -10, "v_max": 110}`, `{"type": "quantile", "n": 200}`, `{"type": "iqn", "embedding": 64, "n_tau": 64, "n_tau_prime": 64, "k": 32}`, `{"type": "fqf", "n": 32, "embedding": 64}`. The signature includes it. A DQN sidecar has no `head` and the restore path treats absence as the scalar head, so every existing checkpoint still loads |
 | restore | `tools/restore.ALGORITHMS` gains the four names; each returns a module whose greedy policy is argmax over the head's **mean**. The risk-sensitive read (A4) is a second policy the sidecar does not select -- it is chosen by the eval, §5 |
-| knobs | `SNEK_DIST_*` for what the group owns (`SNEK_DIST_ATOMS`, `SNEK_DIST_V_MIN`, `SNEK_DIST_V_MAX`, `SNEK_DIST_QUANTILES`, `SNEK_DIST_TAU_SAMPLES`, `SNEK_DIST_EMBEDDING`, `SNEK_DIST_KAPPA` for the Huber threshold, `SNEK_DIST_FRACTION_LR` for FQF's proposal net). Everything DQN already names (`SNEK_LEARNING_RATE`, `SNEK_BATCH_SIZE`, `SNEK_N_STEP_UPDATE`, `SNEK_TARGET_UPDATE_*`, the fork, the replay, epsilon) keeps its name and default, because it means the same thing. PPO's knobs are refused by name |
+| knobs | `SNEK_DIST_*` for what the group owns (`SNEK_DIST_ATOMS`, `SNEK_DIST_V_MIN`, `SNEK_DIST_V_MAX`, `SNEK_DIST_QUANTILES`, `SNEK_DIST_TAU_SAMPLES` / `SNEK_DIST_TAU_PRIME_SAMPLES` / `SNEK_DIST_POLICY_SAMPLES` for IQN's N, N′ and K, `SNEK_DIST_EMBEDDING`, `SNEK_DIST_KAPPA` for the Huber threshold, `SNEK_DIST_FRACTION_LR` and `SNEK_DIST_FRACTION_ENTROPY` for FQF's proposal net). Everything DQN already names (`SNEK_LEARNING_RATE`, `SNEK_BATCH_SIZE`, `SNEK_N_STEP_UPDATE`, `SNEK_TARGET_UPDATE_*`, the fork, the replay, epsilon) keeps its name and default, because it means the same thing. PPO's knobs are refused by name |
+| the paper's exploration | every paper in this group anneals ε linearly from 1.0 to a floor over a fixed number of steps and holds it; snek3's `refine_epsilon` reads the eval history instead. The paper cell needs the paper's schedule, so **`algos/dqn/schedules.py` gains `SNEK_EPSILON_SCHEDULE=linear`** with `SNEK_EPSILON_ANNEAL_STEPS` (moves) and the existing `SNEK_INITIAL_EPSILON` / `SNEK_MIN_EPSILON` as its ends; `eval`, the default, is byte-for-byte the schedule A1 ran, and a fixture says so. This is the one change to `algos/dqn/` before A6, made **before A1 runs** so the control has it too. The shield is `SNEK_GUIDED_FRACTION=0` in the paper cell |
 | the step | DQN's: `step_granularity` 1, one `collector.step()`, four game moves at the default fork. The x-axis is DQN's, so A2-A6 read directly against A1 |
-| the reward scale | the support and the Huber threshold are set from the reward configuration the batch runs under, not from Atari's. With win 100, food 1, death −5 and γ 0.99 the discounted return lies in roughly [−6, 110]; **C51's `v_min`/`v_max` must bracket that**, and this is the first thing the smoke checks (§4) |
+| the reward scale | the papers clip rewards to [−1, 1] and size every scale against that (`README.md`, "Translating"); here rewards are not clipped, so the support and the Huber threshold are set from the reward configuration the batch runs under. With win 100, food 1, death −5 and γ 0.99 the discounted return lies in roughly [−6, 110]; **C51's `v_min`/`v_max` must bracket that**, and this is the first thing the smoke checks (§4). κ, the Huber threshold, is 1 as in every paper -- on this reward scale that is one meal, which is the paper's unit too |
 
 **Why not fold the heads into `algos/dqn/agent.py`.** The DQN row is the control for everything above
 it, and A1 is scheduled to run *before* any head exists. A control whose code changed between its run
 and the rows read against it is not a control. `algos/dqn/` does not change in this group.
+
+## 1b. The papers' settings, and how each lands here
+
+Every paper in the group runs the Dopamine-era Atari recipe -- Adam, batch 32, a 1M replay, one update
+per 4 agent steps, a target copy every 8,000-10,000 updates, ε 1.0 → 0.01 annealed over the first
+250k-1M steps and held, 1-step returns, uniform replay (PER is Rainbow's, not this group's) -- and the
+papers differ from each other in the head, the loss and the learning rate. The **paper cell** of every
+row runs this recipe on Snake, translated by `README.md`'s rules; the **local cell** runs the same head
+on `algos/dqn/`'s tuned defaults (lr 1e-5, batch 128, a 100k replay, a hard target copy every 8 updates,
+PER, the eval-driven ε, the shield and the fork). The two cells differ in the plumbing and agree on the
+algorithm, which is what makes the gap between them attributable.
+
+| setting | the papers (verified 2026-09-16 against the papers and the Dopamine / authors' configs) | paper cell here | local cell |
+|---|---|---|---|
+| optimiser, batch | Adam, 32 | Adam, `SNEK_BATCH_SIZE=32` | Adam, 128 |
+| learning rate, Adam ε | DQN / C51 2.5e-4; QR-DQN, IQN, FQF, M-DQN, M-IQN **5e-5**; Adam ε 0.01/32 = 3.125e-4 (C51, QR, IQN, FQF), DQN-Adam 1.5e-4 | the paper's per rung: `SNEK_LEARNING_RATE` 2.5e-4 for A1 and A2, 5e-5 for A3-A6; `SNEK_ADAM_EPSILON` 3.125e-4 | 1e-5, 1e-7 |
+| replay | 1M transitions, uniform, prefill 20k steps (Dopamine `min_replay_history`; FQF 50k) | `SNEK_REPLAY_BUFFER_MAX_LENGTH=1000000`, `SNEK_PRIORITY_EXPONENT=0`, `SNEK_INITIAL_COLLECT_STEPS=20000` | 100k, PER 0.6, 2,000 |
+| update frequency | one gradient step of batch 32 per 4 agent steps: 8 replayed samples per transition | `SNEK_REPLAY_RATIO` for 8 samples per transition at batch 32 (2 gradient steps per move at `collect_envs` 1) | 1.0 |
+| target network | hard copy every 8,000 updates (Dopamine; the papers say "as DQN", 10k) | `SNEK_TARGET_UPDATE_PERIOD=8000`, τ 1.0 | 8 |
+| n-step | 1 in every paper of this group (Dopamine's IQN gin uses 3; the Munchausen paper reverts it to 1 and says so) | `SNEK_N_STEP_UPDATE=1` | 1 |
+| exploration | ε linear 1.0 → 0.01 over 250k steps (M-DQN, Rainbow's ε ablation) to 1M steps (DQN, QR-DQN, FQF); ε 0.001 at eval | `SNEK_EPSILON_SCHEDULE=linear`, `SNEK_INITIAL_EPSILON=1.0`, `SNEK_MIN_EPSILON=0.01`, `SNEK_EPSILON_ANNEAL_STEPS=1000000` moves; eval greedy as every snek3 eval is; **shield off, fork off** | the eval-driven schedule, 0.4 → 0.002, shield 0.8, fork 4 |
+| discount | 0.99 | 0.99 | 0.99 |
+| gradient clipping | none (DQN-family papers); the dueling paper clips the norm at 10 | none | none |
+| reward | clipped to [−1, 1] | **not clipped** -- see §1; scales set from the return range instead | same |
+| network | Nature CNN → 512 | `SNEK_FC_LAYERS=320`, the reference's trunk; the head is the rung's | same |
+| budget | 200M frames = 50M agent steps, 3-5 seeds | 50M moves a cell (12.5M counted steps at `collect_envs` 1, or the same moves at a wider `collect_envs`), 4 seeds; raised to the reference's 100M if the curve is still rising | as the paper cell |
+
+Per-rung values the papers fix and the plan takes verbatim:
+
+| rung | the paper's values |
+|---|---|
+| A2 C51 | 51 atoms; support [−10, 10] **on clipped rewards** -- here [−10, 110] at 51 atoms is a 2.4-wide bin, so the stability batch also runs **101 atoms** (the same 2.4 → 1.2 width step the paper's 21 → 51 gave); cross-entropy on the projected target; ε 0.01 |
+| A3 QR-DQN | N 200, κ 1 (QR-DQN-1), lr 5e-5 |
+| A4 IQN | N = N′ = 64 loss samples (Dopamine's config; the paper says 8 "appears to be sufficient" and does not state the Atari-57 value), K 32 policy samples, cosine embedding 64, κ 1, lr 5e-5. **Risk-sensitive form: the distortion is applied to the acting policy during training and to the policy in the Bellman target, and the score is reported under the risk-neutral eval** -- CVaR 0.25 and CVaR 0.1 are the paper's two CVaR arms |
+| A5 FQF | N 32; quantile net Adam 5e-5; fraction proposal **RMSProp** (centered, momentum 0, ε 1e-5) at 2.5e-9; fraction entropy coefficient 0.001 (the released code's default); target 10k; uniform replay, prefill 50k |
+| A6 Munchausen | α 0.9, τ 0.03, l₀ −1; ε-greedy acting (not the softmax); 1-step; M-DQN on Dopamine DQN-Adam at lr 5e-5 and target 8,000, M-IQN on Dopamine IQN with 1-step. **τ is set against a unit reward**; here the food reward is 1, so τ 0.03 means what it meant, and the +100 win is the term it under-weights -- the smoke records the log-policy term's magnitude beside the reward |
 
 ## 2. The rows
 
@@ -89,7 +126,7 @@ from τ ∈ [0, 0.25] (a CVaR policy) rather than from [0, 1].
 | module | contents |
 |---|---|
 | `heads.py::Implicit` | the cosine embedding of τ, the Hadamard product with the trunk, `q_values(obs, taus)`; `taus` default to N uniform draws, and a `risk` argument maps them through a distortion (`cvar`: τ ← α·τ) |
-| `algo.py` (`iqn`) | `build_config` adds the embedding width, `n_tau` for the online and target samples, and `SNEK_DIST_RISK_ALPHA` (1.0 = neutral); the training policy uses neutral τ, the greedy `policy_fn` uses the configured α |
+| `algo.py` (`iqn`) | `build_config` adds the embedding width, N / N′ / K, and `SNEK_DIST_RISK_ALPHA` (1.0 = neutral) with `SNEK_DIST_RISK_TRAIN` (0/1). **The paper's risk-sensitive agent applies the distortion to the acting policy during training and to the target's policy, and evaluates risk-neutrally** (Dabney et al. 2018 §4); `SNEK_DIST_RISK_TRAIN=1` does exactly that, and is the paper cell. With it at 0 the training policy is neutral and only the greedy `policy_fn` uses α, which is this plan's own addition: a second read of a neutral checkpoint (§5) |
 
 **The trunk is `QNet`'s hidden layers.** `algos/ppo/net.py` reuses `algos/dqn/net.py`'s `QNet` weight for
 weight; the implicit head does the same for the hidden stack and replaces only the head, so an IQN arm
@@ -97,8 +134,10 @@ can `SNEK_INIT_FROM` a DQN or PPO checkpoint's trunk if that is ever wanted.
 
 Tests: the cosine embedding at τ = 0 is all ones; with `risk_alpha` = 1 the policy equals the neutral
 mean; with α → 0 the greedy action follows the lowest quantile on a hand-built two-action example whose
-means tie and whose tails differ. Mutants: the distortion applied to the target τ (it must apply to the
-acting τ only), the embedding's `π` dropped.
+means tie and whose tails differ; with `risk_train` = 1 the target's argmax is taken under the distorted
+samples and the target's *values* under undistorted ones (the paper's split). Mutants: the distortion
+applied to the target's value samples, `risk_train` applied to the acting policy only, the embedding's
+`π` dropped.
 
 **The eval question this row raises** is in §5: a risk-sensitive `policy_fn` is a second greedy policy
 over the same checkpoint, and the batch runs both.
@@ -112,7 +151,7 @@ fatal move is exactly that shape.
 
 | module | contents |
 |---|---|
-| `heads.py::FractionProposal` | a linear layer on the trunk feature producing N logits, softmax, cumsum to τ_1..τ_{N−1}, midpoints τ̂; its own optimiser at `SNEK_DIST_FRACTION_LR` (default 2.5e-9 as in the paper, scaled to this trunk in the smoke) and an entropy bonus `SNEK_DIST_FRACTION_ENTROPY` |
+| `heads.py::FractionProposal` | a linear layer on the trunk feature producing N logits, softmax, cumsum to τ_1..τ_{N−1}, midpoints τ̂; its own **RMSProp** optimiser (centered, momentum 0, ε 1e-5, as the authors' code) at `SNEK_DIST_FRACTION_LR` (2.5e-9, the paper's) and an entropy bonus `SNEK_DIST_FRACTION_ENTROPY` (0.001, the released default) |
 | `losses.py::fraction_loss` | the closed-form gradient `2 F(τ_i) − F(τ̂_i) − F(τ̂_{i−1})`, detached from the quantile net |
 
 Tests: fractions are monotone in (0, 1) with τ_0 = 0 and τ_N = 1 by construction; the fraction gradient
@@ -140,18 +179,25 @@ bootstrap instead of the reward, the temperature dropped from the log-softmax.
 
 ## 3. The batches, in order
 
+Every row is two cells of four seeds -- one wave -- unless the table says otherwise: the **paper** cell on
+§1b's recipe and the **local** cell on `algos/dqn/`'s defaults. Both cells share the reward preset,
+`SNEK_OBS_HISTORY=8` and `SNEK_FC_LAYERS=320` of the PPO reference, and the rung's head values from §1b.
+
 | batch | arms | base | read against | judged on |
 |---|---|---|---|---|
-| A1 | 4 seeds of `dqn` | the current PPO reference's reward preset, `SNEK_OBS_HISTORY=8`, `SNEK_FC_LAYERS=320`, DQN's own defaults; cap from `b2`'s onset (3M counted steps first, raised if the curve is still rising at the cap) | PPO's `hist8` table (`docs/runs.md` b27) | stage-B density, `hof5000`, `hof30k`, drawdown count |
-| A2 stability | 2 × 2: `v_max` 110 / 200, seeds 1-2 each | A1's config | -- | does the perfect rate hold after onset; `zero_since` never >200 evals after 80% |
-| A2 | 4 seeds at the stable support | A1's config | A1 | as A1 |
-| A3 | 4 seeds, N = 200 | A1's config | A2 | as A1 |
-| A4 | 4 seeds neutral, **plus** the same four checkpoints measured under CVaR α = 0.25 in stage B (§5) | A1's config | A3 | as A1; and the neutral-vs-CVaR delta on the *same* checkpoints |
-| A5 | 4 seeds, N = 32 | A1's config | A4 | as A1 |
-| A6 | 4 seeds M-DQN, 4 seeds M-best | A1's config; the best of A2-A5 | A1; that rung | as A1 |
+| A1 | 4 seeds `dqn` **paper** (§1b: lr 2.5e-4, batch 32, 1M uniform replay, target 8k, ε linear 1 → 0.01 over 1M moves, no shield, no fork) + 4 seeds `dqn` **local** (DQN's defaults) | the reference's reward, history and trunk; 50M moves, raised if still rising | PPO's `hist8` table (`docs/runs.md` b27); the two cells against each other | stage-B density, `hof5000`, `hof30k`, drawdown count |
+| A2 stability | paper cell, 2 × 2: 51 atoms on [−10, 110] / 101 atoms on [−10, 110], seeds 1-2 each; `v_max` 200 as a third pair only if both clip mass at the top atom in the smoke | A1 paper | -- | does the perfect rate hold after onset; `zero_since` never >200 evals after 80% |
+| A2 | 4 paper at the stable support + 4 local | A1 | A1's two cells | as A1 |
+| A3 | 4 paper, N 200, κ 1, lr 5e-5 + 4 local | A1 | A2 | as A1 |
+| A4 | 4 paper neutral + 4 paper **CVaR 0.25 trained** (`SNEK_DIST_RISK_TRAIN=1`, the paper's risk-sensitive agent); the local cell and a CVaR 0.1 cell run in a second wave only if the first moves. Every neutral checkpoint is also *read* under CVaR 0.25 in stage B (§5) | A1 | A3 | as A1; the trained-CVaR cell against the neutral one, and the neutral-vs-CVaR *read* delta on the same checkpoints |
+| A5 | 4 paper, N 32 + 4 local | A1 | A4 | as A1 |
+| A6 | 4 paper M-DQN (on A1 paper) + 4 paper M-best (on the best of A2-A5's paper cells) | A1; that rung | A1 paper; that rung | as A1 |
 
 Each row waits for the one above to close. Every arm is a `train` spec on the shared queue with
 `SNEK_ALGO` naming the rung; `SNEK_OBS_HISTORY=8` is one depth per wave, as the queue rule requires.
+**The paper cell is the row's headline number**; the local cell's job is to say what the fork, the shield,
+PER and the fast target copy are worth on this game, and it is dropped from a row once two rows in a
+row have shown the same sign.
 
 ## 4. Smoke and stability gates before a batch is queued
 
@@ -160,7 +206,9 @@ Each row waits for the one above to close. Every arm is a `train` spec on the sh
 2. For C51: `reward config:` is read off the log and the support brackets the discounted return range
    it implies; the smoke asserts no target mass clips to the end atoms on the prefill batch.
 3. The mutation spec kills every mutant.
-4. A 500k-step laptop arm reaches a non-zero perfect rate. A rung that cannot is not queued and the
+4. The paper cell's ε schedule is read off the log at three points and is the linear ramp asked for;
+   the shield line reads 0 and the fork line reads 1 branch.
+5. A 500k-step laptop arm reaches a non-zero perfect rate. A rung that cannot is not queued and the
    plan is revisited; the tuning budget for that is one laptop wave.
 
 ## 5. The eval decision this group needs: two greedy policies per checkpoint
@@ -182,6 +230,9 @@ and it is what G1's search-versus-network decision (`g-planning.md` §5) reuses.
 
 ## 6. What would change the plan
 
+- **The paper cells trail the local cells everywhere.** The codebase's plumbing -- the shield, the fork,
+  PER, the fast target -- is what makes value learning work on this game, not the head; the finding is
+  written, the local cell becomes the base for A3-A6 and the paper cell is kept at one rung (A4) only.
 - **A2 cannot be made stable within its stability batch.** Then A3 runs as the base of the ladder and
   the finding is written; QR-DQN has no support to mis-set and is the usual modern default anyway.
 - **A4's CVaR read beats its own neutral read on the 30k top.** That is the group's headline and it

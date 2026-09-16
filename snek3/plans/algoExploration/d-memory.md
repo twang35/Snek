@@ -47,12 +47,21 @@ chunk zero the state, and the `(1 − done)` that gates GAE gates the recurrence
 | `algos/ppo/rollout.py` | a `(T, N, hidden)` state buffer beside the others and a `(T, N)` `fresh` mask; GAE unchanged |
 | `algos/ppo/collect.py` | carries the state across steps, zeroes on `done` |
 | `algos/ppo/agent.py` | the epoch loop iterates minibatches of **whole lanes** (sequences), not shuffled transitions, and replays the GRU from the stored state; the losses are the same three statements |
-| knobs | `SNEK_PPO_RECURRENT` (0/off; `gru`), `SNEK_PPO_RECURRENT_HIDDEN` (128), `SNEK_PPO_SEQ_MINIBATCH` (lanes per minibatch, 16). Feed-forward PPO is exactly what it was at the defaults, and a fixture asserts a rollout and an update are byte-identical with the knob off |
+| knobs | `SNEK_PPO_RECURRENT` (0/off; `gru`, `lstm`), `SNEK_PPO_RECURRENT_HIDDEN` (128), `SNEK_PPO_SEQ_MINIBATCH` (lanes per minibatch, 16). Feed-forward PPO is exactly what it was at the defaults, and a fixture asserts a rollout and an update are byte-identical with the knob off |
 
 Tests: a GRU replay from the stored state reproduces the log-probs stored at collection (the ratio is
 1 on the first epoch, to tolerance); a `done` inside a chunk zeroes the state; the recurrent net with
 `hidden` = 0 is refused rather than silently feed-forward. Mutants: the state not zeroed on `done`, the
 minibatch shuffling transitions, the stored state off by one step.
+
+**There is no recurrent-PPO paper; the reference is OpenAI baselines' `ppo2` with the `lstm` policy**
+(`baselines/common/models.py`, `baselines/ppo2/ppo2.py`): one LSTM of 128 units after the trunk, the
+state carried across rollouts, minibatches of whole per-env rollouts (`nenvs // nminibatches` lanes
+each) with the `done` mask resetting the state inside a sequence, truncated backpropagation over the
+rollout. That is the design above, so D1's paper cell *is* the plan: LSTM 128 (`gru` is the local
+variant), the reference's rollout of 256 as the BPTT length, 128 lanes / 4 minibatches = 32 lanes a
+minibatch. SB3-contrib's `RecurrentPPO` (256 hidden, chunked minibatches) is the other common form and
+is not followed, because its chunking breaks the whole-sequence property the tests pin.
 
 **The base is `hist8`, not `hist0`.** The question is whether memory adds to what the history window
 already gives, since that is the incumbent. A second cell at `SNEK_OBS_HISTORY=0` asks whether
@@ -62,33 +71,60 @@ recurrence *replaces* the window; it runs only if the first cell moves.
 
 Recurrent replay distributed DQN: an LSTM Q-network trained on fixed-length sequences from replay,
 each stored with the recurrent state at its start, with a **burn-in** prefix that is replayed to warm
-the state before the loss is taken over the rest, n-step targets, PER with a sequence priority
-(η-mix of max and mean absolute TD), and the value rescaling h(x) = sign(x)(√(|x| + 1) − 1) + εx.
-Here it is R2D2 the algorithm, at the box's actor count, on B1's Rainbow head.
+the state before the loss is taken over the rest, n-step double-Q targets, PER with a sequence priority
+(η-mix of max and mean absolute TD), and the value rescaling h(x) = sign(x)(√(|x| + 1) − 1) + εx on
+**unclipped** rewards. **The paper's head is a dueling scalar head, not a distributional one**, and the
+LSTM's input is the trunk's features concatenated with the previous action (one-hot) and the previous
+reward. Here it is R2D2 the algorithm, at the box's actor count.
 
 | module | contents |
 |---|---|
-| `algos/r2d2/net.py` | trunk → LSTM(`hidden`) → B1's dueling C51 head (or the scalar head, `SNEK_R2D2_HEAD=scalar`, for the ablation) |
+| `algos/r2d2/net.py` | trunk → concat(previous action one-hot, previous reward) → LSTM(`hidden`) → dueling scalar head (F1's `DuelingTrunk`, scalar form). `SNEK_R2D2_HEAD=c51` puts B1's dueling C51 head there instead, for the **local** variant that asks whether the memory and the distribution compound |
 | `algos/r2d2/replay.py` | a sequence buffer over `algos/dqn/replay.py`'s sum tree: entries are `(burn_in + length)`-step windows with the stored initial state; priorities per sequence. New; the transition buffer is reused for the tree only |
-| `algos/r2d2/collect.py` | `algos/dqn/collect.py`'s lanes carrying an LSTM state, cutting sequences at `SNEK_R2D2_SEQ_LENGTH` with overlap `SNEK_R2D2_SEQ_OVERLAP`; **no fork** (a forked lane would need a copied state and a copied sequence prefix; refused by name) |
-| `algos/r2d2/agent.py` | burn-in replay under `no_grad`, the n-step target on the remainder, the rescaling and its inverse, the sequence priority |
-| knobs | `SNEK_R2D2_HIDDEN` (256), `SNEK_R2D2_SEQ_LENGTH` (80), `SNEK_R2D2_BURN_IN` (40), `SNEK_R2D2_SEQ_OVERLAP` (40), `SNEK_R2D2_PRIORITY_ETA` (0.9), `SNEK_R2D2_RESCALE` (1), `SNEK_R2D2_HEAD` (`c51`); DQN's names for the rest |
+| `algos/r2d2/collect.py` | `algos/dqn/collect.py`'s lanes carrying an LSTM state and the previous action and reward, cutting sequences at `SNEK_R2D2_SEQ_LENGTH` with overlap `SNEK_R2D2_SEQ_OVERLAP`, never across an episode boundary; **no fork** (a forked lane would need a copied state and a copied sequence prefix; refused by name) |
+| `algos/r2d2/agent.py` | burn-in replay under `no_grad`, the n-step double-Q target on the remainder, the rescaling and its inverse, the sequence priority |
+| knobs | `SNEK_R2D2_HIDDEN` (512), `SNEK_R2D2_SEQ_LENGTH` (80), `SNEK_R2D2_BURN_IN` (40), `SNEK_R2D2_SEQ_OVERLAP` (40), `SNEK_R2D2_PRIORITY_ETA` (0.9), `SNEK_R2D2_RESCALE` (1) with `SNEK_R2D2_RESCALE_EPS` (1e-3), `SNEK_R2D2_HEAD` (`scalar`), `SNEK_R2D2_PREV_INPUT` (1: feed previous action and reward); DQN's names for the rest, at the paper's values (§2b) |
 | the step | one `collector.step()`, `collect_envs` moves |
 
 Tests: the rescaling and its inverse compose to the identity; the burn-in leaves parameters without
 gradient (a fixture checks `.grad` is None after a burn-in-only pass); the sequence priority at η = 1 is
 the max and at η = 0 the mean; a stored state replayed over the burn-in matches the state the collector
-had at the loss window's start when the weights have not changed. Mutants: burn-in included in the
-loss, the inverse rescaling skipped on the target, overlap producing a gap instead.
+had at the loss window's start when the weights have not changed; the previous-action input at an
+episode's first step is the zero vector. Mutants: burn-in included in the loss, the inverse rescaling
+skipped on the target, overlap producing a gap instead, the previous reward fed unrescaled.
+
+## 2b. The papers' settings, and how each lands here
+
+| setting | R2D2 (Table 2 and §2; "missing parameters follow Ape-X") | here |
+|---|---|---|
+| LSTM | 512, after the conv trunk's 512 features; previous action and reward as extra inputs | **512** (`SNEK_R2D2_HIDDEN`), over `fc 320`; a 256 cell is the tuning wave |
+| head | dueling, scalar, 512-wide streams | dueling scalar (F1's module); the C51 head is the local variant |
+| sequence, burn-in, overlap | 80, 40, 40; never across an episode boundary | 80, 40, 40 |
+| n-step | 5, double Q | `SNEK_N_STEP_UPDATE=5` |
+| discount | 0.997 | 0.99 (`README.md`, "Translating") |
+| replay | 4M observations (1e5 part-overlapping sequences); priority exponent 0.9, IS exponent 0.6, η 0.9 | 1e5 sequences (4M rows at 26+16 values ≈ 700 MB per box; halve it to 5e4 if the desktop's memory says so); α 0.9, β 0.6 held, η 0.9 |
+| batch | 64 sequences | 64 sequences |
+| optimiser | Adam 1e-4, ε 1e-3 | Adam 1e-4, ε 1e-3 |
+| target | hard copy every 2,500 learner updates | 2,500 |
+| value rescaling | h(x) with ε 1e-3; rewards **not** clipped | the same, on the unclipped reward -- this is the one paper in the series whose reward handling transfers as written |
+| exploration | 256 actors, per-actor ε_i = 0.4^(1 + 7 i / 255) (Ape-X), so ε from 0.4 down to 0.4⁸ ≈ 6.5e-4, held for the run | `collect_envs` 32 lanes with the same formula over i = 0..31 (`SNEK_EPSILON_SCHEDULE=apex`, `SNEK_INITIAL_EPSILON` 0.4, `SNEK_APEX_ALPHA` 7) -- a per-lane ε the collector already has the shape for, since the fork gives lanes different roles today; shield off, fork off |
+| replay ratio | ~0.8 replays per observation | `SNEK_REPLAY_RATIO` for 0.8 samples per transition |
+| actor weight refresh | every 400 environment steps | not applicable: one process, the collector reads the live net |
+| frames | 10B, 256 actors | 50M moves a cell, raised if still rising -- the ordinary budget, not the paper's; R2D2's algorithmic content does not need the actor count and the box has not got it |
+
+D2's **local** cell keeps everything above and swaps in this codebase's plumbing where it exists: PER
+0.6, the eval-driven ε, the shield, the fast target. Because R2D2 has no fork and the per-lane ε ladder
+is its own exploration answer, the local cell's difference is smaller than Group A's, and it runs only
+if the paper cell trails B1.
 
 ## 3. The batches
 
 | batch | arms | base | read against | judged on |
 |---|---|---|---|---|
-| D1 | 4 seeds `SNEK_PPO_RECURRENT=gru` | b27's `hist8` PPO config verbatim (the reference; `plans/zigzag-shaping.md` §6 states it) | PPO `hist8` | stage-B density, `hof5000`, `hof30k`, drawdowns; the onset step |
-| D1 no-window | 4 seeds at `SNEK_OBS_HISTORY=0` | D1 | PPO `hist0` (b7) and D1 | does recurrence replace the window; only if D1 moved |
-| D2 | 4 seeds of `r2d2` | A1's reward and history; B1's head and optimiser | D1 and B1 | as D1 |
-| D2 scalar head | 4 seeds `SNEK_R2D2_HEAD=scalar` | D2 | A1 and D2 | recurrence on a plain DQN, so the gain over A1 is memory alone |
+| D1 | 4 seeds `SNEK_PPO_RECURRENT=lstm` (the `ppo2` reference form, hidden 128) + 4 seeds `gru` | b27's `hist8` PPO config verbatim (the reference; `plans/zigzag-shaping.md` §6 states it) | PPO `hist8` | stage-B density, `hof5000`, `hof30k`, drawdowns; the onset step |
+| D1 no-window | 4 seeds of the better cell at `SNEK_OBS_HISTORY=0` | D1 | PPO `hist0` (b7) and D1 | does recurrence replace the window; only if D1 moved |
+| D2 | 4 seeds `r2d2` **paper** (§2b: LSTM 512, scalar dueling head, 5-step, Adam 1e-4, target 2,500, the Ape-X ε ladder) + 4 seeds `r2d2` with `SNEK_R2D2_HEAD=c51` (B1's head under the memory) | A1's reward and history | D1, A1 paper and B1 paper | as D1; the scalar cell against A1 is memory alone, the C51 cell against B1 is memory on the stack |
+| D2 local | 4 seeds paper with the codebase's PER, ε and target | D2 paper | D2 paper | only if D2 paper trails B1 |
 
 ## 4. Gates
 
@@ -96,7 +132,8 @@ loss, the inverse rescaling skipped on the target, overlap producing a gap inste
    same numbers (a fixed-seed `evaluate.py ... one` on a HOF entry before and after, byte-identical rows).
 2. Smoke for both; `watch.py` on a recurrent checkpoint plays a whole game with the state carried.
 3. The mutation specs kill every mutant.
-4. Tuning budget: one laptop wave each on the hidden width and, for D2, the sequence length.
+4. Tuning budget: one laptop wave each on the hidden width (D1 128 / 256; D2 512 / 256) and, for D2, the
+   sequence length (80 / 160, Agent57's).
 
 ## 5. What would change the plan
 

@@ -19,7 +19,7 @@ tell whether C1's result was the idea or the implementation.
 | replay, collection | `algos/dqn/replay.py` and `collect.py` with the fork **off** and the shield off: SAC's exploration is its own entropy, and forking a stochastic policy's replay would put a different distribution under the critics than the actor induces. `SNEK_FORK_*`, epsilon and the shield knobs are refused by name |
 | the sidecar | `algo` `sac` or `sac2`; no new head field -- the checkpoint is an actor of `QNet` shape, so `restore` reads it exactly as a PPO checkpoint, argmax over logits |
 | the step | DQN's: one `collector.step()`, `collect_envs` moves; `SNEK_COLLECT_ENVS` default 16 so the replay fills at a useful rate |
-| knobs | `SNEK_SAC_LEARNING_RATE` (3e-4), `SNEK_SAC_CRITIC_LEARNING_RATE` (3e-4), `SNEK_SAC_BATCH_SIZE` (256), `SNEK_SAC_TAU` (0.005, Polyak), `SNEK_SAC_TARGET_ENTROPY_RATIO` (0.98 of log |A|), `SNEK_SAC_INIT_ALPHA` (1.0), `SNEK_SAC_ALPHA_LEARNING_RATE` (3e-4), `SNEK_SAC_UPDATES_PER_STEP` (1). `DISCOUNT` and `COLLECT_ENVS` shared |
+| knobs | `SNEK_SAC_LEARNING_RATE` (3e-4), `SNEK_SAC_CRITIC_LEARNING_RATE` (3e-4), `SNEK_SAC_BATCH_SIZE` (64), `SNEK_SAC_TARGET_UPDATE_PERIOD` (8000, hard copy) / `SNEK_SAC_TAU` (1.0; 0.005 makes it Polyak), `SNEK_SAC_ALPHA` (`auto`, or a fixed number), `SNEK_SAC_TARGET_ENTROPY_RATIO` (0.98 of log \|A\|), `SNEK_SAC_INIT_ALPHA` (1.0), `SNEK_SAC_ALPHA_LEARNING_RATE` (3e-4), `SNEK_SAC_REPLAY_RATIO` (0.25 gradient steps per move), `SNEK_SAC_N_STEP` (1), `SNEK_SAC_ENTROPY_PENALTY` (0, off), `SNEK_SAC_CRITIC_COMBINE` (`min`), `SNEK_SAC_Q_CLIP` (0, off). `DISCOUNT` and `COLLECT_ENVS` shared. Defaults are C1's paper values (§2b) |
 
 ## 2. The rows
 
@@ -40,32 +40,60 @@ gradient's sign flips as entropy crosses the target; the actor loss is minimised
 Q/α on a two-state example; Polyak at τ = 1 is a hard copy. Mutants: the min over critics replaced by
 the mean, the log π term's sign, the `(1 − done)` on the soft target, the entropy target's sign.
 
-### C2 -- Revisiting Discrete SAC (Zhou, Wang, Feng & Zhou 2022)
+### C2 -- Revisiting Discrete SAC (Zhou, Wang, Feng & Zhou 2022; TMLR 2024, arXiv 2209.10081)
 
-The paper finds discrete SAC fails on Atari for two reasons and fixes each: the temperature drives
-the policy to near-uniform when the target entropy is too high, and the Q estimate overshoots. The
-fixes, as knobs on `algos/sac/`:
+The paper finds discrete SAC fails on Atari for two reasons and fixes each -- and **the fixes are not
+what an earlier draft of this plan said** (verified 2026-09-16 against the paper's §5 and Table 3 and
+the authors' code). The temperature is **fixed at α = 0.05** in every main run, not auto-tuned; the
+policy's entropy is stabilised by an **entropy-penalty** on the *change* in entropy between updates;
+and the Q overshoot is fixed by **double average Q-learning with a Q-clip**, which is a PPO-style clip
+on the critic's update rather than a clip of the target to a running range.
 
-| fix | knob | default for `sac` | value for `sac2` |
+| fix | what it is | knob | `sac` | `sac2` |
+|---|---|---|---|---|
+| **entropy-penalty** | β · ½ E[(H(π_old) − H(π))²] added to the policy loss, π_old the policy before the update; β swept {0.1, 0.2, 0.5, 1} | `SNEK_SAC_ENTROPY_PENALTY` | 0 | 0.5 |
+| **double average Q** | the target is r + γ · avg(Q′₁, Q′₂) instead of the min | `SNEK_SAC_CRITIC_COMBINE` | `min` | `avg` |
+| **Q-clip** | the critic loss is max((Q − y)², (Q′ + clip(Q − Q′, −c, c) − y)²), Q′ the target critic; c swept {0.5, 1, 2, 5} | `SNEK_SAC_Q_CLIP` | 0 | 0.5 |
+| fixed temperature | α is a constant, no target entropy and no α optimiser | `SNEK_SAC_ALPHA` | `auto` | 0.05 |
+
+`sac2` is `sac` with those values as its defaults; a `sac` spec can set any of them, and a `sac2` spec can
+put α back on `auto` for the ablation that asks whether the fixed temperature is itself a fix.
+
+Tests: with `avg` and two equal critics the target equals the `min` target; the Q-clip term equals the
+plain squared error when \|Q − Q′\| < c and is the larger of the two branches otherwise; the entropy
+penalty is zero when the policy did not move and grows as its square; with `SNEK_SAC_ALPHA` fixed the
+α optimiser is not built. Mutants: `avg` computed as a sum, the clip applied to the target instead of
+the online-minus-target difference, the penalty using the entropy's sign rather than its square.
+
+## 2b. The papers' settings, and how each lands here
+
+| setting | SAC-Discrete (Christodoulou 2019, Table 2) | Revisiting (Zhou et al., Table 3, both agents) | here |
 |---|---|---|---|
-| **entropy-penalty** -- the target entropy is scaled down and α's loss is clipped so the temperature cannot run away | `SNEK_SAC_TARGET_ENTROPY_RATIO`, `SNEK_SAC_ALPHA_CLIP` | 0.98, off | 0.7, on |
-| **double average Q-learning with Q-clip** -- the target uses the *average* of the two critics rather than the min, and the TD target is clipped to a running range of the average | `SNEK_SAC_CRITIC_COMBINE` (`min`/`avg`), `SNEK_SAC_Q_CLIP` | `min`, off | `avg`, on |
+| optimiser, lr | Adam 3e-4, all nets | Adam 1e-5 actor and critic, 3e-4 for α when auto | the paper's, per row: C1 3e-4, C2 1e-5 |
+| batch | 64 | 64 | 64 |
+| replay | 1M; 20k random steps before learning | 1e5 | C1 1M, C2 1e5; prefill 20k moves |
+| target | hard copy every 8,000 updates (the pseudocode writes Polyak, no τ given) | Polyak τ 0.005 | the paper's, per row |
+| update frequency | 1 gradient step per 4 env steps | 0.1 per step (Tianshou `update-per-step`) | `SNEK_SAC_REPLAY_RATIO` 0.25 for C1, 0.1 for C2 |
+| n-step | 1 | 3 | per row |
+| temperature | auto, target 0.98 · log \|A\| | fixed 0.05 | per row |
+| network | Nature CNN → 512 | 2 × 512 | `fc 320` actor and critics, the reference's trunk; a 2 × 512 cell is the local departure worth one wave if C2 is short |
+| critic loss | MSE | (Eq. 17 above) | Huber for C1 (the +100 terminal, as `algos/dqn/agent.py` argues) -- **a stated departure**; C2's clip is on the squared error as the paper writes it |
+| discount | 0.99 | 0.99 | 0.99 |
+| reward | clipped [−1, 1] | clipped | not clipped |
+| budget | 100k agent steps, 5 seeds | 10M env steps, 3 seeds | 50M moves a cell, raised if still rising; C1's paper budget is tiny and is the reason it also runs at F1's 500k-step cap |
 
-`sac2` is `sac` with those values as its defaults; a `sac` spec can set any of them. The paper's
-third recommendation, a larger batch, is `SNEK_SAC_BATCH_SIZE` and is set in the spec.
-
-Tests: with `avg` and two equal critics the target equals the `min` target; Q-clip leaves a target
-inside the range untouched and clips one outside; the α clip is inert when the loss is inside the
-bound. Mutants: `avg` computed as a sum, the clip range read from the online net instead of the
-running statistic.
+**On this game the fixed α is the thing to watch.** α 0.05 was set against a unit reward; here food is 1,
+so the entropy term is the paper's relative to a meal and 2,000× smaller relative to the win. The paper
+cell keeps 0.05 as written; if the policy goes deterministic before the endgame is learned, the one
+tuning wave (§4) is over α ∈ {0.05, 0.2, 1.0}, and `auto` is the comparison.
 
 ## 3. The batches
 
 | batch | arms | base | read against | judged on |
 |---|---|---|---|---|
-| C1 | 4 seeds of `sac` | the PPO reference's reward preset, `SNEK_OBS_HISTORY=8`, `SNEK_FC_LAYERS=320`; the group's defaults | A1 (DQN) and PPO's `hist8` table | stage-B density, `hof5000`, `hof30k`, drawdowns; **and the policy entropy trace** beside PPO's, which is in every PPO row already |
-| C2 | 4 seeds of `sac2` | C1's | C1 | as C1 |
-| C2 halves | 4 seeds entropy-penalty only, 4 seeds Q-clip only | C1's | C1, C2 | which fix did it |
+| C1 | 4 seeds `sac` on the 2019 paper's settings (§2b) + 4 seeds `sac` at F1's 500k-step cap (the paper's own regime, scaled) | the PPO reference's reward preset, `SNEK_OBS_HISTORY=8`, `SNEK_FC_LAYERS=320` | A1 paper (DQN) and PPO's `hist8` table | stage-B density, `hof5000`, `hof30k`, drawdowns; **and the policy entropy trace** beside PPO's, which is in every PPO row already |
+| C2 | 4 seeds `sac2` on the 2022 paper's settings (§2b) + 4 seeds `sac2` with `SNEK_SAC_ALPHA=auto` | C1's | C1 | as C1; the fixed-vs-auto α pair says whether the temperature was a fix |
+| C2 halves | 4 seeds entropy-penalty only, 4 seeds avg-Q + Q-clip only (the paper's two ablations) | C2's | C1, C2 | which fix did it |
 
 The halves run only if C2 differs from C1 by more than noise (`n=4` resolves ~10 pp, `CLAUDE.md`);
 if C1 and C2 are level there is nothing to attribute.
@@ -73,11 +101,12 @@ if C1 and C2 are level there is nothing to attribute.
 ## 4. Gates
 
 1. Smoke for both names; the actor checkpoint restores and watches as a PPO one does.
-2. A 500k-move laptop arm shows α falling from 1.0 and the entropy approaching the target; a
-   temperature that stays at its initial value is the paper's failure mode and is fixed before the row
-   is queued.
+2. A 500k-move laptop arm of `sac` shows α falling from 1.0 and the entropy approaching the target; a
+   temperature that stays at its initial value is the 2019 agent's failure mode and is fixed before the
+   row is queued. The same arm of `sac2` logs the entropy-penalty term and the fraction of critic
+   samples the Q-clip's second branch wins, both non-zero.
 3. The mutation spec kills every mutant.
-4. Tuning budget: one laptop wave over `SNEK_SAC_LEARNING_RATE` and `SNEK_SAC_UPDATES_PER_STEP`.
+4. Tuning budget: one laptop wave over α (§2b) for C2 and over `SNEK_SAC_LEARNING_RATE` for C1.
 
 ## 5. What would change the plan
 

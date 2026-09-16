@@ -15,46 +15,53 @@ read against, so EfficientZero V2 (G3) has a comparison on this game.
 
 ### F1 -- BBF (Schwarzer et al. 2023, "Bigger, Better, Faster")
 
-Rainbow-style DQN at a high replay ratio, with: a wider network (Impala CNN ×4 on Atari), **shrink-and-
-perturb resets** of the final layers every `reset_interval` gradient steps (parameters interpolated
-toward a fresh initialisation), **n-step annealed** 10 → 3 and **γ annealed** 0.97 → 0.997 over the
-first 10k steps after each reset, weight decay, a self-predictive representation loss (SPR), dueling,
-no noisy nets, no PER, and a target network with Polyak averaging.
+Rainbow-style DQN at a high replay ratio, with: a wider network (Impala CNN at width ×4 on Atari, a
+2048-wide hidden layer), **shrink-and-perturb resets** of the encoder every `reset_interval` gradient
+steps (parameters interpolated half-way toward a fresh initialisation) with the layers after it reset
+fully, **n-step annealed** 10 → 3 and **γ annealed** 0.97 → 0.997 exponentially over the first 10k
+gradient steps after each reset, weight decay, a self-predictive representation loss (SPR), dueling,
+double-Q, **C51 and prioritised replay kept**, no noisy nets, an EMA target network, and no ε-greedy at
+all during training. Verified 2026-09-16 against §4 and the authors' `BBF.gin`.
 
 **What transfers and what does not, decided up front:**
 
-| piece | here |
-|---|---|
-| the network | wider MLP: `SNEK_FC_LAYERS` at 4× the reference width (1280) with layer norm, the same "bigger" lever without a CNN. The trunk is `QNet`'s hidden stack, so the shape is one knob |
-| resets | `algos/bbf/resets.py::shrink_and_perturb(module, alpha, seed)`: θ ← α θ + (1 − α) θ_fresh, on the head and the last hidden layer, every `SNEK_BBF_RESET_INTERVAL` gradient steps (40k in the paper; scaled to the run in the smoke). The optimiser state for those parameters is reset with them. New |
-| n-step and γ anneal | `algos/bbf/schedules.py`: exponential from `SNEK_BBF_N_STEP_START` (10) to `SNEK_N_STEP_UPDATE` (3) and from `SNEK_BBF_GAMMA_START` (0.97) to `SNEK_DISCOUNT` (0.99 here, not 0.997 -- the horizon argument in `e-exploration.md` §1) over `SNEK_BBF_ANNEAL_STEPS` (10k) after each reset. **`algos/dqn/collect.py`'s n-step window becomes settable between steps**; that is the one change to `algos/dqn/`, and it is a setter with a fixture that the window at n is exactly what the constant n produced |
-| SPR | **dropped for the first batch**. The self-predictive loss is a representation learner for pixels; on a 26-value vector it is a transition-model auxiliary of unclear value, and it is the one piece with its own network and its own knobs. `SNEK_BBF_SPR=1` is reserved and a second batch adds it if F1 is short of the paper's relative gain |
-| dueling, Polyak, weight decay | **F1 builds `DuelingTrunk`**, in `algos/rainbow/net.py` where B1 will find it: F1 runs in phase 1 and B1 in phase 4, so the module is written here and reused there. `SNEK_TARGET_UPDATE_TAU` 0.005, AdamW `SNEK_BBF_WEIGHT_DECAY` 0.1 |
-| replay | `algos/dqn/replay.py` with priorities off (`SNEK_PRIORITY_EXPONENT=0`), replay ratio `SNEK_REPLAY_RATIO` 2 (the paper's 8 at batch 32 is 2 gradient steps per transition at batch 128) |
-| head | scalar (the paper's C51 is on for Atari; here it is off for the first batch so F1 reads against A1 without Group A's head, and A2 exists before a second F1 batch would) |
-| the step | DQN's |
+| piece | the paper | here |
+|---|---|---|
+| the network | Impala ×4, 15-layer ResNet, hidden 2048 | wider MLP: `SNEK_FC_LAYERS` at 4× the reference width (1280) with layer norm, the same "bigger" lever without a CNN. The trunk is `QNet`'s hidden stack, so the shape is one knob; a 2048 cell is the tuning wave |
+| resets | encoder shrink-and-perturbed 50 % toward a fresh init, the layers after it fully reset, every 40k gradient steps at replay ratio 8 (20k at 2); no resets in the last 100k gradient steps | `algos/bbf/resets.py::shrink_and_perturb(module, alpha, seed)`: θ ← α θ + (1 − α) θ_fresh with α 0.5 on the hidden stack, and a full re-init of the head, every `SNEK_BBF_RESET_INTERVAL` gradient steps (40k); `SNEK_BBF_NO_RESETS_AFTER` (a fraction of the cap). The optimiser state for those parameters is reset with them. New |
+| n-step and γ anneal | 10 → 3 and 0.97 → 0.997, exponential, over 10k gradient steps after each reset | `algos/bbf/schedules.py`: from `SNEK_BBF_N_STEP_START` (10) to `SNEK_N_STEP_UPDATE` (3) and from `SNEK_BBF_GAMMA_START` (0.97) to `SNEK_DISCOUNT` (**0.99** here, not 0.997 -- `README.md`, "Translating") over `SNEK_BBF_ANNEAL_STEPS` (10k gradient steps) after each reset. **`algos/dqn/collect.py`'s n-step window becomes settable between steps**; that is the one change to `algos/dqn/`, and it is a setter with a fixture that the window at n is exactly what the constant n produced |
+| SPR | weight 5, 5-step latent prediction | **dropped for the first batch.** The self-predictive loss is a representation learner for pixels; on a 26-value vector it is a transition-model auxiliary of unclear value, and it is the one piece with its own network and its own knobs. `SNEK_BBF_SPR` is reserved and a second batch adds it at the paper's weight if F1 is short of the paper's relative gain. This is F1's one stated departure from the paper |
+| dueling, double-Q, EMA target, weight decay | on, on, τ 0.005 every update with target-net action selection, AdamW 0.1 | **F1 builds `DuelingTrunk`**, in `algos/rainbow/net.py` where B1 will find it; double-Q is DQN's; `SNEK_TARGET_UPDATE_TAU` 0.005 with period 1; AdamW `SNEK_BBF_WEIGHT_DECAY` 0.1 |
+| replay | prioritised, capacity 200k, 2,000 steps before learning | `algos/dqn/replay.py` with PER **on** at its default exponent (the paper keeps Dopamine's prioritised scheme), 200k capacity, 2,000 prefill |
+| replay ratio | **8** gradient steps per env step for the headline (2 also reported), batch 32 | `SNEK_REPLAY_RATIO` for 8 gradient steps per move at batch 32 -- the paper's headline setting and the row's point; the 2 cell is the second wave |
+| head | C51, 51 atoms | **C51 at A2's stable support** -- F1 runs in phase 1 beside A1, so the head is built here (`algos/dist/heads.Categorical`, A2's module, written early) rather than after A2; a scalar-head cell reads against A1 without the distribution |
+| optimiser | Adam 1e-4, ε 1.5e-4 | the same |
+| exploration | ε 0 during training, 0.001 at eval | ε 0, shield off, fork off; eval greedy |
+| budget | 100k agent steps, 26 games, many seeds | **100k moves** -- the paper's regime scaled by `README.md`'s rule, and then 500k as the plan's own second cap |
 
 `build_config` is DQN's plus `SNEK_BBF_*`; PPO's knobs refused by name. `algo.py` registers `bbf`.
 
 Tests: shrink-and-perturb at α = 1 is a no-op and at α = 0 equals a fresh init with the given seed;
-the optimiser's moment buffers for the reset parameters are zero after a reset; the anneal starts at
-its start value on the step after a reset and reaches the target at `anneal_steps`; the n-step setter
-produces the constant window's targets when held. Mutants: the reset applied to every layer, the
-anneal not restarted on a reset, γ annealed the wrong direction.
+the head is fully re-initialised while the hidden stack is interpolated; the optimiser's moment buffers
+for the reset parameters are zero after a reset; the anneal starts at its start value on the step after
+a reset and reaches the target at `anneal_steps`; no reset fires inside the no-reset tail; the n-step
+setter produces the constant window's targets when held. Mutants: the reset applied to every layer at
+α, the anneal not restarted on a reset, γ annealed the wrong direction, the tail guard dropped.
 
 ## 2. The batches
 
 | batch | arms | base | read against | judged on |
 |---|---|---|---|---|
-| F1 | 4 seeds of `bbf` at **`SNEK_MAX_STEPS` = 500k counted steps** (2M moves at the fork's four; ~2% of a reference run) | A1's reward and history, the BBF defaults above | A1 at the same step, and A1's full run | **onset step** (first eval ≥80%), the perfect rate at the cap, and the stage-B density at the cap against A1's density at the same step. Then `hof5000`/`hof30k` as usual on whatever it produced |
-| F1 long | the same 4 arms held to A1's cap (`SNEK_INIT_FROM` the F1 checkpoints, or simply a second batch at the long cap) | F1 | A1 | whether the data-efficient config also wins at the budget the series has been using, or trades the top for the onset |
+| F1 | 4 seeds `bbf` at **100k moves** (the paper's regime; replay ratio 8, resets every 40k gradient steps, no resets in the last 12.5 %) + 4 seeds at **500k moves** (~1 % of a reference run; the reset interval and tail scaled with the cap) | A1's reward and history, the paper's values above; no fork, so a counted step is one move | A1's two cells at the same move count, and A1's full run | **onset step** (first eval ≥80%), the perfect rate at the cap, and the stage-B density at the cap against A1's density at the same step. Then `hof5000`/`hof30k` as usual on whatever it produced |
+| F1 replay ratio 2 | 4 seeds at 500k moves with `SNEK_REPLAY_RATIO` 2 and resets every 20k (the paper's cheaper setting) + 4 seeds scalar head | F1 | F1 | is the replay ratio the lever; is the distribution |
+| F1 long | the best cell held to A1's cap (`SNEK_INIT_FROM` the F1 checkpoints, or simply a second batch at the long cap) | F1 | A1 | whether the data-efficient config also wins at the budget the series has been using, or trades the top for the onset |
 
 ## 3. Gates
 
 1. Smoke; the reset fires at least once inside the 5,000-step smoke (`SNEK_BBF_RESET_INTERVAL` set
    low in the smoke spec) and the log line says so.
 2. The mutation spec kills every mutant.
-3. Tuning budget: one laptop wave on the reset interval and the replay ratio.
+3. Tuning budget: one laptop wave on the reset interval and the hidden width (1280 / 2048).
 
 ## 4. What F1's number is used for
 

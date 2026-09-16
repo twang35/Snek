@@ -149,5 +149,14 @@ as the deciding numbers rather than the best single eval. Each row's design plan
 specific to it: G1's search-versus-network decision, A4's risk-sensitive acting arm, H1's reproduction
 gate.
 
+**Each row emulates its paper (decided 2026-09-16).** The first cell of every row is the paper's own
+configuration -- optimiser, learning rate, batch, replay, target period, exploration schedule, head
+sizes -- translated to Snake only where a setting cannot transfer (reward clipping, the discount, frame
+budgets, the CNN trunk), by the rules in [`README.md`](README.md) "Translating a paper's setting to
+Snake". This codebase's own additions to value learning -- the fork, the exploration shield, the
+eval-driven epsilon, the fast target copy -- are **off** in that cell and on in a second, *local* cell,
+so the gap between an algorithm and PPO is not confounded with the gap between the paper's plumbing and
+snek3's. Every plan carries a "paper settings" table with the verified values and their sources.
+
 The series' own summary lives in `docs/findings.md` when rows close, one line per row against PPO; this
 plan is the ordering and does not carry results.

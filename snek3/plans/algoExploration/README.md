@@ -29,12 +29,32 @@ These are the rules the codebase already enforces; a plan says only where its al
 | a step | `step_granularity` says what a counted step is; `advance()` returns `(steps, transitions)` and every row carries `transitions`. A plan states what its step is, because `SNEK_MAX_STEPS`, `SNEK_EVAL_INTERVAL` and every chart's x-axis read it | `algos/ppo/algo.py` §1 |
 | tests | a `tests/test_<name>_*.py` per module with the arithmetic pinned (a loss on a hand-worked batch, a target on a known transition), and a `tests/mut_<name>.json` mutation spec whose mutants all die before the row is queued | `skills/mutation-test` |
 | the batch | 4 seeds a cell, seed pinned to the arm letter, the current PPO reference config for everything the algorithm does not own (reward preset, `SNEK_OBS_HISTORY`, `SNEK_FC_LAYERS`), stage A at 100 episodes on every checkpoint, stage B, `hof5000`, `hof30k`. Judged on stage-B density, the depth passes and the drawdown count, never on a single eval | `docs/protocol.md` |
+| **paper fidelity** | **every row's first cell is the paper's configuration**, translated to Snake by the rules in the next section and nothing else -- the paper's optimiser, learning rate, batch, replay size, target period, exploration schedule and network width, with this codebase's own additions (the fork, the shield, the eval-driven epsilon, the horizon anneal) **off**. A second cell, the **local** cell, runs the same algorithm on the codebase's tuned defaults where the two differ materially; it is what says whether a gap is the algorithm or the plumbing. The paper cell is the headline, the row's plan carries a "paper settings" table naming each knob's paper value, its translation and the reason where one does not transfer, and a spec that departs from the table says so in its manifest note | each plan's "paper settings" section; `docs/protocol.md` |
 | the gate | a row starts when the row it is read against has a closed stage-B number; a row that does not stabilise within the tuning budget its plan names is closed as a finding | `algorithm-series.md` §3 |
+
+## Translating a paper's setting to Snake
+
+The rows are meant to emulate their papers, on this game. Most settings carry over as written; the
+ones below do not, and every plan translates them the same way so the rows stay comparable.
+
+| the paper says | here | why |
+|---|---|---|
+| **frames** (Atari, frame-skip 4) | one Snake move is one agent step, so **1 agent step = 4 frames** and a 200M-frame run is 50M moves; a 100k-step (400k-frame) data-efficiency budget is 100k moves. Budgets are stated in moves, and a plan converts once | the papers' budgets are in frames and their periods (target update, anneal, ε) are mostly in agent steps or gradient updates; mixing the units has cost this project before |
+| **reward clipping to [−1, 1]** | **not applied.** Clipping would turn the +100 perfect game into +1, and b33 showed the win reward is a monotone onset lever that saturates at 100. Instead every scale that the papers set against a unit reward -- a categorical support, a Huber threshold, Munchausen's temperature, a value transform's range -- is set from **the discounted return the reward preset implies** (about [−6, 110] at γ 0.99, win 100, food 1, death −5), and the smoke asserts it brackets a prefill batch | the papers' scales are for clipped rewards; the equivalent operation here is scaling the head, not the game |
+| **discount 0.997 / 0.999** and TD horizons sized to 27k-frame Atari episodes | **`SNEK_DISCOUNT` 0.99** for every value row, the reference's value; a perfect game is ~1,000-2,300 moves and b10/b30 already measured γ → 1.0 on PPO | the horizon argument is the game's, not the paper's; the paper cell keeps everything else |
+| **ε-greedy, 1.0 → 0.1 (or 0.01) over the first 1M frames, 0.001 at eval** | the paper's linear schedule over `SNEK_EPSILON_ANNEAL_STEPS` moves, then held; **the eval-driven `refine_epsilon` schedule, the shield (`SNEK_GUIDED_FRACTION`) and the fork (`SNEK_FORK_BRANCHES`) are off** in the paper cell and on in the local cell. Eval is greedy (ε 0) as every snek3 eval already is | none of the three exist in any paper; they are this codebase's answers to the endgame, and the local cell measures them |
+| **a 1M-transition replay with a 50k (80k-frame) prefill** | **1M transitions** (`SNEK_REPLAY_BUFFER_MAX_LENGTH`) and the paper's prefill, at 26+16 float32 values a row about 170 MB -- affordable on both boxes | the codebase's 100k default was sized for the fork; the paper cell takes the paper's |
+| **target network period 8k-10k updates (32k-40k frames)** | the paper's, in gradient updates | the codebase's `SNEK_TARGET_UPDATE_PERIOD` default of 8 is a hard copy every 8 updates and is the single largest departure from every value paper; it stays in the local cell only |
+| **batch 32, one update per 4 agent steps** (8 replayed samples per transition) | batch 32, `SNEK_REPLAY_RATIO` set for 8 samples per transition | the paper's replay ratio is a load-bearing setting (BBF is *about* it), so the paper cell matches samples per transition rather than gradient steps |
+| **a CNN trunk (Nature DQN, IMPALA, ResNet)** | the reference's `fc 320` MLP over the 26+16-value observation for the paper cell; a plan that needs a trunk with more shape (a residual stack, a wider net) states the MLP analogue and its budget | there is no image; the trunk substitution is stated per row so it is not mistaken for the paper's |
+| **an LSTM of 512 (R2D2) or a 256-wide recurrent core** | the paper's width where the trunk is comparable, otherwise the width the plan states with the paper's as the reference | the observation is 42 values, not 3136 CNN features; a plan says which |
+| **200M frames, 5 seeds; 100k steps, 10-50 seeds** | 4 seeds a cell as everywhere here; a plan budgets the moves per arm from the paper's frames when the paper's budget is the question (F1, G3) and from the reference's 100M transitions otherwise | the protocol's seed count is fixed by the boxes |
 
 ## What every plan decides
 
 Each plan answers, per algorithm: what it is in one paragraph and which paper; the modules and what is
-reused from `algos/dqn/` or `algos/ppo/`; the seam answers that differ from the base; the knobs and their
+reused from `algos/dqn/` or `algos/ppo/`; the seam answers that differ from the base; **the paper's
+settings and how each lands here (the paper cell), and where the local cell departs**; the knobs and their
 defaults; the sidecar fields; the tests and the mutants; the batch and what it is read against; the
 tuning budget before the row is closed; and the one result that would change the next row's plan.
 

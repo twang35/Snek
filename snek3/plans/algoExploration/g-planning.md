@@ -39,17 +39,19 @@ and the terminal is death, starvation or the perfect game.
 
 | module | contents |
 |---|---|
-| `algos/mcts/search.py` | the batched PUCT: a tree per lane as arrays (children by action, N, W, P), selection by PUCT with `c_puct`, expansion of all leaves in one network call, evaluation of the leaf value, backup. Dirichlet noise at the root in training (`SNEK_MCTS_DIRICHLET_ALPHA` 0.3, ε 0.25), none at eval |
+| `algos/mcts/search.py` | the batched PUCT: a tree per lane as arrays (children by action, N, W, P), selection by the AlphaZero pseudocode's rule `(log((N + 19652 + 1) / 19652) + 1.25) · P · √N_parent / (1 + N_child)` (`SNEK_MCTS_C_INIT` 1.25, `SNEK_MCTS_C_BASE` 19652), expansion of all leaves in one network call, evaluation of the leaf value, backup with the discount. Dirichlet noise at the root in training (`SNEK_MCTS_DIRICHLET_ALPHA`, ε 0.25), none at eval. **α scales inversely with the move count**: the papers use 0.3 for chess's ~35 moves, 0.03 for Go's ~250; Snake has 3, so the paper's rule gives **α ≈ 3** (`10 / moves`, the AlphaZero heuristic), and 0.3 is the local value |
 | `algos/mcts/net.py` | `QNet`'s trunk, a policy head (logits over 3 actions) and a value head; **the policy head alone is what `restore` builds for the network-only read**, and it is `algos/ppo/net.py`'s actor shape, so a PPO checkpoint can seed it (`SNEK_INIT_FROM`) |
-| `algos/mcts/collect.py` | self-play over `collect_envs` lanes: search at every step, act by sampling the visits with temperature `SNEK_MCTS_TEMPERATURE` (1.0 for the first `SNEK_MCTS_TEMP_STEPS` moves of an episode, then 0), store `(obs, visits, reward)`, fill in the value target at episode end (n-step bootstrap from the value head for long games, `SNEK_MCTS_TD_STEPS` 200, since a 2,300-move game's pure Monte-Carlo target is one number per episode) |
-| `algos/mcts/agent.py` | cross-entropy of the policy head against the visits, Huber on the value, weight decay |
-| `algos/mcts/algo.py` | `mcts`: `build_config` with `SNEK_MCTS_SIMULATIONS` (50), `SNEK_MCTS_C_PUCT` (1.25), the knobs above, `SNEK_MCTS_REPLAY_SIZE` (a game-level buffer, in positions), `SNEK_REPLAY_RATIO`; `policy_fn` is the search at eval simulations with temperature 0 |
+| `algos/mcts/collect.py` | self-play over `collect_envs` lanes: search at every step, act by sampling the visits with temperature `SNEK_MCTS_TEMPERATURE` (1.0 for the first `SNEK_MCTS_TEMP_STEPS` moves of an episode -- the papers' 30 is 30 of ~150 moves; here 300 of ~1,500, the same fraction -- then 0), store `(obs, visits, reward)`, fill in the value target at episode end. **AlphaZero's target is the game outcome**; on a 2,300-move game with a discount that is one number per episode, so the plan uses MuZero's n-step bootstrap from the value head, `SNEK_MCTS_TD_STEPS` 10 (MuZero Atari's), and states the departure -- an AlphaZero cell with the pure outcome (`td_steps` = ∞) runs beside it |
+| `algos/mcts/agent.py` | cross-entropy of the policy head against the visits, MSE on the value (the papers'), equal weights, SGD momentum 0.9 with weight decay 1e-4 and the papers' step schedule (`SNEK_MCTS_OPTIMIZER` `sgd`; `adam` is the local variant) |
+| `algos/mcts/algo.py` | `mcts`: `build_config` with `SNEK_MCTS_SIMULATIONS` (**800**, AlphaZero's; MuZero Atari's 50 is the second cell), the knobs above, `SNEK_MCTS_REPLAY_SIZE` (the most recent games, in positions -- AlphaZero's window is 1e6 games), `SNEK_REPLAY_RATIO`; `policy_fn` is the search at eval simulations with temperature 0 |
 
 **The value target on a game this long.** A perfect game is ~1,000 moves for the champions. With γ =
 0.99 the return-to-go is dominated by the next few meals plus the +100 at the end, and the death −5 is
 small against it. The plan uses the reward preset unchanged so the row is comparable, and records the
 value target's scale in the smoke; if the value head cannot separate a doomed board from a safe one at
-that scale, `SNEK_MCTS_VALUE_RESCALE` (R2D2's h) is the knob.
+that scale, `SNEK_MCTS_VALUE_RESCALE` (R2D2's h, which is also MuZero's) is the knob. Q in the tree is
+min-max normalised over the tree as MuZero does, since the papers' ±1 value range is the one thing
+their PUCT constants assume.
 
 Tests: PUCT on a hand-built two-action tree picks the documented child; the backup adds the value to
 every ancestor's W and N exactly once; the root visits sum to `simulations`; a search with `simulations`
@@ -67,9 +69,10 @@ targets by a fresh search. Read against G1: what learning the model costs when t
 
 | module | contents |
 |---|---|
-| `algos/muzero/model.py` | h, g, f as MLPs over the latent width `SNEK_MUZERO_LATENT` (128); reward and value as categorical over a support (Group A's `Categorical` head at a support sized to the reward), with the h(x) rescaling |
+| `algos/muzero/model.py` | h, g, f as MLPs over the latent width `SNEK_MUZERO_LATENT` (128), the latent min-max scaled to [0, 1] as the paper; reward and value as categorical over an **integer support** with the h(x) rescaling (ε 0.001): the paper's 601 atoms over [−300, 300] on Atari; here the rescaled return range is about [−1.5, 10] plus the linear term, so **`SNEK_MUZERO_SUPPORT` 21 atoms over [−10, 10]** brackets it with margin, and the smoke asserts it |
+| the gradient | each unrolled step's loss scaled by 1/K and the gradient into the dynamics function's hidden state scaled by ½, as the pseudocode's `scale_gradient` |
 | `algos/muzero/search.py` | G1's `search.py` with the simulator calls replaced by `g`; the same arrays, the same PUCT, min-max normalised Q. One file, a `model` argument -- the real simulator is a model too, and G1's search is written against that interface so G2 does not fork it |
-| `algos/muzero/agent.py` | the K-step loss: policy CE, value CE, reward CE at each unrolled step, gradient scaled by 1/K; reanalyse ratio `SNEK_MUZERO_REANALYSE` (1.0) |
+| `algos/muzero/agent.py` | the K-step loss (K 5): policy CE, value CE, reward CE at each unrolled step, value weight 0.25 (the Reanalyze setting), TD steps 10, priorities \|ν − z\| with α = β = 1; reanalyse fraction `SNEK_MUZERO_REANALYSE` (0.8, the paper's "80% of updates use a fresh search's policy target") |
 | `algos/muzero/algo.py` | `muzero`; `policy_fn` is the search in latent space at eval simulations, `needs_state = False` -- **MuZero acts from the observation alone**, which is what makes it comparable to the network-only rows and is one of the reasons it is in the series |
 
 Tests: the unrolled loss at K = 1 equals a one-step loss; the learned reward on a scripted transition
@@ -88,8 +91,8 @@ the sample-efficiency tricks that carry it at low step counts.
 
 | module | contents |
 |---|---|
-| `algos/muzero/` | the same package with `NAME` `ezv2`: `SNEK_EZ_CONSISTENCY` (2.0) adds the latent consistency loss, `SNEK_EZ_VALUE_PREFIX=1` swaps the reward head for the prefix LSTM, `SNEK_EZ_GUMBEL=1` selects the Gumbel root, `SNEK_MUZERO_SIMULATIONS` 16 (V2's few-simulation regime) |
-| `algos/muzero/gumbel.py` | sequential halving over the root's actions with Gumbel-perturbed logits and the completed-Q improved policy as the target. New |
+| `algos/muzero/` | the same package with `NAME` `ezv2`: `SNEK_EZ_CONSISTENCY` (2.0) adds the latent consistency loss, `SNEK_EZ_VALUE_PREFIX=1` swaps the reward head for the prefix LSTM (hidden 512 in the paper; `SNEK_EZ_PREFIX_HIDDEN` 128 over this latent), `SNEK_EZ_GUMBEL=1` selects the Gumbel root, `SNEK_MUZERO_SIMULATIONS` 16 (V2's Atari value), value weight 0.25, policy entropy 5e-3, TD steps 5 with `td_lambda` 0.95, the **mixed value target** (n-step TD for young transitions and early training, the search-based value otherwise; `SNEK_EZ_MIXED_T1` 40k updates, `SNEK_EZ_MIXED_T2` 20k transitions), target net every 400 updates, priorities α = β = 1 |
+| `algos/muzero/gumbel.py` | sequential halving over the root's actions with Gumbel-perturbed logits, the `σ(q) = (c_visit + max_b N(b)) · c_scale · q` transform at c_visit 50, c_scale 0.1 (the V2 repo's Atari value, not 1), and the completed-Q improved policy as the target. Snake has 3 actions, so the paper's K = 8 sampled actions is every action: sequential halving over 3 with 16 simulations. New |
 
 Tests: sequential halving over 3 actions with 16 simulations visits the documented counts; the
 consistency loss is zero when g is the identity on a repeated observation; the value prefix on a
@@ -110,21 +113,38 @@ loss. Acts with the network alone. Read against G2 and against PPO: whether the 
 
 | module | contents |
 |---|---|
-| `algos/muesli/` | `agent.py`: the CMPO target π_CMPO ∝ π exp(clip(advantage / normaliser)), the policy loss (CE to that target plus the PG term with importance weights, from replay with retrace-style correction), the model loss shared with `algos/muzero/agent.py`; `algo.py` `muesli` with `SNEK_MUESLI_CLIP` (1.0), `SNEK_MUESLI_MODEL_WEIGHT`; `policy_fn` is argmax over the policy head, stateless, `needs_state = False` |
-| the step | PPO-like: `advance()` collects `collect_envs` moves then updates from a replay of recent sequences |
+| `algos/muesli/` | `agent.py`: the CMPO target π_CMPO ∝ π_prior exp(clip(advantage / σ_adv, −c, c)) with c 1.0 and the advantage normalised by a moving std (β_var 0.99, ε 1e-12), computed **exactly over the 3 actions** (the paper samples 16 actions on Atari; with 3 the expectation is exact, which is also what its large-scale run does); the policy loss = PG term with Retrace advantages (λ 0.95) + λ_CMPO 1.0 × KL to the CMPO target, entropy bonus 0; the model loss shared with `algos/muzero/agent.py` at K 5, value weight 0.25, reward 1.0; a target network at update rate 0.1; AdamW 3e-4 decayed to 0, weight decay 0; `algo.py` `muesli` with `SNEK_MUESLI_CLIP`, `SNEK_MUESLI_KL_WEIGHT`, `SNEK_MUESLI_REPLAY_FRACTION` (0.75), `SNEK_MUESLI_TARGET_RATE`; `policy_fn` is argmax over the policy head, stateless, `needs_state = False` |
+| the step | as the paper's: each batch is 96 sequences of 30 steps, **75 % from replay and 25 % fresh** on-policy; `advance()` collects `collect_envs` × 30 moves, appends them to a replay of 6M positions' worth (scaled to the cap), and takes one update per collection |
 
 Tests: the CMPO target with zero advantages is the current policy; the clip is inert inside its bound;
 the policy loss gradient points toward the higher-advantage action on a two-action example. Mutants:
 the exp taken before the clip, the normaliser dropped, importance weights unclipped.
 
+## 2b. The papers' settings, and how each lands here
+
+| setting | AlphaZero (preprint; pseudocode) | MuZero Atari (App. B, D, F, G; pseudocode) | EfficientZero V2 Atari (Table 3; repo) | Muesli Atari (Table 5) | here |
+|---|---|---|---|---|---|
+| simulations | 800 | 50 | 16 | -- (acts with the network) | G1 800 and 50; G2 50; G3 16 |
+| PUCT | c_init 1.25, c_base 19652 | c1 1.25, c2 19652, min-max Q | Gumbel root, c_visit 50, c_scale 0.1 | -- | the paper's, per row |
+| root noise | Dir(α) ε 0.25, α by move count (0.3 chess, 0.03 Go) | Dir(0.25), ε 0.25 | Dir(0.3), ε 0.25 | -- | α ≈ 3 for 3 moves in the paper cell; 0.3 local |
+| temperature | ∝ visits for 30 moves, then argmax | 1.0 → 0.5 → 0.25 by training progress, whole game | 1 → 0.5 at 50 % → 0.25 at 75 % | -- | G1 the AlphaZero form (300 moves); G2, G3 the MuZero schedule |
+| unroll K, TD steps | -- | 5, 10 | 5, 5 (λ 0.95) | 5, Retrace | per row |
+| optimiser | SGD m 0.9, lr 0.2 → 0.0002 in 3 steps, wd 1e-4, batch 4096 | SGD m 0.9, lr 0.05 · 0.1^(step / 350k), wd 1e-4, batch 1024 | SGD m 0.9, lr 0.2, wd 1e-4, grad norm 5, batch 256 | AdamW 3e-4 → 0, wd 0 | the paper's optimiser per row; **batch 256** for all four (the papers' 1024-4096 are for 350 actors' throughput; 256 is EZ's and fits the lanes) |
+| value / reward | MSE, ±1 | categorical 601 over ±300, h(x) ε 0.001, value weight 0.25 (Reanalyze) | categorical over ±300 (51 bins in the repo), value 0.25, consistency 2.0, entropy 5e-3 | categorical, value 0.25, reward 1.0 | G1 MSE on the unrescaled return; G2-G4 categorical 21 over ±10 on the rescaled return |
+| replay, priority | last 1e6 games, uniform | 125k sequences of 200; \|ν − z\|, α = β = 1 | 1e6 transitions FIFO; α = β = 1 | 6M frames, 75 % replay | scaled to the cap, per row |
+| reanalyse | -- | 80 % | 1.0 (repo) | -- | per row |
+| target network | -- | acting checkpoint every 1,000 updates | every 400 updates | rate 0.1 | per row |
+| discount | 1 (game outcome) | 0.997 | 0.997 | 0.995 | 0.99 |
+| budget | 700k updates, 5,000 actors | 20B frames (Reanalyze 200M), 350 actors | 100k env steps, update-to-data 1 | 200M frames | G1 and G2 the reference's 100M transitions; G3 100k moves, then 500k; G4 50M moves |
+
 ## 3. The batches
 
 | batch | arms | base | read against | judged on |
 |---|---|---|---|---|
-| G1 | 4 seeds of `mcts`, 50 simulations, measured **both ways** (§5) | the PPO reference's reward preset, `hist8`, `SNEK_FC_LAYERS=320`; `SNEK_INIT_FROM` a PPO `hist8` checkpoint's trunk for two of the seeds, fresh for the other two | PPO `hist8`, the fixed-path references | stage-B density and the depth passes **for the network alone**; the same for the search at eval simulations; steps per perfect game via `tools.fixed_path --policy` beside the references |
-| G1 simulations | the best G1 seed's checkpoint measured at 1, 10, 50, 200 simulations | G1 | G1 | the perfect rate as a function of the search budget: where the network alone ends and the search begins to pay |
+| G1 | 4 seeds of `mcts` at **800** simulations (AlphaZero's, §2b: SGD, MSE value, α ≈ 3, TD ∞) + 4 seeds at **50** (MuZero Atari's search budget with the TD-10 target), measured **both ways** (§5) | the PPO reference's reward preset, `hist8`, `SNEK_FC_LAYERS=320`; all fresh, as the papers -- a `SNEK_INIT_FROM` PPO trunk is the local variant and runs only if the fresh cells do not learn a prior | PPO `hist8`, the fixed-path references | stage-B density and the depth passes **for the network alone**; the same for the search at eval simulations; steps per perfect game via `tools.fixed_path --policy` beside the references |
+| G1 simulations | the best G1 seed's checkpoint measured at 1, 10, 50, 200, 800 simulations | G1 | G1 | the perfect rate as a function of the search budget: where the network alone ends and the search begins to pay |
 | G2 | 4 seeds of `muzero` at G1's cap | G1's | G1 | as G1, network-alone and searched |
-| G3 | 4 seeds of `ezv2` at 500k, 4 at G2's cap | G2's | F1 at 500k; G2 | as G1 |
+| G3 | 4 seeds of `ezv2` at 100k moves (the paper's regime) + 4 at 500k; then 4 at G2's cap if either moved | G2's | F1 at 100k and 500k; G2 | as G1 |
 | G4 | 4 seeds of `muesli` | G2's | PPO `hist8`, G2 network-alone | as PPO |
 
 **Registered prediction (the agent's, 2026-09-16).** The G1 search at 50 simulations plays perfect
@@ -140,8 +160,10 @@ a better teacher than the policy gradient for this game even when no search runs
 1. The seam change lands first with its tests; every existing checkpoint measures identically.
 2. G1 smoke with `SNEK_MCTS_SIMULATIONS=4`; the log reports the search's moves per second, which sets
    the cap for the spec. A search below ~200 lane-moves/s on the laptop is redesigned before it is
-   queued (batch the leaf evaluations wider, or cut simulations), since a 2,300-move game at 50
-   simulations is the budget item.
+   queued (batch the leaf evaluations wider, or cut simulations), since a 2,300-move game at 800
+   simulations is the budget item -- **and 800 is the number most likely to fail this gate.** If it does,
+   the 800 cell runs at whatever the gate allows and says so; the 50 cell is the one the paper's Atari
+   form supports anyway.
 3. The mutation specs kill every mutant.
 4. G2-G4 wait for G1's closed number.
 

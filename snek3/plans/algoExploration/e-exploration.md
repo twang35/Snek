@@ -21,7 +21,7 @@ Both rows are R2D2 (D2) with an intrinsic reward and a policy conditioned on how
 | base agent | `algos/r2d2/`, imported: the LSTM net, the sequence replay, the burn-in agent. The intrinsic modules feed it an augmented reward and an augmented observation |
 | the intrinsic reward | NGU's: an **episodic** term from a k-nearest-neighbour count in a learned embedding, reset every episode, times a **lifelong** term from random network distillation, clipped to [1, L]. Both new, in `algos/ngu/intrinsic.py` |
 | the embedding | NGU's inverse-dynamics embedding: f(obs) trained to predict the action between consecutive observations. On a 26-value vector the embedding is an MLP to 32 dims |
-| the conditioning | a family of N policies indexed by β_i (intrinsic weight) and γ_i (discount), the index one-hot appended to the observation (UVFA). `SNEK_NGU_MIXTURES` (8 in the plan; 32 in the paper, cut for the actor count), β_max `SNEK_NGU_BETA_MAX` (0.3), γ from `SNEK_DISCOUNT` down to `SNEK_NGU_GAMMA_MIN` (0.99 → 0.97; the game's horizon is ~2,300 moves so the paper's 0.997 range does not transfer) |
+| the conditioning | a family of N policies indexed by β_i (intrinsic weight) and γ_i (discount), the index one-hot appended to the observation (UVFA). `SNEK_NGU_MIXTURES` **32, the paper's** -- the lanes are vectorised, so 32 lanes is one lane per mixture and costs nothing the box lacks; β_max `SNEK_NGU_BETA_MAX` (0.3) with the paper's spacing β_0 = 0, β_{N−1} = β_max, β_i = β_max · σ(10 (2i − (N − 2)) / (N − 2)); γ from `SNEK_DISCOUNT` (γ_0, the exploitative end) down to `SNEK_NGU_GAMMA_MIN`, evenly spaced in log(1 − γ) as the paper's Eq. 4. The paper's range is 0.997 → 0.99; here **0.99 → 0.97**, because `SNEK_DISCOUNT` is 0.99 for every row (`README.md`, "Translating") and the paper's ratio of horizons (3.3×) is kept |
 | the sidecar | `recurrent` from D and `conditioning`: `{"mixtures": 8, "obs_extra": 8}`; in the signature |
 | restore | greedy under the **exploitative** index (β = 0, the highest γ), which is what the eval measures; a `--policy-variant mixture:<i>` in the style of `a-return-tail.md` §5 measures any other |
 | the step | D2's |
@@ -40,7 +40,7 @@ r = r_e + β_i r_i and one Q-network over the sum.
 
 | module | contents |
 |---|---|
-| `algos/ngu/intrinsic.py` | the RND predictor and target (`SNEK_NGU_RND_HIDDEN` 128) with a running normalisation of the error; the inverse-dynamics embedding and its classifier; the episodic k-NN (k = 10, kernel ε = 1e-3, cluster distance 8e-3, pseudo-count constant 1e-3, all as the paper, exposed as knobs prefixed `SNEK_NGU_`) |
+| `algos/ngu/intrinsic.py` | the RND predictor and target (`SNEK_NGU_RND_HIDDEN` 128, output 128 as the paper) with a running normalisation of the error, clipped to [1, L] with L = 5; the inverse-dynamics embedding (32 dims, classifier hidden 128, L2 1e-5) at lr 5e-4; the episodic k-NN (k = 10, kernel ε 1e-4 per Table 6 -- the paper's text says 1e-3, and the knob carries whichever the smoke shows is not degenerate on a 32-dim embedding -- cluster distance 8e-3, pseudo-count constant 1e-3, maximum similarity 8, memory capacity 30,000, all exposed as knobs prefixed `SNEK_NGU_`) |
 | `algos/ngu/algo.py` (`ngu`) | wraps `R2d2Algo`: `advance()` computes r_i per lane per step from the embedding of the new observation, augments the reward before it enters the sequence buffer, appends the mixture one-hot to the observation, trains RND and the embedding on the same batch; `fields()` reports the mean r_i and the mixture in use per lane |
 | the actors | each lane is assigned a mixture index at episode start, uniformly (NGU) -- and stays on it for the episode |
 
@@ -60,8 +60,8 @@ uniformly.
 
 | module | contents |
 |---|---|
-| `algos/ngu/net.py::SplitHead` | two heads on the LSTM output; each trained with its own target on its own reward stream (both through the rescaling); combined only for acting |
-| `algos/ngu/meta.py` | the bandit: per lane, a window of `SNEK_A57_WINDOW` (90) episodes of (index, extrinsic return), UCB with `SNEK_A57_UCB_BETA` (1.0) and ε `SNEK_A57_EPSILON` (0.5); the chosen index is what the bandit selected, logged per episode |
+| `algos/ngu/net.py::SplitHead` | **two networks of identical architecture**, as the paper (§3.1), not two heads on one LSTM: Q_e(θ_e) and Q_i(θ_i), each trained with its own transformed Retrace target on its own reward stream under the shared target policy argmax(Q_e + β_j Q_i); combined only for acting. `SNEK_A57_SPLIT=heads` shares the trunk and LSTM for the cheaper local variant |
+| `algos/ngu/meta.py` | the bandit: per lane, a sliding window of `SNEK_A57_WINDOW` episodes of (index, extrinsic return) -- **160**, the actors' value in the paper's §4 (its Table 3 prints 90; the text is followed) -- UCB with `SNEK_A57_UCB_BETA` (1.0) and ε `SNEK_A57_EPSILON` (0.5), every arm pulled once first; the chosen index is what the bandit selected, logged per episode |
 | `algos/ngu/algo.py` (`agent57`) | `ngu` with the split head on and the meta-controller replacing the uniform draw; `fields()` adds the fraction of episodes the bandit spent at β = 0 -- **the number this row is for** |
 
 Tests: the combined Q at β = 0 equals the extrinsic head; each head's loss sees only its own reward
@@ -70,12 +70,26 @@ to the arm with the higher mean return on a two-arm synthetic problem within the
 intrinsic head trained on the summed reward, the bandit's exploration bonus dropped, the window not
 sliding.
 
+## 2b. The papers' settings, and how each lands here
+
+| setting | NGU (Table 6) | Agent57 (Table 3, App. E) | here |
+|---|---|---|---|
+| base | R2D2: LSTM 512, dueling, Adam 1e-4 ε 1e-4, batch 64, trace 80 / replay period 40, target 1,500 | the same, trace **160** / period 80 | D2's paper cell; E2 at 160 / 80 |
+| return estimator | transformed Retrace, λ 0.95 | the same | Retrace λ 0.95 replaces D2's n-step target in this group (`SNEK_NGU_RETRACE_LAMBDA`); D2's n-step is the ablation |
+| mixtures | 32; β_max 0.3; γ 0.997 → 0.99 | 32; γ 0.9999 → 0.99 with the three-piece spacing of App. G.1 | 32; β_max 0.3; γ 0.99 → 0.97 (NGU spacing); for E2 the paper's extension *up* to 0.9999 becomes γ_0 = 0.999 (b30's measured ceiling on this game) with the same three-piece spacing |
+| priority | exponent 0.9, η 1.0 (max only), IS 0 | exponent 0.9, η 0.9, IS 0 | per row |
+| replay | 5e6 observations, 6,250 sequences before learning | the same | 1e5 sequences as D2; 6,250 before learning |
+| intrinsic module | RND 128, embedding 32, classifier 128, lr 5e-4, L 5, k 10, memory 30,000 | the same | the same, over an MLP in place of the conv stack |
+| bandit | -- | window 160, β 1, ε 0.5, per actor | per lane |
+| exploration | ε 0.4^(1 + 8 i / 255) over 256 actors; eval ε 0.01 | the same | the Ape-X ladder over 32 lanes with α 8 (D2's `apex` schedule); eval greedy |
+| frames | 35B | ~90B | 50M moves a cell -- the paper's budgets are 3 orders of magnitude beyond the box, and the rows are here to confirm a null |
+
 ## 3. The batches
 
 | batch | arms | base | read against | judged on |
 |---|---|---|---|---|
-| E1 | 4 seeds of `ngu`, exploitative index measured | D2's config | D2 | stage-B density, `hof5000`, `hof30k`, drawdowns; the onset step; **the mean r_i trace**, which should fall to its clip floor early if the game has nothing to explore |
-| E2 | 4 seeds of `agent57` | E1's | E1, D2 | as E1; **the bandit's β = 0 fraction over training** |
+| E1 | 4 seeds of `ngu` on §2b, exploitative index measured | D2's paper config | D2 paper | stage-B density, `hof5000`, `hof30k`, drawdowns; the onset step; **the mean r_i trace**, which should fall to its clip floor early if the game has nothing to explore |
+| E2 | 4 seeds of `agent57` on §2b (two networks, trace 160) + 4 seeds `SNEK_A57_SPLIT=heads` | E1's | E1, D2 paper | as E1; **the bandit's β = 0 fraction over training** |
 
 **Registered prediction (the agent's, 2026-09-16).** E1 trails D2 on onset and is level or below on
 density: the intrinsic term pays for visiting board states the shortest route avoids, and a lane on a
@@ -89,7 +103,7 @@ greedy policy and novelty reaches them.
 1. D2 closed. Both rows import it and there is nothing to smoke before it exists.
 2. Smoke for both names; the exploitative checkpoint restores and watches.
 3. The mutation specs kill every mutant.
-4. Tuning budget: one laptop wave on β_max and the mixture count. The rows are not tuned further; a
+4. Tuning budget: one laptop wave on β_max and the kernel ε. The rows are not tuned further; a
    null here is the expected finding.
 
 ## 5. What would change the plan
