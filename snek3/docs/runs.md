@@ -240,6 +240,7 @@ lever is a knob. Nothing promoted.
 | | |
 |---|---|
 | base | pen01 (horizon anneal + step penalty 0.01, 26-value observation) |
+| the config in full, since `hist8` is the base every batch since has run on | PPO, `fc 320`, 128 lanes, rollout 256, minibatch 512, 4 epochs, lr 2.5e-4, clip 0.2, huber value loss, vf 0.5, grad clip 0.5, Adam ε 1e-7, adv norm on, `target_kl` 0. Reward: preset `b2` (chase-safe 0.1, gate 75, food-distance 0), step penalty 0.01, win 100 (default), death −5, starve −0.5. **Anneals: `SNEK_PPO_ANNEAL_FRACTION` 0.5 of the 100M cap** — γ 0.99 → 0.999, λ 0.95 → 0.999 and entropy 0.01 → 0.001 all ramp linearly to their finals at 50M and hold them for the last 50M; lr and clip are not annealed. b33 ran the same config at a 50M cap, so its ramps land at 25M |
 | varies | `SNEK_OBS_HISTORY` 0 / 4 / 8 — two bits per past move, `[turned left, turned right]`, read off the body ([`../plans/archive/obs-history.md`](../plans/archive/obs-history.md)) |
 | cells × seeds | 3 × 8, 100M |
 | control | `hist0`, the batch's own |
