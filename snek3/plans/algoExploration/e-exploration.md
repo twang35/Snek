@@ -22,7 +22,7 @@ Both rows are R2D2 (D2) with an intrinsic reward and a policy conditioned on how
 | the intrinsic reward | NGU's: an **episodic** term from a k-nearest-neighbour count in a learned embedding, reset every episode, times a **lifelong** term from random network distillation, clipped to [1, L]. Both new, in `algos/ngu/intrinsic.py` |
 | the embedding | NGU's inverse-dynamics embedding: f(obs) trained to predict the action between consecutive observations. On a 26-value vector the embedding is an MLP to 32 dims |
 | the conditioning | a family of N policies indexed by β_i (intrinsic weight) and γ_i (discount), the index one-hot appended to the observation (UVFA). `SNEK_NGU_MIXTURES` **32, the paper's** -- the lanes are vectorised, so 32 lanes is one lane per mixture and costs nothing the box lacks; β_max `SNEK_NGU_BETA_MAX` (0.3) with the paper's spacing β_0 = 0, β_{N−1} = β_max, β_i = β_max · σ(10 (2i − (N − 2)) / (N − 2)); γ from `SNEK_DISCOUNT` (γ_0, the exploitative end) down to `SNEK_NGU_GAMMA_MIN`, evenly spaced in log(1 − γ) as the paper's Eq. 4. The paper's range is 0.997 → 0.99; here **0.99 → 0.97**, because `SNEK_DISCOUNT` is 0.99 for every row (`README.md`, "Translating") and the paper's ratio of horizons (3.3×) is kept |
-| the sidecar | `recurrent` from D and `conditioning`: `{"mixtures": 8, "obs_extra": 8}`; in the signature |
+| the sidecar | `recurrent` from D and `conditioning`: `{"mixtures": 32, "obs_extra": 32}`; in the signature |
 | restore | greedy under the **exploitative** index (β = 0, the highest γ), which is what the eval measures; a `--policy-variant mixture:<i>` in the style of `a-return-tail.md` §5 measures any other |
 | the step | D2's |
 

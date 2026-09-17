@@ -48,17 +48,17 @@ algorithm, which is what makes the gap between them attributable.
 | setting | the papers (verified 2026-09-16 against the papers and the Dopamine / authors' configs) | paper cell here | local cell |
 |---|---|---|---|
 | optimiser, batch | Adam, 32 | Adam, `SNEK_BATCH_SIZE=32` | Adam, 128 |
-| learning rate, Adam ε | DQN / C51 2.5e-4; QR-DQN, IQN, FQF, M-DQN, M-IQN **5e-5**; Adam ε 0.01/32 = 3.125e-4 (C51, QR, IQN, FQF), DQN-Adam 1.5e-4 | the paper's per rung: `SNEK_LEARNING_RATE` 2.5e-4 for A1 and A2, 5e-5 for A3-A6; `SNEK_ADAM_EPSILON` 3.125e-4 | 1e-5, 1e-7 |
+| learning rate, optimiser | **DQN: RMSProp** 2.5e-4 (decay 0.95, ε 1e-5, centred -- Nature and Dopamine; there is no Adam DQN in the original paper). C51 Adam 2.5e-4; QR-DQN, IQN, FQF, M-DQN, M-IQN Adam **5e-5**; Adam ε 0.01/32 = 3.125e-4 throughout | A1's paper cell uses the **Munchausen paper's DQN-Adam** (Adam 5e-5, ε 3.125e-4), because it is the DQN every other rung's paper is compared against and A6's M-DQN is built on it; the RMSProp original is not run. `SNEK_LEARNING_RATE` 2.5e-4 for A2, 5e-5 for A1 and A3-A6; `SNEK_ADAM_EPSILON` 3.125e-4 | 1e-5, 1e-7 |
 | replay | 1M transitions, uniform, prefill 20k steps (Dopamine `min_replay_history`; FQF 50k) | `SNEK_REPLAY_BUFFER_MAX_LENGTH=1000000`, `SNEK_PRIORITY_EXPONENT=0`, `SNEK_INITIAL_COLLECT_STEPS=20000` | 100k, PER 0.6, 2,000 |
-| update frequency | one gradient step of batch 32 per 4 agent steps: 8 replayed samples per transition | `SNEK_REPLAY_RATIO` for 8 samples per transition at batch 32 (2 gradient steps per move at `collect_envs` 1) | 1.0 |
-| target network | hard copy every 8,000 updates (Dopamine; the papers say "as DQN", 10k) | `SNEK_TARGET_UPDATE_PERIOD=8000`, τ 1.0 | 8 |
+| update frequency | one gradient step of batch 32 per 4 agent steps: 8 replayed samples per transition | `SNEK_REPLAY_RATIO=0.25` (the knob is gradient steps per transition, `algos/dqn/algo.py`), batch 32: 8 samples per move | 1.0 at batch 128 |
+| target network | hard copy every 8,000 **agent steps** (Dopamine's `target_update_period` counts agent steps; at one update per 4 steps that is 2,000 gradient updates, 32k frames; Nature DQN's "10,000 parameter updates" is the same order) | `SNEK_TARGET_UPDATE_PERIOD=2000` -- **the knob counts gradient updates** (`DdqnAgent.train_step`), so 8,000 here would be 4× the paper's | 8 |
 | n-step | 1 in every paper of this group (Dopamine's IQN gin uses 3; the Munchausen paper reverts it to 1 and says so) | `SNEK_N_STEP_UPDATE=1` | 1 |
-| exploration | ε linear 1.0 → 0.01 over 250k steps (M-DQN, Rainbow's ε ablation) to 1M steps (DQN, QR-DQN, FQF); ε 0.001 at eval | `SNEK_EPSILON_SCHEDULE=linear`, `SNEK_INITIAL_EPSILON=1.0`, `SNEK_MIN_EPSILON=0.01`, `SNEK_EPSILON_ANNEAL_STEPS=1000000` moves; eval greedy as every snek3 eval is; **shield off, fork off** | the eval-driven schedule, 0.4 → 0.002, shield 0.8, fork 4 |
+| exploration | ε linear 1.0 → 0.01 over the first **1M frames = 250k agent steps** (Dopamine `epsilon_decay_period` 250k; Nature DQN's "final exploration frame" 1M); ε 0.001 at eval | `SNEK_EPSILON_SCHEDULE=linear`, `SNEK_INITIAL_EPSILON=1.0`, `SNEK_MIN_EPSILON=0.01`, `SNEK_EPSILON_ANNEAL_STEPS=250000` moves (the earlier draft's 1M was frames read as moves); eval greedy as every snek3 eval is; **shield off, fork off** | the eval-driven schedule, 0.4 → 0.002, shield 0.8, fork 4 |
 | discount | 0.99 | 0.99 | 0.99 |
 | gradient clipping | none (DQN-family papers); the dueling paper clips the norm at 10 | none | none |
 | reward | clipped to [−1, 1] | **not clipped** -- see §1; scales set from the return range instead | same |
 | network | Nature CNN → 512 | `SNEK_FC_LAYERS=320`, the reference's trunk; the head is the rung's | same |
-| budget | 200M frames = 50M agent steps, 3-5 seeds | 50M moves a cell (12.5M counted steps at `collect_envs` 1, or the same moves at a wider `collect_envs`), 4 seeds; raised to the reference's 100M if the curve is still rising | as the paper cell |
+| budget | 200M frames = 50M agent steps, 3-5 seeds | 50M moves a cell -- **50M counted steps in the paper cell**, since the fork is off and `collect_envs` is 1, so one counted step is one move; the local cell's four-branch fork makes it 12.5M counted steps for the same moves -- 4 seeds; raised to the reference's 100M if the curve is still rising | as the paper cell |
 
 Per-rung values the papers fix and the plan takes verbatim:
 
@@ -66,7 +66,7 @@ Per-rung values the papers fix and the plan takes verbatim:
 |---|---|
 | A2 C51 | 51 atoms; support [−10, 10] **on clipped rewards** -- here [−10, 110] at 51 atoms is a 2.4-wide bin, so the stability batch also runs **101 atoms** (the same 2.4 → 1.2 width step the paper's 21 → 51 gave); cross-entropy on the projected target; ε 0.01 |
 | A3 QR-DQN | N 200, κ 1 (QR-DQN-1), lr 5e-5 |
-| A4 IQN | N = N′ = 64 loss samples (Dopamine's config; the paper says 8 "appears to be sufficient" and does not state the Atari-57 value), K 32 policy samples, cosine embedding 64, κ 1, lr 5e-5. **Risk-sensitive form: the distortion is applied to the acting policy during training and to the policy in the Bellman target, and the score is reported under the risk-neutral eval** -- CVaR 0.25 and CVaR 0.1 are the paper's two CVaR arms |
+| A4 IQN | N = N′ = 64 loss samples (Dopamine's config; the paper says 8 "appears to be sufficient" and does not state the Atari-57 value), K 32 policy samples, cosine embedding 64, κ 1, lr 5e-5. **Risk-sensitive form: the distortion is applied to the acting policy during training and to the policy in the Bellman target.** Whether the paper's Figure 5 scores are under the same distorted policy or a risk-neutral read is not stated unambiguously in §4 and the implementer checks it against the text before the spec is written; the batch measures **both** reads of every checkpoint (§5), so the row does not depend on the answer -- CVaR 0.25 and CVaR 0.1 are the paper's two CVaR arms |
 | A5 FQF | N 32; quantile net Adam 5e-5; fraction proposal **RMSProp** (centered, momentum 0, ε 1e-5) at 2.5e-9; fraction entropy coefficient 0.001 (the released code's default); target 10k; uniform replay, prefill 50k |
 | A6 Munchausen | α 0.9, τ 0.03, l₀ −1; ε-greedy acting (not the softmax); 1-step; M-DQN on Dopamine DQN-Adam at lr 5e-5 and target 8,000, M-IQN on Dopamine IQN with 1-step. **τ is set against a unit reward**; here the food reward is 1, so τ 0.03 means what it meant, and the +100 win is the term it under-weights -- the smoke records the log-policy term's magnitude beside the reward |
 
@@ -185,7 +185,7 @@ Every row is two cells of four seeds -- one wave -- unless the table says otherw
 
 | batch | arms | base | read against | judged on |
 |---|---|---|---|---|
-| A1 | 4 seeds `dqn` **paper** (§1b: lr 2.5e-4, batch 32, 1M uniform replay, target 8k, ε linear 1 → 0.01 over 1M moves, no shield, no fork) + 4 seeds `dqn` **local** (DQN's defaults) | the reference's reward, history and trunk; 50M moves, raised if still rising | PPO's `hist8` table (`docs/runs.md` b27); the two cells against each other | stage-B density, `hof5000`, `hof30k`, drawdown count |
+| A1 | 4 seeds `dqn` **paper** (§1b: DQN-Adam 5e-5, batch 32, replay ratio 0.25, 1M uniform replay, target 2,000 updates, ε linear 1 → 0.01 over 250k moves, no shield, no fork) + 4 seeds `dqn` **local** (DQN's defaults) | the reference's reward, history and trunk; 50M moves, raised if still rising | PPO's `hist8` table (`docs/runs.md` b27); the two cells against each other | stage-B density, `hof5000`, `hof30k`, drawdown count |
 | A2 stability | paper cell, 2 × 2: 51 atoms on [−10, 110] / 101 atoms on [−10, 110], seeds 1-2 each; `v_max` 200 as a third pair only if both clip mass at the top atom in the smoke | A1 paper | -- | does the perfect rate hold after onset; `zero_since` never >200 evals after 80% |
 | A2 | 4 paper at the stable support + 4 local | A1 | A1's two cells | as A1 |
 | A3 | 4 paper, N 200, κ 1, lr 5e-5 + 4 local | A1 | A2 | as A1 |

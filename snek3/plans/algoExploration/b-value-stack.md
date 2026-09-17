@@ -49,7 +49,7 @@ give different outputs and the same in eval mode; the greedy policy is determini
 Mutants: the mean subtracted over the atom axis instead of the action axis, σ not zeroed at act time,
 the value stream broadcast to the wrong axis.
 
-### B2 -- Beyond the Rainbow (Clark, Towers, Evers & Farquhar 2024)
+### B2 -- Beyond the Rainbow (Clark, Towers, Evers & Hare 2024)
 
 Rainbow rebuilt for one desktop (Clark, Towers, Evers & Hare, arXiv 2411.03820, verified 2026-09-16
 against the paper's Table D6 and the authors' code): IQN in place of C51, Munchausen on and double-Q
@@ -95,8 +95,8 @@ at the fraction.
 |---|---|---|---|
 | optimiser | Adam 6.25e-5, ε 1.5e-4 | Adam 1e-4, ε 1.95e-5 | the paper's, per row |
 | batch, replay | 32; 1M; 20k steps before learning | 256; 2²⁰; 200k transitions before learning | the paper's, per row |
-| update frequency | one update per 4 agent steps: 8 samples per transition | one update per 64-env step: 4 samples per transition | `SNEK_REPLAY_RATIO` to the paper's samples per transition |
-| target period | 8,000 updates (32k frames) | 500 gradient steps | the paper's |
+| update frequency | one update per 4 agent steps: 8 samples per transition | one update per 64-env step: 4 samples per transition | `SNEK_REPLAY_RATIO` 0.25 at batch 32 (Rainbow) and 1/64 ≈ 0.0156 at batch 256 (BTR); the knob is gradient steps per transition |
+| target period | 8,000 agent steps = 2,000 gradient updates (32k frames) | 500 gradient steps | `SNEK_TARGET_UPDATE_PERIOD` 2,000 / 500 -- the knob counts gradient updates |
 | PER | α 0.5, β 0.4 → 1 | α 0.2, β 0.45 held | the paper's |
 | n-step | 3 | 3 | 3 |
 | distribution | C51, 51 atoms, [−10, 10] | IQN, 8 taus | A2's stable support; IQN 8 / 8 / 8 |

@@ -59,8 +59,9 @@ minibatch shuffling transitions, the stored state off by one step.
 state carried across rollouts, minibatches of whole per-env rollouts (`nenvs // nminibatches` lanes
 each) with the `done` mask resetting the state inside a sequence, truncated backpropagation over the
 rollout. That is the design above, so D1's paper cell *is* the plan: LSTM 128 (`gru` is the local
-variant), the reference's rollout of 256 as the BPTT length, 128 lanes / 4 minibatches = 32 lanes a
-minibatch. SB3-contrib's `RecurrentPPO` (256 hidden, chunked minibatches) is the other common form and
+variant), the reference's rollout of 128 (`SNEK_PPO_ROLLOUT`; baselines' Atari default is also 128) as the BPTT
+length, and baselines' 4 minibatches over 128 lanes = 32 lanes a minibatch (the reference's 256-transition
+minibatches are a transition count and do not apply to whole-lane sequences). SB3-contrib's `RecurrentPPO` (256 hidden, chunked minibatches) is the other common form and
 is not followed, because its chunking breaks the whole-sequence property the tests pin.
 
 **The base is `hist8`, not `hist0`.** The question is whether memory adds to what the history window

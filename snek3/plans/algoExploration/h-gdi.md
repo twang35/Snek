@@ -51,7 +51,7 @@ If the gate passes, the Snake row proceeds. If it fails, §2 and §3 are not bui
 Tests: with a family of one point the algorithm is plain V-trace actor-critic (a fixture checks the
 target against a hand-computed one); the selector converges to the better of two points on a
 synthetic problem; a behaviour at temperature → 0 is the greedy actor. Mutants: the importance ratio
-unclipped, the selector's window not sliding, the behaviour sampled from the wrong lane's point.
+unclipped, a bandit's count not incremented on the point it chose, the behaviour sampled from the wrong lane's point.
 
 ## 3. The batch
 
