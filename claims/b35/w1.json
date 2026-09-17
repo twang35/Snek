@@ -1,0 +1,18 @@
+{
+ "arms": [
+  "b35a-dqnpaper-seed1",
+  "b35b-dqnpaper-seed2",
+  "b35c-dqnpaper-seed3",
+  "b35d-dqnpaper-seed4",
+  "b35e-dqnlocal-seed5",
+  "b35f-dqnlocal-seed6",
+  "b35g-dqnlocal-seed7",
+  "b35h-dqnlocal-seed8"
+ ],
+ "batch": "b35",
+ "box": "desktop",
+ "claimed_iso": "2026-09-17T01:51:42",
+ "claimed_ts": 1789635102.71084,
+ "kind": "wave",
+ "wave": 1
+}
