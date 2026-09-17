@@ -119,7 +119,7 @@ Group A); BTR has no local cell, because its collection *is* one of the things i
 | batch | arms | base | read against | judged on |
 |---|---|---|---|---|
 | B1 | 4 seeds `rainbow` **paper** (§2b) + 4 seeds `rainbow` **local** (A1's local plumbing under the Rainbow head and flags) | the reference's reward, history and trunk | A2's two cells and PPO's `hist8` table | stage-B density, `hof5000`, `hof30k`, drawdowns |
-| B1 ablation | 4 seeds paper with noisy off (ε 1 → 0.01 over 250k steps, the paper's own non-noisy ablation) | B1 paper | B1 paper | whether noisy nets matter here |
+| B1 ablation | 4 seeds paper with noisy off (ε 1 → 0.01 over the first **250k frames = 62.5k moves**, the paper's own non-noisy ablation) | B1 paper | B1 paper | whether noisy nets matter here |
 | B2 | 4 seeds `btr` (§2b, the paper's collection) + 4 seeds `btr` with `SNEK_BTR_LAYER_NORM=1` (the paper's post-submission variant) | the reference's reward and history | B1 paper and A4 + A6 | as B1 |
 | B2 ablation | 4 seeds with the plain `QNet` trunk in place of the residual one + 4 seeds with spectral norm off | B2 | B2 | is the trunk the difference, and is it the norm |
 

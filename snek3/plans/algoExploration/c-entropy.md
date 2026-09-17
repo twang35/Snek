@@ -19,7 +19,7 @@ tell whether C1's result was the idea or the implementation.
 | replay, collection | `algos/dqn/replay.py` and `collect.py` with the fork **off** and the shield off: SAC's exploration is its own entropy, and forking a stochastic policy's replay would put a different distribution under the critics than the actor induces. `SNEK_FORK_*`, epsilon and the shield knobs are refused by name |
 | the sidecar | `algo` `sac` or `sac2`; no new head field -- the checkpoint is an actor of `QNet` shape, so `restore` reads it exactly as a PPO checkpoint, argmax over logits |
 | the step | DQN's: one `collector.step()`, `collect_envs` moves; `SNEK_COLLECT_ENVS` default 16 so the replay fills at a useful rate |
-| knobs | `SNEK_SAC_LEARNING_RATE` (3e-4), `SNEK_SAC_CRITIC_LEARNING_RATE` (3e-4), `SNEK_SAC_BATCH_SIZE` (64), `SNEK_SAC_TARGET_UPDATE_PERIOD` (8000, hard copy) / `SNEK_SAC_TAU` (1.0; 0.005 makes it Polyak), `SNEK_SAC_ALPHA` (`auto`, or a fixed number), `SNEK_SAC_TARGET_ENTROPY_RATIO` (0.98 of log \|A\|), `SNEK_SAC_INIT_ALPHA` (1.0), `SNEK_SAC_ALPHA_LEARNING_RATE` (3e-4), `SNEK_SAC_REPLAY_RATIO` (0.25 gradient steps per move), `SNEK_SAC_N_STEP` (1), `SNEK_SAC_ENTROPY_PENALTY` (0, off), `SNEK_SAC_CRITIC_COMBINE` (`min`), `SNEK_SAC_Q_CLIP` (0, off). `DISCOUNT` and `COLLECT_ENVS` shared. Defaults are C1's paper values (§2b) |
+| knobs | `SNEK_SAC_LEARNING_RATE` (3e-4), `SNEK_SAC_CRITIC_LEARNING_RATE` (3e-4), `SNEK_SAC_BATCH_SIZE` (64), `SNEK_SAC_TARGET_UPDATE_PERIOD` (2000 gradient updates, hard copy) / `SNEK_SAC_TAU` (1.0; 0.005 makes it Polyak), `SNEK_SAC_ALPHA` (`auto`, or a fixed number), `SNEK_SAC_TARGET_ENTROPY_RATIO` (0.98 of log \|A\|), `SNEK_SAC_INIT_ALPHA` (1.0), `SNEK_SAC_ALPHA_LEARNING_RATE` (3e-4), `SNEK_SAC_REPLAY_RATIO` (0.25 gradient steps per move), `SNEK_SAC_N_STEP` (1), `SNEK_SAC_ENTROPY_PENALTY` (0, off), `SNEK_SAC_CRITIC_COMBINE` (`min`), `SNEK_SAC_Q_CLIP` (0, off). `DISCOUNT` and `COLLECT_ENVS` shared. Defaults are C1's paper values (§2b) |
 
 ## 2. The rows
 
@@ -72,7 +72,7 @@ the online-minus-target difference, the penalty using the entropy's sign rather 
 | optimiser, lr | Adam 3e-4, all nets | Adam 1e-5 actor and critic, 3e-4 for α when auto | the paper's, per row: C1 3e-4, C2 1e-5 |
 | batch | 64 | 64 | 64 |
 | replay | 1M; 20k random steps before learning | 1e5 | C1 1M, C2 1e5; prefill 20k moves |
-| target | hard copy every 8,000 updates (the pseudocode writes Polyak, no τ given) | Polyak τ 0.005 | the paper's, per row |
+| target | hard copy, "fixed network update frequency 8000" -- **the unit is not stated**; read as agent steps, as Dopamine counts it, that is 2,000 gradient updates at one update per 4 steps (the pseudocode writes Polyak, no τ given) | Polyak τ 0.005 | `SNEK_SAC_TARGET_UPDATE_PERIOD` **2,000** gradient updates for C1 (the knob counts updates, as DQN's does); τ 0.005 for C2 |
 | update frequency | 1 gradient step per 4 env steps | 0.1 per step (Tianshou `update-per-step`) | `SNEK_SAC_REPLAY_RATIO` 0.25 for C1, 0.1 for C2 |
 | n-step | 1 | 3 | per row |
 | temperature | auto, target 0.98 · log \|A\| | fixed 0.05 | per row |
