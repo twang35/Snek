@@ -13,11 +13,11 @@ are in git history before 2026-09-10.
 
 ## Open
 
-- **Where the value ladder (Group A) runs now that A1 has closed.** b35 says the papers' recipe does not reach competence in
-  10M moves on this game and b36 (live) says the same for C51 on it, so the A2 comparison and A3-A6 cannot be read on the
-  paper cell at this budget. The plan's own answer (`../plans/algoExploration/a-return-tail.md` §6, first bullet) is to base
-  the ladder on the local cell, which arrives in ~1M steps at 4.3 h an arm, and keep one paper cell at A4; the alternative is
-  the plan's full 50M-move budget for the paper cell, ~18 h an arm. Decision pending; nothing queued.
+- **Group A runs on the local plumbing** (decided 2026-09-17): b35 and b36 showed the papers' recipe does not reach
+  competence in 10M moves on this game for DQN or C51, so rows A2-A4 are queued on b35's local cell (b37: C51 and QR-DQN;
+  b38: IQN neutral and CVaR-trained). Still open: whether the paper cell arrives at its full 50M-move budget (~18 h an arm),
+  and A5 (FQF) and A6 (Munchausen), which wait for b37/b38's reading. The CVaR read of b38's neutral checkpoints is a hand
+  pass (`--policy-variant cvar:0.25`) once the batch closes.
 - **`rp` annealed to zero after onset.** b34's per-reversal penalty gave the fastest onset and the best stability on the
   `hist8` base and cost 5 pp of plateau density; a penalty that decays to 0 by ~10M would say whether the two can be
   separated. The reversal-rate-by-fill measurement the b34 prediction named is still owed.
@@ -47,6 +47,8 @@ are in git history before 2026-09-10.
 
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
+| [b38](#b38--iqn-risk-neutral-beside-trained-under-cvar-025-on-the-local-plumbing) | IQN trained risk-neutral / under CVaR 0.25 (`SNEK_DIST_RISK_ALPHA` 0.25, `SNEK_DIST_RISK_TRAIN` 1) | b35's local cell, `SNEK_ALGO=iqn` | 2 × 4 | 3M steps | registered | — |
+| [b37](#b37--c51-and-qr-dqn-on-the-local-plumbing) | the head: C51 (51 atoms) / QR-DQN (N 200) | b35's local cell | 2 × 4 | 3M steps | registered | — |
 | [b36](#b36--c51-stability-two-supports-on-the-paper-cells-plumbing) | C51's support: 51 atoms / 101 atoms on [-10, 110] | b35's paper cell, C51 head, Adam 2.5e-4 | 2 × 2 | 10M moves | registered | — |
 | [b35](#b35--dqn-the-value-familys-control-paper-cell-beside-local-cell) | the plumbing: the DQN-Adam paper cell (batch 32, 1M uniform replay, target 2,000 updates, ε linear 1 → 0.01, no shield, no fork) beside snek3's DQN defaults (PER, fork 4, shield, eval-driven ε) | hist8 observation and b27's reward, `fc 320` | 2 × 4 | 10M moves / 3M steps | falsified on local, held on paper | paper: 7-16% perfect at 10M moves, still rising, no stage B; local: 90% by 0.6-1.6M then a 71-88% oscillation, 45 stage-B rows, best 96.6, none at 98. The plumbing is the whole gap; neither is near PPO's 95% |
 | [b34](#b34--zigzag-shaping-a-reversal-potential-beside-a-reversal-penalty) | `SNEK_ZIGZAG_SHAPING` 0.5 (potential, window 8) / `SNEK_REVERSAL_PENALTY` 0.5 (plain) | b27's `hist8`, verbatim | 2 × 4 | 100M | held for `zz`, falsified for `rp` | `zz` level with the base everywhere; `rp` the fastest onset and most stable cell on this base, 30k top level (`b34e` @3.6M, 29,954 /30k), but 90.1% density against 95.4 -- a standing penalty caps the plateau |
@@ -109,6 +111,38 @@ evals below 50% and 80%), then best30. `hof5000` re-measures the top rows at 5,0
 at complete separation (Mann-Whitney p=0.029). Details in [`protocol.md`](protocol.md).
 
 ---
+
+## b38 — IQN, risk-neutral beside trained under CVaR 0.25, on the local plumbing
+
+| | |
+|---|---|
+| base | b35's local cell (`b35e`-`b35h`'s knobs, verbatim: hist8, b27's reward, `fc 320`, γ 0.99, lr 1e-5, batch 128, 100k PER 0.6, target every 8 updates, the eval-driven ε with shield 0.8 and fork 4), `SNEK_ALGO=iqn`: N = N′ 64, K 32, cosine embedding 64, κ 1 |
+| varies | the acting rule during training. **neutral** (`b38a`-`b38d`): τ uniform on [0, 1]. **cvar25** (`b38e`-`b38h`): `SNEK_DIST_RISK_ALPHA=0.25`, `SNEK_DIST_RISK_TRAIN=1` -- Dabney et al. 2018 §4's risk-sensitive agent, the distortion τ ← 0.25τ on the acting policy and on the target's argmax; every eval risk-neutral, as the paper scores it |
+| cells × seeds | 2 × 4, seeds 1-8 pinned to the letter |
+| cap | 3M counted steps = 12M moves, b35's local cap |
+| control | b35's local DQN cell; b37's two heads; the two cells against each other. The CVaR *read* of the neutral checkpoints (`tools.closeout --policy-variant cvar:0.25`) is a hand pass after the batch closes |
+| predicted | registered 2026-09-17 by the agent: the neutral cell sits with b37's heads; the CVaR-trained cell arrives later (it under-explores the food-seeking moves a neutral policy takes) but holds a steadier plateau -- fewer evals below 80, a higher stage-A share at ≥98 -- which is the tail-risk diagnosis showing through |
+
+**Why.** Row A4 is the row Group A exists for: acting on the low quantiles is the one thing a scalar
+critic cannot do, and it is the most direct test of the diagnosis that the failures are rare fatal
+moves rather than noisy returns. It runs on the local plumbing for the reason b37 does.
+
+## b37 — C51 and QR-DQN on the local plumbing
+
+| | |
+|---|---|
+| base | b35's local cell (`b35e`-`b35h`'s knobs, verbatim: hist8, b27's reward, `fc 320`, γ 0.99, lr 1e-5, batch 128, 100k PER 0.6, target every 8 updates, the eval-driven ε with shield 0.8 and fork 4) |
+| varies | the head. **c51local** (`b37a`-`b37d`): `SNEK_ALGO=c51`, 51 atoms on [−10, 110]. **qrdqnlocal** (`b37e`-`b37h`): `SNEK_ALGO=qrdqn`, N 200, κ 1 |
+| cells × seeds | 2 × 4, seeds 1-8 pinned to the letter |
+| cap | 3M counted steps = 12M moves, b35's local cap |
+| control | b35's local DQN cell (90% by 0.6-1.6M, then 71-88%; 45 stage-B rows, best 96.6); the two heads against each other. C51's stability, which b36 could not read, reads off this cell's drawdown columns |
+| predicted | registered 2026-09-17 by the agent: both heads reach 90% in DQN's 0.6-1.6M and plateau higher and steadier -- recent perfect above 71-88%, fewer evals below 80 -- with QR-DQN at or above C51; neither near PPO's 95% density, stage B in the tens of rows |
+
+**Why.** Rows A2 and A3, moved from the papers' plumbing to snek3's own because b35 and b36 showed the
+papers' recipe does not reach competence in 10M moves on this game for either DQN or C51
+(`../plans/algoExploration/a-return-tail.md` §6, first bullet; decided with the user 2026-09-17). The
+local cell arrives in a million steps at 4.3 h an arm, so the heads can be compared where a head has
+something to act on; with the base fixed the two rows share one wave.
 
 ## b36 — C51 stability: two supports on the paper cell's plumbing
 

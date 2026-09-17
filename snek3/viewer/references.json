@@ -355,5 +355,29 @@
   "label": "reference: b27's hist8 cell at 100M -- b36 is C51's stability batch on the paper cell's plumbing, two supports; read for stability, the comparison against b35 follows",
   "after": "c51a101",
   "value": "ppo"
+ },
+ "b37": {
+  "arms": [
+   "b35e-dqnlocal-seed5",
+   "b35f-dqnlocal-seed6",
+   "b35g-dqnlocal-seed7",
+   "b35h-dqnlocal-seed8"
+  ],
+  "label": "reference: b35's local DQN cell (snek3's plumbing: PER, fork 4, shield, target every 8) at 3M steps -- the control for every value-based row; b37 is C51 and QR-DQN on the same plumbing",
+  "after": "qrdqnlocal",
+  "value": "dqn",
+  "knob": "name"
+ },
+ "b38": {
+  "arms": [
+   "b35e-dqnlocal-seed5",
+   "b35f-dqnlocal-seed6",
+   "b35g-dqnlocal-seed7",
+   "b35h-dqnlocal-seed8"
+  ],
+  "label": "reference: b35's local DQN cell at 3M steps -- b38 is IQN on the same plumbing, risk-neutral beside trained under CVaR 0.25",
+  "after": "iqncvar25",
+  "value": "dqn",
+  "knob": "name"
  }
 }
