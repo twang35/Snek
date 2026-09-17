@@ -39,6 +39,8 @@ are in git history before 2026-09-10.
 
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
+| [b36](#b36--c51-stability-two-supports-on-the-paper-cells-plumbing) | C51's support: 51 atoms / 101 atoms on [-10, 110] | b35's paper cell, C51 head, Adam 2.5e-4 | 2 × 2 | 10M moves | registered | — |
+| [b35](#b35--dqn-the-value-familys-control-paper-cell-beside-local-cell) | the plumbing: the DQN-Adam paper cell (batch 32, 1M uniform replay, target 2,000 updates, ε linear 1 → 0.01, no shield, no fork) beside snek3's DQN defaults (PER, fork 4, shield, eval-driven ε) | hist8 observation and b27's reward, `fc 320` | 2 × 4 | 10M moves / 3M steps | registered | — |
 | [b34](#b34--zigzag-shaping-a-reversal-potential-beside-a-reversal-penalty) | `SNEK_ZIGZAG_SHAPING` 0.5 (potential, window 8) / `SNEK_REVERSAL_PENALTY` 0.5 (plain) | b27's `hist8`, verbatim | 2 × 4 | 100M | registered | — |
 | [b33](#b33--the-perfect-game-reward) | `SNEK_PERFECT_GAME_REWARD` 0 / 10 / 30 / 50 / 100 / 200 / 300 / 1000 | pen01 + hist8, anneal final at 25M | 8 × 4 | 50M | held on 0-300, falsified on 1000 | a monotone onset lever saturating at 100 (density 87.3 → 94.9, then 94.9-96.5); no collapse after 15M in any cell — 1000's drawdowns are a 15M onset; `win0` reaches 99.78 best30 and 9 rows at ≥99.8 /5k, so invariant 6 falls; nothing at 99.8 /30k from any cell at 50M, where b27's 100M had 9 |
 | [b32](#b32--b28s-best-checkpoints-annealed-on-to-a-horizon-of-10) | warm start from b28's eight best /30k checkpoints; γ and λ 0.999 → 1.0 over 50M, held 50M | b28's converged values | 1 × 8 | 100M | falsified (the top moved) | stage B 99.8% in every window from the first eval; `hof30k` 92 full rows, 78 at ≥99.8; **`b32g` @62423040 at 29,967 /30k, the new record** (99.86 on a second seed), from a 61-63M plateau averaging the old ceiling; the other seven arms stayed on it |
@@ -99,6 +101,41 @@ evals below 50% and 80%), then best30. `hof5000` re-measures the top rows at 5,0
 at complete separation (Mann-Whitney p=0.029). Details in [`protocol.md`](protocol.md).
 
 ---
+
+## b36 — C51 stability: two supports on the paper cell's plumbing
+
+| | |
+|---|---|
+| base | b35's paper cell (its entry below), with C51's optimiser: Adam 2.5e-4, ε 3.125e-4 |
+| varies | `SNEK_DIST_ATOMS` 51 (`b36a`-`b36b`) / 101 (`b36c`-`b36d`) on `SNEK_DIST_V_MIN=-10`, `SNEK_DIST_V_MAX=110` |
+| cells × seeds | 2 × 2, seeds 1-4 pinned to the letter |
+| control | none: a stability batch, judged on its own curve (`zero_since` never above 200 evals once an arm has read 80%; no target mass piling on the end atoms) |
+| predicted | registered 2026-09-17 by the agent: both supports stable at this reward -- snek2's C51 instability was the 30-value observation and the b2-era reward scale, not the head -- and 101 atoms level with 51 on onset and density, so 51 is the comparison's setting |
+
+**Why.** Row A2 of the algorithm series (`plans/algoExploration/a-return-tail.md` §3) runs C51 against
+b35's DQN, but snek2's C51 was unstable enough that a win-reward shrink was tried and falsified, so the
+plan puts a stability batch first. The support is this game's discounted return range, not the paper's
+clipped [−10, 10]: at 51 atoms that is a 2.4-wide bin against the paper's 0.4, so the second cell halves
+it, the same step the paper's 21 → 51 ablation took. Only a stable support proceeds to the four-seed
+comparison.
+
+## b35 — DQN, the value family's control: paper cell beside local cell
+
+| | |
+|---|---|
+| base | the hist8 observation (`SNEK_OBS_HISTORY=8`), b27's reward (preset `b2`, chase-safe 0.1 at gate 75, food-distance 0, step penalty 0.01, win 100), `fc 320`, γ 0.99; `SNEK_ALGO=dqn` |
+| varies | the plumbing. **paper** (`b35a`-`b35d`): the Munchausen paper's DQN-Adam -- Adam 5e-5, ε 3.125e-4, batch 32, `SNEK_REPLAY_RATIO` 0.25 (one update per 4 moves), 1M uniform replay (`SNEK_PRIORITY_EXPONENT=0`), 20k prefill, hard target copy every 2,000 updates, 1-step, `SNEK_EPSILON_SCHEDULE=linear` 1.0 → 0.01 over 250k moves, shield 0, fork 1, one lane; eval every 2,500 steps. **local** (`b35e`-`b35h`): snek3's DQN defaults -- lr 1e-5, batch 128, replay ratio 1, 100k PER 0.6, target every 8 updates, the eval-driven ε 0.4 → 0.002, shield 0.8, fork 4; eval every 1,000 |
+| cells × seeds | 2 × 4, seeds 1-8 pinned to the letter |
+| cap | paper 10M moves (= 10M counted steps, one lane and no fork); local 3M counted steps = 12M moves, b2's cap. Both sized under 8 h with stage B and the hof passes, from the laptop's 1,865 and 357 st/s |
+| control | PPO's `hist8` table (`b27q`-`b27x`, 94-95% density, 99.81 /30k); the two cells against each other |
+| predicted | registered 2026-09-17 by the agent: the local cell reaches 90% perfect by 1M counted steps as b2 did and ends at 40-60% stage-B density, well under PPO; the paper cell learns more slowly (ε is 0.5 for its first 125k moves), reads a non-zero perfect rate by 3M moves and ends below the local cell, because uniform replay and an unshielded ε 0.01 keep feeding the endgame deaths the fork exists to avoid |
+
+**Why.** Row A1 of the algorithm series (`plans/algoExploration/a-return-tail.md`): every value-based
+row -- C51 through FQF, Rainbow, R2D2 -- is read against DQN, and no DQN has run on the 26+16
+observation or b27's reward. Two cells because the series compares algorithms on their papers'
+settings, and this codebase's own plumbing (the fork, the shield, PER, the fast target copy) exists in
+no paper: the gap between the cells is what that plumbing is worth here, measured once, so every later
+row's paper cell can be read with it in mind.
 
 ## b34 — zigzag shaping: a reversal potential beside a reversal penalty
 
