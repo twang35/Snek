@@ -13,6 +13,14 @@ are in git history before 2026-09-10.
 
 ## Open
 
+- **Where the value ladder (Group A) runs now that A1 has closed.** b35 says the papers' recipe does not reach competence in
+  10M moves on this game and b36 (live) says the same for C51 on it, so the A2 comparison and A3-A6 cannot be read on the
+  paper cell at this budget. The plan's own answer (`../plans/algoExploration/a-return-tail.md` §6, first bullet) is to base
+  the ladder on the local cell, which arrives in ~1M steps at 4.3 h an arm, and keep one paper cell at A4; the alternative is
+  the plan's full 50M-move budget for the paper cell, ~18 h an arm. Decision pending; nothing queued.
+- **`rp` annealed to zero after onset.** b34's per-reversal penalty gave the fastest onset and the best stability on the
+  `hist8` base and cost 5 pp of plateau density; a penalty that decays to 0 by ~10M would say whether the two can be
+  separated. The reversal-rate-by-fill measurement the b34 prediction named is still owed.
 - **What the perfect-game reward's onset effect is made of.** b33 says W below 100 slows the arrival and W above it
   buys nothing; whether the slow onset at 1000 is the huber critic (δ 1) learning the terminal jump — testable
   with `mse` at 1000 — or the normalised advantages, is open. The starve/death split stage B does not record.
@@ -40,8 +48,8 @@ are in git history before 2026-09-10.
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
 | [b36](#b36--c51-stability-two-supports-on-the-paper-cells-plumbing) | C51's support: 51 atoms / 101 atoms on [-10, 110] | b35's paper cell, C51 head, Adam 2.5e-4 | 2 × 2 | 10M moves | registered | — |
-| [b35](#b35--dqn-the-value-familys-control-paper-cell-beside-local-cell) | the plumbing: the DQN-Adam paper cell (batch 32, 1M uniform replay, target 2,000 updates, ε linear 1 → 0.01, no shield, no fork) beside snek3's DQN defaults (PER, fork 4, shield, eval-driven ε) | hist8 observation and b27's reward, `fc 320` | 2 × 4 | 10M moves / 3M steps | registered | — |
-| [b34](#b34--zigzag-shaping-a-reversal-potential-beside-a-reversal-penalty) | `SNEK_ZIGZAG_SHAPING` 0.5 (potential, window 8) / `SNEK_REVERSAL_PENALTY` 0.5 (plain) | b27's `hist8`, verbatim | 2 × 4 | 100M | registered | — |
+| [b35](#b35--dqn-the-value-familys-control-paper-cell-beside-local-cell) | the plumbing: the DQN-Adam paper cell (batch 32, 1M uniform replay, target 2,000 updates, ε linear 1 → 0.01, no shield, no fork) beside snek3's DQN defaults (PER, fork 4, shield, eval-driven ε) | hist8 observation and b27's reward, `fc 320` | 2 × 4 | 10M moves / 3M steps | falsified on local, held on paper | paper: 7-16% perfect at 10M moves, still rising, no stage B; local: 90% by 0.6-1.6M then a 71-88% oscillation, 45 stage-B rows, best 96.6, none at 98. The plumbing is the whole gap; neither is near PPO's 95% |
+| [b34](#b34--zigzag-shaping-a-reversal-potential-beside-a-reversal-penalty) | `SNEK_ZIGZAG_SHAPING` 0.5 (potential, window 8) / `SNEK_REVERSAL_PENALTY` 0.5 (plain) | b27's `hist8`, verbatim | 2 × 4 | 100M | held for `zz`, falsified for `rp` | `zz` level with the base everywhere; `rp` the fastest onset and most stable cell on this base, 30k top level (`b34e` @3.6M, 29,954 /30k), but 90.1% density against 95.4 -- a standing penalty caps the plateau |
 | [b33](#b33--the-perfect-game-reward) | `SNEK_PERFECT_GAME_REWARD` 0 / 10 / 30 / 50 / 100 / 200 / 300 / 1000 | pen01 + hist8, anneal final at 25M | 8 × 4 | 50M | held on 0-300, falsified on 1000 | a monotone onset lever saturating at 100 (density 87.3 → 94.9, then 94.9-96.5); no collapse after 15M in any cell — 1000's drawdowns are a 15M onset; `win0` reaches 99.78 best30 and 9 rows at ≥99.8 /5k, so invariant 6 falls; nothing at 99.8 /30k from any cell at 50M, where b27's 100M had 9 |
 | [b32](#b32--b28s-best-checkpoints-annealed-on-to-a-horizon-of-10) | warm start from b28's eight best /30k checkpoints; γ and λ 0.999 → 1.0 over 50M, held 50M | b28's converged values | 1 × 8 | 100M | falsified (the top moved) | stage B 99.8% in every window from the first eval; `hof30k` 92 full rows, 78 at ≥99.8; **`b32g` @62423040 at 29,967 /30k, the new record** (99.86 on a second seed), from a 61-63M plateau averaging the old ceiling; the other seven arms stayed on it |
 | [b31](#b31--mse-value-loss-on-the-hist8-base) | `SNEK_PPO_VALUE_LOSS` mse | pen01 + hist8 | 1 × 8 | 100M | falsified | worse on this base: onset 51 vs 83% at 0-25M, 88.0% density, nothing reaches 30k at 99.8; only the stability columns keep `mse`'s old gain |
@@ -128,7 +136,7 @@ comparison.
 | cells × seeds | 2 × 4, seeds 1-8 pinned to the letter |
 | cap | paper 10M moves (= 10M counted steps, one lane and no fork); local 3M counted steps = 12M moves, b2's cap. Both sized under 8 h with stage B and the hof passes, from the laptop's 1,865 and 357 st/s |
 | control | PPO's `hist8` table (`b27q`-`b27x`, 94-95% density, 99.81 /30k); the two cells against each other |
-| predicted | registered 2026-09-17 by the agent: the local cell reaches 90% perfect by 1M counted steps as b2 did and ends at 40-60% stage-B density, well under PPO; the paper cell learns more slowly (ε is 0.5 for its first 125k moves), reads a non-zero perfect rate by 3M moves and ends below the local cell, because uniform replay and an unshielded ε 0.01 keep feeding the endgame deaths the fork exists to avoid |
+| predicted | registered 2026-09-17 by the agent: the local cell reaches 90% perfect by 1M counted steps as b2 did and ends at 40-60% stage-B density, well under PPO; the paper cell learns more slowly (ε is 0.5 for its first 125k moves), reads a non-zero perfect rate by 3M moves and ends below the local cell, because uniform replay and an unshielded ε 0.01 keep feeding the endgame deaths the fork exists to avoid -- **falsified on the local cell** (90% by 1M for one seed of four; stage-B density 0%, best row 96.6), **held on the paper cell**, which at 10M moves reads 7-16% perfect and gives stage B nothing |
 
 **Why.** Row A1 of the algorithm series (`plans/algoExploration/a-return-tail.md`): every value-based
 row -- C51 through FQF, Rainbow, R2D2 -- is read against DQN, and no DQN has run on the 26+16
@@ -136,6 +144,12 @@ observation or b27's reward. Two cells because the series compares algorithms on
 settings, and this codebase's own plumbing (the fork, the shield, PER, the fast target copy) exists in
 no paper: the gap between the cells is what that plumbing is worth here, measured once, so every later
 row's paper cell can be read with it in mind.
+
+**Learned.** Neither DQN is near PPO on this observation and reward, and the cells are far apart. The paper recipe does not
+arrive in 10M moves: 7-16% perfect, trailing score 80-85, still rising, no stage B. The local plumbing reaches 90% in
+0.6-1.6M counted steps and then oscillates at 71-88% with 74.5% of its evals below 80; 45 stage-B rows, best 96.6, none at
+98. So the fork, the shield, PER and the fast target are worth the whole gap, and the value ladder cannot be built on the
+paper cell at this budget (a fifth of the plan's 50M). `plans/algoExploration/a-return-tail.md` §6, first bullet, applies.
 
 ## b34 — zigzag shaping: a reversal potential beside a reversal penalty
 
@@ -145,7 +159,7 @@ row's paper cell can be read with it in mind.
 | varies | the reward, two ways. **`zz`**: `SNEK_ZIGZAG_SHAPING=0.5`, potential-based, Φ = −(reversal pairs among the last 8 moves the body shows -- the observation history depth), F = c·(γΦ(s′) − Φ(s)). **`rp`**: `SNEK_REVERSAL_PENALTY=0.5`, subtracted on every step whose move is a `left` straight after a `right` or the converse. A reversal is adjacent moves only; a U-turn (the same turn twice, the fill pattern) is not one. [`../plans/zigzag-shaping.md`](../plans/zigzag-shaping.md) |
 | cells × seeds | 2 × 4 (`b34a`-`b34d` `zz` seeds 1-4, `b34e`-`b34h` `rp` seeds 5-8) |
 | control | b27's `hist8` cell (`b27q`-`b27x`), the base itself: 94-95% density, 99.81 /30k |
-| predicted | registered 2026-09-16 by the agent with the user: `zz` level with `hist8` on density and the 30k top, and its reversal rate by board fill within 1 pp of the champion's -- the invariance holds and PPO takes nothing from the hint, as b21 found for chase-safe. `rp` cuts the early-board (fill < 50%) reversal rate by more than half, leaves the endgame's ~0 where it is, and sits within noise of `hist8` on density. A density or 30k gain in `rp` falsifies "zigzagging is not the mechanism"; a density loss says the early zigzags are load-bearing |
+| predicted | registered 2026-09-16 by the agent with the user: `zz` level with `hist8` on density and the 30k top, and its reversal rate by board fill within 1 pp of the champion's -- the invariance holds and PPO takes nothing from the hint, as b21 found for chase-safe. `rp` cuts the early-board (fill < 50%) reversal rate by more than half, leaves the endgame's ~0 where it is, and sits within noise of `hist8` on density. A density or 30k gain in `rp` falsifies "zigzagging is not the mechanism"; a density loss says the early zigzags are load-bearing -- **held for `zz`, falsified for `rp`**: `zz` is the base to the decimal; `rp` loses 5 pp of density (89.4-90.8 against 94.3-95.7, complete separation) while its onset is the fastest on this base (98% by 1.9-2.5M) and its stability the best measured, and the 30k top is level |
 
 **Why.** The move-history plan deferred this as its "fifth arm": b27 showed that letting the policy
 *see* its turn sequence was the largest lever found, and whether *charging* for zigzags does anything
@@ -154,6 +168,12 @@ meal, 17 per episode), almost all below 50% board fill and one in ~900 steps fro
 terms act on the open early board. The doses are sized from that: 0.5 puts the potential's traffic at
 0.18 per meal (chase-safe's order) and the penalty at 0.089 per meal (the step penalty's flow, which
 b26 found real where a tenth of it did nothing).
+
+**Learned.** The potential is a no-op, as b21 found for chase-safe; the penalty is not. `rp50` arrives fastest on this
+base (98% by 1.9-2.5M in every seed, before the reference's quickest at 4.1M), is the most stable cell measured (0.04% of
+evals below 80), and matches the 30k top -- `b34e` @3637248 ran 29,954 /30,000, the 99.82 ceiling from a 3.6M checkpoint --
+but its 500-episode density is 90.1% against 95.4, complete separation: the standing charge caps the plateau at 97-98.
+Neither term enters the base. Worth one wave: `rp` annealed to zero after onset.
 
 ## b33 — the perfect-game reward
 

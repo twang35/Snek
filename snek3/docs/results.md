@@ -22,6 +22,66 @@ whose published artifacts are history, and the daemon's ledger, whose keys are t
 waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
 
 
+<!-- progress_update: batch b35 -->
+## Batch b35 — the `eval_interval` sweep, 2 values x 4 seeds, 10M, closed 2026-09-17
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b27q-hist8-seed17, b27r-hist8-seed18, b27s-hist8-seed19, b27t-hist8-seed20, b27u-hist8-seed21, b27v-hist8-seed22, b27w-hist8-seed23, b27x-hist8-seed24`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| eval_interval | rows | ≥98%/500 | per-seed share | ≥99.2 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| dqnpaper | 0 | – | – – – – | 0 | – | 17.48 (11.3-26.4) | 0.0 | – | – | 0.0% |
+| dqnlocal | 45 | 0.0% | 0.0 0.0 – – | 0 | 96.6 | 88.30 (83.1-95.6) | 27.2 | 1.46% | 74.52% | 0.1% |
+| **ppo** (reference) | 22,192 | 95.4% | 95.7 94.3 95.6 95.6 95.5 95.6 95.1 95.7 | 12479 | 100.0 | 99.79 (99.7-99.9) | 95.5 | 0.0% | 0.68% | 85.4% |
+
+<!-- reading -->
+The local cell's prediction is **falsified**: 90% by 1M counted steps held for one seed of four (`b35g` at 0.6M; the others 1.19, 1.45, 1.63M), and stage-B density is 0% against the predicted 40-60 -- 45 rows in the batch, 44 from `b35f`, best 96.6, none at 98, with 74.5% of post-competence stage-A evals below 80. The paper cell's prediction **held** and undersells it: a non-zero perfect rate by 3M moves (2-5% at 2.5M) and well below the local cell, but at 10M moves the four seeds sit at 7-16% perfect with a trailing score of 80-85 and no eval above 46, still rising slowly, so there is no stage B at all. What the batch settles: on the `hist8` observation and b27's reward, the codebase's DQN plumbing (PER, the fork, the shield, a target copy every 8 updates) is the difference between a policy that reaches 90% in a million steps and one that has not reached 20% in ten million moves; and even with it, DQN's plateau is a 70-88% oscillation with nothing at 98 over 500 episodes, against PPO's 95% density. What it does not settle: whether the paper recipe arrives at the plan's 50M-move budget (this ran a fifth of it, still climbing). Verdict for the algorithm series: the paper cell cannot carry the value ladder at this budget, and the local cell is the base the comparisons can be read on (`plans/algoExploration/a-return-tail.md` §6, first bullet).
+<!-- /reading -->
+
+### Every arm
+
+| arm | eval_interval | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b35a-dqnpaper-seed1` | dqnpaper | 0 | – | – | – | 16.6 @10.0M | 0.0 | – |
+| `b35b-dqnpaper-seed2` | dqnpaper | 0 | – | – | – | 15.6 @9.8M | 0.0 | – |
+| `b35c-dqnpaper-seed3` | dqnpaper | 0 | – | – | – | 26.4 @6.1M | 0.0 | – |
+| `b35d-dqnpaper-seed4` | dqnpaper | 0 | – | – | – | 11.3 @9.2M | 0.0 | – |
+| `b35e-dqnlocal-seed5` | dqnlocal | 1 | 0.0% | 0 | 92.2 | 90.5 @1.4M | 22.7 | 0.08% |
+| `b35f-dqnlocal-seed6` | dqnlocal | 44 | 0.0% | 0 | 96.6 | 95.6 @1.9M | 46.8 | 0.04% |
+| `b35g-dqnlocal-seed7` | dqnlocal | 0 | – | – | – | 84.0 @0.7M | 20.3 | 2.84% |
+| `b35h-dqnlocal-seed8` | dqnlocal | 0 | – | – | – | 83.1 @2.6M | 19.2 | 7.96% |
+
+<!-- /progress_update: batch b35 -->
+
+<!-- progress_update: batch b34 -->
+## Batch b34 — the `knob` sweep, 2 values x 4 seeds, 100M, closed 2026-09-17
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b27q-hist8-seed17, b27r-hist8-seed18, b27s-hist8-seed19, b27t-hist8-seed20, b27u-hist8-seed21, b27v-hist8-seed22, b27w-hist8-seed23, b27x-hist8-seed24`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| knob | rows | ≥98%/500 | per-seed share | ≥99.2 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| **0** (reference) | 22,192 | 95.4% | 95.7 94.3 95.6 95.6 95.5 95.6 95.1 95.7 | 12479 | 100.0 | 99.79 (99.7-99.9) | 95.5 | 0.0% | 0.68% | 85.4% |
+| zz50 | 11,074 | 95.3% | 94.3 96.7 94.4 95.9 | 5893 | 100.0 | 99.83 (99.7-99.9) | 95.3 | 0.0% | 0.67% | 84.6% |
+| rp50 | 11,360 | 90.1% | 89.4 90.0 90.8 90.3 | 5796 | 100.0 | 99.83 (99.8-99.9) | 98.4 | 0.0% | 0.04% | 85.7% |
+
+<!-- reading -->
+`zz50` **held**: level with the `hist8` reference on every column (95.3 against 95.4% density, 99.83 best30, onset 5.0-7.0M against 4.1-8.6M, 0.67% of evals below 80 in both), so PPO takes nothing from a potential over its own reversals, as b21 found for chase-safe. `rp50` **falsified on density**: 89.4-90.8% against the reference's 94.3-95.7, complete separation, a 5 pp loss -- while onset is the fastest on this base (98% by 1.9-2.5M in every seed; 0-25M window 93-94% against 78-91), the stability columns are the best measured (0.04% below 80, sef 98.4), and the top is level (99.83 best30; `b34e` @3637248 at 29,954 /30,000, the 99.82 ceiling, from a 3.6M-step checkpoint). The registered reading of a density loss was "the early zigzags are load-bearing", but the faster onset cuts against it: the penalty helps the policy arrive and costs it at the plateau, where a standing −0.5 per reversal (0.089 a meal, the step penalty's flow) competes with the last few percent of perfect games. The reversal-rate-by-fill measurement the prediction named has not been run and is what separates the two readings. Verdict: neither term enters the base. The one follow-up worth its wave is `rp` annealed to zero after onset, which would say whether the fast start and the stability can be kept without the cap.
+<!-- /reading -->
+
+### Every arm
+
+| arm | knob | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b34a-zz50-seed1` | zz50 | 2756 | 94.3% | 1304 | 100.0 | 99.7 @87.0M | 96.1 | 0.0% |
+| `b34b-zz50-seed2` | zz50 | 2789 | 96.7% | 1557 | 100.0 | 99.9 @81.1M | 94.4 | 0.0% |
+| `b34c-zz50-seed3` | zz50 | 2734 | 94.4% | 1453 | 100.0 | 99.8 @72.5M | 95.2 | 0.0% |
+| `b34d-zz50-seed4` | zz50 | 2795 | 95.9% | 1579 | 100.0 | 99.9 @82.7M | 95.4 | 0.0% |
+| `b34e-rp50-seed5` | rp50 | 2822 | 89.4% | 1325 | 100.0 | 99.8 @95.5M | 98.5 | 0.0% |
+| `b34f-rp50-seed6` | rp50 | 2822 | 90.0% | 1540 | 100.0 | 99.9 @94.0M | 98.4 | 0.0% |
+| `b34g-rp50-seed7` | rp50 | 2847 | 90.8% | 1501 | 100.0 | 99.8 @71.2M | 98.2 | 0.0% |
+| `b34h-rp50-seed8` | rp50 | 2869 | 90.3% | 1430 | 100.0 | 99.8 @84.1M | 98.5 | 0.0% |
+
+<!-- /progress_update: batch b34 -->
+
 <!-- progress_update: batch b33 -->
 ## Batch b33 — the `perfect_game_reward` sweep, 8 values x 4 seeds, 50M, closed 2026-09-14
 

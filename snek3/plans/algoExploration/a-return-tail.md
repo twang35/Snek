@@ -1,5 +1,12 @@
 # Group A: the return tail -- DQN, C51, QR-DQN, IQN, FQF, Munchausen
 
+**Read 2026-09-17, A1 closed and A2's stability batch at 85%** (`docs/runs.md` b35, b36): the paper cell does not reach
+competence in 10M moves on either head -- DQN 7-16% perfect and C51 14-25%, both still rising, no stage B -- while the local
+cell reaches 90% in 0.6-1.6M counted steps and plateaus at 71-88%. §6's first bullet is the case that applies: the ladder's
+rows are read on the local plumbing, with the paper cell kept at A4, unless the user prefers to give the paper cell its full
+50M-move budget (~18 h an arm on the desktop). b36's stability criterion never engaged (no arm reached 80%), so A2 carries its
+own stability read in its drawdown columns; 51 and 101 atoms were level, and 51 is the setting. Decision pending; nothing queued.
+
 **Status: built 2026-09-17** (`algos/dist/`, the linear ε schedule and the Munchausen knobs on `algos/dqn/`, the sidecar's `head`, the `--policy-variant` read; tests `tests/test_dist_*.py`, mutants `tests/mut_dist.json`). Batches queue in the order of §3, A1 first. Group A of [`algorithm-series.md`](algorithm-series.md);
 conventions in [`README.md`](README.md). Phase 1 (A1) and phase 2 (A2-A6) of the running order.
 

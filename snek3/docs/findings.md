@@ -17,6 +17,38 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### The Dopamine-era DQN recipe does not reach competence on this game in 10M moves, snek3's own DQN plumbing does in a million steps and then plateaus at 70-88%, and neither is within reach of PPO on the same observation and reward
+
+b35 (2026-09-17, `docs/runs.md`): two DQN cells on the `hist8` observation and b27's reward. The **paper cell** -- the Munchausen
+paper's DQN-Adam (5e-5, ε 3.125e-4), batch 32, one gradient step per four moves, a 1M uniform replay, a hard target copy every
+2,000 updates, ε linear 1.0 → 0.01 over 250k moves and held, no exploration shield, no fork, one lane -- reads 7-16% perfect
+over its last 50 evals at 10M moves in all four seeds, trailing score 80-85, no single eval above 46, and the curves are still
+rising slowly (seed 1 by quarter: 2, 7, 11, 16%). Stage B has nothing to measure. The **local cell** -- lr 1e-5, batch 128, a
+100k PER replay, a target copy every 8 updates, the eval-driven ε with the shield at 0.8 and the four-branch fork -- reaches
+50% by 80-120k counted steps and 90% by 0.6-1.6M, then oscillates: 71-88% perfect over the last 50 evals, 74.5% of
+post-competence evals below 80, 45 stage-B rows in the batch (44 from one arm), best 96.6, none at 98. Against PPO's `hist8`
+cell at 95.4% density this is the same order as b3's 11.6x. Two limits: the paper cell ran a fifth of the plan's 50M-move
+budget, so the finding is "not in 10M", not "never"; and b36 (live) shows C51 on the same paper plumbing at the same 14-25%
+at 8.5M moves, so the recipe, not the head, is what is missing. Consequence for the algorithm series: the value ladder's rows
+are read on the local plumbing (`../plans/algoExploration/a-return-tail.md` §6, first bullet).
+
+### A per-reversal penalty on the `hist8` base gives the fastest onset and the best stability measured and costs 5 pp of plateau density; a potential over the same reversals is a no-op
+
+b34 (2026-09-17, `docs/runs.md`, `../plans/zigzag-shaping.md`): b27's `hist8` config verbatim, plus either a potential-based
+zigzag term (`SNEK_ZIGZAG_SHAPING=0.5`, Φ = −reversal pairs among the last 8 moves) or a plain penalty (`SNEK_REVERSAL_PENALTY=0.5`
+on every left-after-right move and the converse), four seeds each at 100M. **`zz50` is the base to the decimal**: 95.3 against
+95.4% stage-B density, 99.83 against 99.79 best30, onset at 98% between 5.0 and 7.0M against the reference's 4.1-8.6M, 0.67% of
+evals below 80 in both -- PPO takes nothing from a shaping hint over what it already sees, as b21 found for chase-safe.
+**`rp50` moves three columns in two directions.** Every seed reads 98% by 1.9-2.5M, before the reference's quickest at 4.1M,
+and its 0-25M window runs 93-94% against 78-91; 0.04% of post-competence evals fall below 80 against 0.68 (sef 98.4, the best
+measured); and its stage-B density is 89.4-90.8% against 94.3-95.7, complete separation, while its share of stage-A evals at
+≥98 matches the reference (85.7 against 85.4) -- the checkpoints read 97-98 at 500 episodes where the base's read ≥98, a cap
+on the plateau rather than a collapse. The top is level: 99.83 best30 in both cells, and `b34e` @3637248 ran **29,954 /30,000
+(99.85), the 99.82 ceiling, from a 3.6M-step checkpoint** -- every earlier reading of that ceiling was at 60M or later. The
+mechanism is open between "the early zigzags are load-bearing" (the registered reading of a density loss) and "a standing
+charge of 0.089 a meal competes with the last percent of perfect games" (which the faster onset favours); the
+reversal-rate-by-fill measurement would separate them. Neither term enters the base.
+
 ### A fixed Hamiltonian cycle wins every game in 2,330 steps and the same cycle with safe shortcuts in 1,416; the record policies finish in 986-1,039, ahead of both, and the undiscounted `b10ck` was slower than not thinking at all
 
 **Addendum, the shortcut reference (same day).** `shortcut-path` follows the tour but steps to whichever neighbour is furthest
