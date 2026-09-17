@@ -1,0 +1,18 @@
+{
+ "arms": [
+  "b37a-c51local-seed1",
+  "b37b-c51local-seed2",
+  "b37c-c51local-seed3",
+  "b37d-c51local-seed4",
+  "b37e-qrdqnlocal-seed5",
+  "b37f-qrdqnlocal-seed6",
+  "b37g-qrdqnlocal-seed7",
+  "b37h-qrdqnlocal-seed8"
+ ],
+ "batch": "b37",
+ "box": "desktop",
+ "claimed_iso": "2026-09-17T10:15:20",
+ "claimed_ts": 1789665320.3307664,
+ "kind": "wave",
+ "wave": 1
+}
