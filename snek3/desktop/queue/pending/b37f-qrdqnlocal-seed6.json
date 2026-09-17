@@ -1,0 +1,29 @@
+{
+ "box": "desktop",
+ "env": {
+  "SNEK_ALGO": "qrdqn",
+  "SNEK_CHASE_SAFE_GATE": "75",
+  "SNEK_CHASE_SAFE_SHAPING": "0.1",
+  "SNEK_DISCOUNT": "0.99",
+  "SNEK_DIST_KAPPA": "1",
+  "SNEK_DIST_QUANTILES": "32",
+  "SNEK_EVAL_INTERVAL": "1000",
+  "SNEK_EVAL_QUEUE": "1",
+  "SNEK_EVAL_QUEUE_DEPTH": "16",
+  "SNEK_EVAL_WORKERS": "8",
+  "SNEK_FC_LAYERS": "320",
+  "SNEK_FOOD_DISTANCE_REWARD": "0",
+  "SNEK_OBS_HISTORY": "8",
+  "SNEK_REWARD_PRESET": "b2",
+  "SNEK_SEED": "6",
+  "SNEK_STEP_PENALTY": "0.01"
+ },
+ "id": "b37f-qrdqnlocal-seed6",
+ "label": "b37: C51 (51 atoms) and QR-DQN (N 32) on snek3's local DQN plumbing, hist8 at 3M steps, QR-DQN (row A3), N 32, kappa 1 (QR-DQN-1), seed 6 of 8",
+ "max_steps": 3000000,
+ "notes": "Batch b37: rows A2 and A3 of the algorithm series on the local plumbing (PER 0.6, fork 4, shield 0.8, target every 8 updates, lr 1e-5, batch 128, the eval-driven epsilon), one wave of two cells x 4 seeds. c51local (b37a-d): C51, 51 atoms on [-10, 110]. qrdqnlocal (b37e-h): QR-DQN, N 32 (not the paper's 200: the paper's value runs at 10 steps/s on this CPU, N 32 at 225; 32 is also FQF's N, so A3 and A5 share the count), kappa 1. Read against b35's local DQN cell (b35e-h: 90% perfect by 0.6-1.6M counted steps, then a 71-88% oscillation, 45 stage-B rows, best 96.6) and against each other. The base is the local plumbing because b35 and b36 showed the papers' recipe (batch 32, 1M uniform replay, replay ratio 0.25, epsilon 0.01 unshielded, no fork) does not reach competence in 10M moves on this game for either DQN or C51 (plans/algoExploration/a-return-tail.md section 6, first bullet; decided with the user 2026-09-17). 3M counted steps = 12M moves, b35's local cap; eval every 1,000. Stage-A recent perfect rate, best30 and the drawdown columns carry the reading where stage B is sparse. C51's stability, which b36 could not read (no arm reached 80%), reads off this cell's drawdown columns. Prediction (agent, 2026-09-17): both heads reach 90% in the same 0.6-1.6M as DQN and plateau higher and steadier -- recent perfect above DQN's 71-88% and fewer evals below 80 -- with QR-DQN at or above C51 (no support to mis-set); neither reaches PPO's 95% density, and stage B stays sparse (tens of rows). Pinned to the desktop, one wave of eight. CPU cost, measured on the laptop 2026-09-17 at 2,000 steps, one arm at a time (counted steps/s): DQN 484, C51 285, QR-DQN N 32 225, N 64 74, N 200 10; IQN N=N' 64 14, 32 23, 16 52, 8 92 -- the quantile Huber grows with N x N' and IQN's cosine embedding is a Linear per (sample, tau), so the papers' N 200 and 64 are days per arm here.",
+ "policy": "b37f-qrdqnlocal-seed6",
+ "priority": 380,
+ "project": "snek3",
+ "type": "train"
+}
