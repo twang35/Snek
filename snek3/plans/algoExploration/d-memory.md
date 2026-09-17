@@ -102,7 +102,7 @@ skipped on the target, overlap producing a gap instead, the previous reward fed 
 | head | dueling, scalar, 512-wide streams | dueling scalar (F1's module); the C51 head is the local variant |
 | sequence, burn-in, overlap | 80, 40, 40; never across an episode boundary | 80, 40, 40 |
 | n-step | 5, double Q | `SNEK_N_STEP_UPDATE=5` |
-| discount | 0.997 | 0.99 (`README.md`, "Translating") |
+| discount | 0.997 | **0.997** (`SNEK_DISCOUNT`); the local cell takes the reference's |
 | replay | 4M observations (1e5 part-overlapping sequences); priority exponent 0.9, IS exponent 0.6, η 0.9 | 1e5 sequences (4M rows at 26+16 values ≈ 700 MB per box; halve it to 5e4 if the desktop's memory says so); α 0.9, β 0.6 held, η 0.9 |
 | batch | 64 sequences | 64 sequences |
 | optimiser | Adam 1e-4, ε 1e-3 | Adam 1e-4, ε 1e-3 |

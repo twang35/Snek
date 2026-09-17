@@ -45,9 +45,10 @@ and the terminal is death, starvation or the perfect game.
 | `algos/mcts/agent.py` | cross-entropy of the policy head against the visits, MSE on the value (the papers'), equal weights, SGD momentum 0.9 with weight decay 1e-4 and the papers' step schedule (`SNEK_MCTS_OPTIMIZER` `sgd`; `adam` is the local variant) |
 | `algos/mcts/algo.py` | `mcts`: `build_config` with `SNEK_MCTS_SIMULATIONS` (**800**, AlphaZero's; MuZero Atari's 50 is the second cell), the knobs above, `SNEK_MCTS_REPLAY_SIZE` (the most recent games, in positions -- AlphaZero's window is 1e6 games), `SNEK_REPLAY_RATIO`; `policy_fn` is the search at eval simulations with temperature 0 |
 
-**The value target on a game this long.** A perfect game is ~1,000 moves for the champions. With γ =
-0.99 the return-to-go is dominated by the next few meals plus the +100 at the end, and the death −5 is
-small against it. The plan uses the reward preset unchanged so the row is comparable, and records the
+**The value target on a game this long.** A perfect game is ~1,000 moves for the champions. Undiscounted,
+as AlphaZero has it, the outcome is the total reward -- ~95 meals plus the +100 win, or the meals so far
+minus 5 at a death -- so the value head is asked for the *score*; at MuZero's 0.997 (horizon ~333) the
+return-to-go is the next few hundred moves' meals plus most of a win that is near. The plan uses the reward preset unchanged so the row is comparable, and records the
 value target's scale in the smoke; if the value head cannot separate a doomed board from a safe one at
 that scale, `SNEK_MCTS_VALUE_RESCALE` (R2D2's h, which is also MuZero's) is the knob. Q in the tree is
 min-max normalised over the tree as MuZero does, since the papers' ±1 value range is the one thing
@@ -134,7 +135,7 @@ the exp taken before the clip, the normaliser dropped, importance weights unclip
 | replay, priority | last 1e6 games, uniform | 125k sequences of 200; \|ν − z\|, α = β = 1 | 1e6 transitions FIFO; α = β = 1 | 6M frames, 75 % replay | scaled to the cap, per row |
 | reanalyse | -- | 80 % | 1.0 (repo) | -- | per row |
 | target network | -- | acting checkpoint every 1,000 updates | every 400 updates | rate 0.1 | per row |
-| discount | 1 (game outcome) | 0.997 | 0.997 | 0.995 | 0.99 |
+| discount | 1 (game outcome) | 0.997 | 0.997 | 0.995 | **the paper's, per row**: G1's AlphaZero cell undiscounted (the outcome; its TD-10 cell at MuZero's 0.997), G2 and G3 0.997, G4 0.995 |
 | budget | 700k updates, 5,000 actors | 20B frames (Reanalyze 200M), 350 actors | 100k env steps, update-to-data 1 | 200M frames | G1 and G2 the reference's 100M transitions; G3 100k moves, then 500k; G4 50M moves |
 
 ## 3. The batches

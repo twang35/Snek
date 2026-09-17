@@ -80,7 +80,7 @@ it for this observation; the paper's post-submission layer-norm result (positive
 | target | hard copy every 500 gradient steps (= 32k moves at 64 envs) |
 | PER | α 0.2; β 0.45 held (the authors' code does not anneal it) |
 | exploration | noisy nets **and** ε linear 1.0 → 0.01 over the first 2M agent steps (`SNEK_EPSILON_SCHEDULE=linear`, A's knob), then ε 0 for the second half of the run (`SNEK_EPSILON_ZERO_AT`, a fraction of the cap, 0.5); the fork off (`SNEK_FORK_BRANCHES=1`), since BTR's collection is wide rather than forked, and this is the one place B2's step changes: one counted step is `collect_envs` moves, and `advance()` reports it |
-| discount | 0.99, not the paper's 0.997 (`README.md`, "Translating") |
+| discount | **0.997**, the paper's (`README.md`, "Translating") |
 
 Tests: spectral norm bounds the largest singular value at 1 ± tolerance after the power iteration
 converges; the residual block is the identity at zero-initialised final layers; with every flag at
@@ -105,7 +105,7 @@ at the fraction.
 | dueling | on | on | on |
 | Munchausen | -- | α 0.9, τ 0.03, l₀ −1 | per row |
 | gradient clipping | none stated (the dueling paper: norm 10) | norm 10 | per row |
-| discount | 0.99 | 0.997 | 0.99 |
+| discount | 0.99 | 0.997 | the paper's, per row |
 | trunk | Nature CNN → 512 | IMPALA ×2, spectral norm on residual convs, adaptive maxpool 6×6, linear 512, no layer norm | `fc 320` for Rainbow; the residual MLP above for BTR |
 | environments | 1 | 64 vectorised | 1 (`collect_envs` 1, no fork) for Rainbow; 64 for BTR |
 | frames | 200M | 200M | 50M moves a cell, raised if still rising |
