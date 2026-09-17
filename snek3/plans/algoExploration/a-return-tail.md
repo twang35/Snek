@@ -194,15 +194,15 @@ Every row is two cells of four seeds -- one wave -- unless the table says otherw
 §1b's recipe and the **local** cell on `algos/dqn/`'s defaults. Both cells share the reward preset,
 `SNEK_OBS_HISTORY=8` and `SNEK_FC_LAYERS=320` of the PPO reference, and the rung's head values from §1b.
 
-| batch | arms | base | read against | judged on |
-|---|---|---|---|---|
-| A1 | 4 seeds `dqn` **paper** (§1b: DQN-Adam 5e-5, batch 32, replay ratio 0.25, 1M uniform replay, target 2,000 updates, ε linear 1 → 0.01 over 250k moves, no shield, no fork) + 4 seeds `dqn` **local** (DQN's defaults) | the reference's reward, history and trunk; 50M moves, raised if still rising | PPO's `hist8` table (`docs/runs.md` b27); the two cells against each other | stage-B density, `hof5000`, `hof30k`, drawdown count |
-| A2 stability | paper cell, 2 × 2: 51 atoms on [−10, 110] / 101 atoms on [−10, 110], seeds 1-2 each; `v_max` 200 as a third pair only if both clip mass at the top atom in the smoke | A1 paper | -- | does the perfect rate hold after onset; `zero_since` never >200 evals after 80% |
-| A2 | 4 paper at the stable support + 4 local | A1 | A1's two cells | as A1 |
-| A3 | 4 paper, N 200, κ 1, lr 5e-5 + 4 local | A1 | A2 | as A1 |
-| A4 | 4 paper neutral + 4 paper **CVaR 0.25 trained** (`SNEK_DIST_RISK_TRAIN=1`, the paper's risk-sensitive agent); the local cell and a CVaR 0.1 cell run in a second wave only if the first moves. Every neutral checkpoint is also *read* under CVaR 0.25 in stage B (§5) | A1 | A3 | as A1; the trained-CVaR cell against the neutral one, and the neutral-vs-CVaR *read* delta on the same checkpoints |
-| A5 | 4 paper, N 32 + 4 local | A1 | A4 | as A1 |
-| A6 | 4 paper M-DQN (on A1 paper) + 4 paper M-best (on the best of A2-A5's paper cells) | A1; that rung | A1 paper; that rung | as A1 |
+| row | batch | arms | base | read against | judged on |
+|---|---|---|---|---|---|
+| A1 | **b35**, closed 2026-09-17 (`docs/runs.md`): paper 7-16% perfect at 10M moves, no stage B; local 90% by 0.6-1.6M then 71-88% | 4 seeds `dqn` **paper** (§1b: DQN-Adam 5e-5, batch 32, replay ratio 0.25, 1M uniform replay, target 2,000 updates, ε linear 1 → 0.01 over 250k moves, no shield, no fork) + 4 seeds `dqn` **local** (DQN's defaults) | the reference's reward, history and trunk; 50M moves, raised if still rising | PPO's `hist8` table (`docs/runs.md` b27); the two cells against each other | stage-B density, `hof5000`, `hof30k`, drawdown count |
+| A2 stability | **b36**, closed 2026-09-17: no arm reached 80%, so the criterion never engaged; 51 and 101 atoms level | paper cell, 2 × 2: 51 atoms on [−10, 110] / 101 atoms on [−10, 110], seeds 1-2 each; `v_max` 200 as a third pair only if both clip mass at the top atom in the smoke | A1 paper | -- | does the perfect rate hold after onset; `zero_since` never >200 evals after 80% |
+| A2 | **b37a-d**, queued 2026-09-17: `c51local`, 51 atoms on [−10, 110], local plumbing, 3M steps | 4 paper at the stable support + 4 local -- **ran as 4 local** | A1 | A1's two cells | as A1 |
+| A3 | **b37e-h**, queued 2026-09-17: `qrdqnlocal`, **N 32** (200 runs at 10 steps/s here), κ 1, local plumbing, 3M steps | 4 paper, N 200, κ 1, lr 5e-5 + 4 local -- **ran as 4 local at N 32**, sharing b37's wave with A2 | A1 | A2 | as A1 |
+| A4 | **b38**, queued 2026-09-17: `iqnlocal` + `iqncvar25`, **N = N′ 8** (64 runs at 14 steps/s here), K 32, local plumbing, **2M steps** | 4 paper neutral + 4 paper **CVaR 0.25 trained** (`SNEK_DIST_RISK_TRAIN=1`, the paper's risk-sensitive agent); the local cell and a CVaR 0.1 cell run in a second wave only if the first moves. Every neutral checkpoint is also *read* under CVaR 0.25 in stage B (§5) | A1 | A3 | as A1; the trained-CVaR cell against the neutral one, and the neutral-vs-CVaR *read* delta on the same checkpoints |
+| A5 | -- (waits for b37/b38; on the local plumbing, N 32) | 4 paper, N 32 + 4 local | A1 | A4 | as A1 |
+| A6 | -- (waits for A5; M-DQN on b35's local cell, M-best on the best of b37/b38) | 4 paper M-DQN (on A1 paper) + 4 paper M-best (on the best of A2-A5's paper cells) | A1; that rung | A1 paper; that rung | as A1 |
 
 Each row waits for the one above to close. Every arm is a `train` spec on the shared queue with
 `SNEK_ALGO` naming the rung; `SNEK_OBS_HISTORY=8` is one depth per wave, as the queue rule requires.
