@@ -338,6 +338,21 @@ def test_seed_claims_the_first_waves_as_the_scheduler_cut_them(bus, capsys):
     assert claims._seed(desktop, 'b21', 'laptop', 1, 8) == 0 and 'already claimed' in capsys.readouterr().out
 
 
+def test_gather_without_a_fetch_still_reads_the_claims_the_repo_already_holds(bus):
+    """`gather(fetch=False)` is the progress update's path: it fetches every branch itself, then reads. The
+    store's worktree must follow the fetched ref, or a box whose scheduler last synced days ago reads every
+    later claim as absent (the laptop showed b34-b36 unclaimed and no live batch, 2026-09-17)."""
+    desktop, laptop = bus['stores']['desktop'], bus['stores']['laptop']
+    laptop.sync()                                   # the laptop's worktree predates the desktop's claim
+    claims.claim_next(desktop, 'desktop', 8, read_specs=_read(desktop), log=lambda m: None)
+    assert claims.read_records(laptop.worktree) == []
+    _git(['fetch', '-q', 'origin', 'claims'], laptop.repo)
+    view = claims.gather(repo=laptop.repo, remote='origin', store=laptop, fetch=False)
+    assert [(r['batch'], r['wave'], r['box']) for r in view['records']] == [('b21', 1, 'desktop')]
+    assert 'desktop holds b21-w1 (8 arms)' in view['lines']
+    assert view['heads']['claims'] == claims.gitbus.ref_head(laptop.repo, 'origin/claims')
+
+
 def test_gather_reads_the_pool_from_the_refs(bus):
     desktop = bus['stores']['desktop']
     claims.claim_next(desktop, 'desktop', 8, read_specs=_read(desktop), log=lambda m: None)

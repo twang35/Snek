@@ -492,6 +492,15 @@ class Store(object):
         branch has never been pushed (the worktree then holds its empty root)."""
         self.ensure()
         gitbus.fetch_branch(self.repo, self.remote, self.branch)
+        return self.reset_to_remote()
+
+    def reset_to_remote(self):
+        """The second half of `sync`: resets the worktree to the remote-tracking ref as it stands and reads
+        the records. For a caller that has already fetched (`gather(fetch=False)`); without the reset the
+        worktree stays at whatever the last `sync` left, and on a box whose scheduler has not run for days
+        that is every claim since read as absent -- the laptop's progress update showed three live batches
+        as unclaimed that way (2026-09-17)."""
+        self.ensure()
         self.head = gitbus.ref_head(self.repo, self.remote_ref())
         if self.head:
             self._git(['reset', '-q', '--hard', self.remote_ref()], check=True)
@@ -633,7 +642,7 @@ def gather(repo=REPO, remote=REMOTE, store=None, fetch=True, now=None):
     store = store or Store(repo=repo, remote=remote)
     if fetch:
         gitbus.fetch_branch(repo, remote, OPS_BRANCH)
-    store.sync() if fetch else (store.ensure(), setattr(store, 'records', read_records(store.worktree)))
+    store.sync() if fetch else store.reset_to_remote()
     specs, malformed = read_specs(repo=repo, remote=remote)
     published = published_ids(repo=repo, remote=remote, fetch=fetch)
     running, ages = running_ids(repo=repo, remote=remote, fetch=fetch, now=now)
