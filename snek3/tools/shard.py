@@ -54,7 +54,8 @@ class _NetPool:
 
 
 def measure_slice(policy_dir, steps, episodes, out_path, policy=None, width=None, seed=0,
-                  stage_a=None, on_row=None, resume=True, device='cpu', stop_target=None):
+                  stage_a=None, on_row=None, resume=True, device='cpu', stop_target=None,
+                  variant=None):
     """Measure `steps` and write rows to `out_path`. Returns every row in the file, by step.
 
     `stage_a` maps step -> the stage-A percent that selected it, carried into each row so the screen
@@ -76,6 +77,7 @@ def measure_slice(policy_dir, steps, episodes, out_path, policy=None, width=None
     # `started` survives a resume (the file's own, if it has one); `finished` is the last write.
     header = {'policy': results.run_name(policy), 'arch': arch, 'episodes': episodes,
               'seed': seed, 'stop_target': stop_target, 'config': config.describe(),
+              'variant': variant,
               'started': previous.get('started') or results.iso_now()}
 
     def flush():
@@ -107,7 +109,7 @@ def measure_slice(policy_dir, steps, episodes, out_path, policy=None, width=None
         net = pool.take()
         checkpoints.load(checkpoints.path(policy_dir, step), net, device=device)
         nets[step] = net
-        return step, restore.policy_fn_for(arch, net, device=device)
+        return step, restore.policy_fn_for(arch, net, device=device, variant=variant)
 
     def on_complete(step, held):
         pool.give_back(nets.pop(step))
@@ -159,7 +161,11 @@ def main(argv=None):
                         help='retire a checkpoint once this perfect rate is out of reach (percent); '
                              'absent: measure every checkpoint to full length')
     parser.add_argument('--no-resume', action='store_true')
+    parser.add_argument('--policy-variant', default=None,
+                        help="a second greedy read of the same weights, e.g. cvar:0.25; needs --label")
     args = parser.parse_args(argv)
+    if args.policy_variant and not args.label:
+        parser.error('--policy-variant needs --label, so the variant\'s rows never overwrite the mean\'s')
 
     directory = restore.policy_dir(args.policy)
     steps, description = selectors.resolve(directory, args.selector, policy=args.policy)
@@ -175,7 +181,7 @@ def main(argv=None):
 
     measure_slice(directory, mine, args.episodes, out_path, policy=args.policy,
                   width=args.width, seed=args.seed, resume=not args.no_resume,
-                  stop_target=args.stop)
+                  stop_target=args.stop, variant=args.policy_variant)
     return 0
 
 

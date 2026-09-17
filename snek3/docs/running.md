@@ -83,6 +83,11 @@ existed, b2's shaping dose had to be confirmed by reading `/proc/<pid>/environ` 
 | `SNEK_INITIAL_EPSILON` | 0.4 | |
 | `SNEK_MIN_EPSILON` | 0.002 | **exactly 0 is rejected, not clamped.** A fully greedy collect policy makes the buffer a closed loop on its own behaviour |
 | `SNEK_GUIDED_FRACTION` | 0.8 | share of refinement-phase episodes where the epsilon coin's random move is drawn from non-fatal actions. **Never the greedy action** |
+| `SNEK_EPSILON_SCHEDULE` | `eval` | `eval` is the two-phase schedule off the eval history (`algos/dqn/schedules.py`, every batch to date). **`linear` is the papers'**: a straight line from `SNEK_INITIAL_EPSILON` to `SNEK_MIN_EPSILON` over `SNEK_EPSILON_ANNEAL_STEPS` **moves**, then held, with the shield at its configured fraction from move 0. The algorithm series' paper cells (`plans/algoExploration/`) run it at 1.0 -> 0.01 over 250,000 moves; the local cells keep `eval`. 2026-09-17 |
+| `SNEK_EPSILON_ANNEAL_STEPS` | 250000 | moves, for `linear` only. 1M Atari frames = 250k agent steps |
+| `SNEK_MUNCHAUSEN_ALPHA` | 0 (off) | Munchausen RL (Vieillard, Pietquin & Geist 2020) on any DQN-family algorithm: the clipped, `tau`-scaled log-policy of the taken action is added to the reward and the bootstrap becomes the soft value under the target net's policy at temperature `tau`. Paper 0.9. **0 is plain double DQN to the bit**; the fixture says so. Group A, row A6 |
+| `SNEK_MUNCHAUSEN_TAU` | 0.03 | the temperature, in reward units (the paper's value against a unit reward; food here is 1) |
+| `SNEK_MUNCHAUSEN_L0` | -1 | the log-policy clip's floor |
 
 ### Replay
 
@@ -104,6 +109,32 @@ existed, b2's shaping dose had to be confirmed by reading `/proc/<pid>/environ` 
 | `SNEK_FORK_PROB` | 0.5 | |
 | `SNEK_FORK_MIN_LENGTH` | 85 | |
 | `SNEK_FORK_MAX_STEPS` | 60 | |
+
+### Distributional heads — only under `SNEK_ALGO=c51`, `qrdqn`, `iqn` or `fqf`
+
+Group A of the algorithm series (`plans/algoExploration/a-return-tail.md`; `algos/dist/`). Each is DQN
+with a distributional head and the loss that fits it, on the same replay, collector and schedules, so
+**every DQN knob above applies unchanged**, and the sidecar gains a `head` field that the restore path
+reads (`tools/arch.py`, `OPTIONAL_FIELDS`). The greedy policy every eval measures is the argmax of the
+distribution's **mean**; `--policy-variant cvar:<alpha>` on `evaluate.py`, `tools.closeout` and
+`tools.shard` measures the argmax of its lower tail instead, under an explicit `--label` so the rows sit
+beside the mean's file (`a-return-tail.md` §5).
+
+| knob | default | rungs | notes |
+|---|---|---|---|
+| `SNEK_DIST_ATOMS` | 51 | c51 | atoms of the fixed support |
+| `SNEK_DIST_V_MIN`, `SNEK_DIST_V_MAX` | -10, 110 | c51 | the support. Set from **this game's discounted return range** (win 100, food 1, death -5), not the papers' clipped [-10, 10]; the smoke asserts a prefill batch's targets do not pile on the end atoms |
+| `SNEK_DIST_QUANTILES` | 200 (qrdqn), 32 (fqf) | qrdqn, fqf | N |
+| `SNEK_DIST_TAU_SAMPLES`, `SNEK_DIST_TAU_PRIME_SAMPLES`, `SNEK_DIST_POLICY_SAMPLES` | 64, 64, 32 | iqn | N, N', K: online and target loss samples and the acting read's draws |
+| `SNEK_DIST_EMBEDDING` | 64 | iqn, fqf | the cosine embedding's width |
+| `SNEK_DIST_KAPPA` | 1.0 | qrdqn, iqn, fqf | the quantile Huber's threshold, in reward units |
+| `SNEK_DIST_FRACTION_LR`, `SNEK_DIST_FRACTION_ENTROPY` | 2.5e-9, 0.001 | fqf | the fraction proposal net's RMSProp rate (the paper's) and entropy bonus (the released code's) |
+| `SNEK_DIST_RISK_ALPHA` | 1.0 (neutral) | all | the CVaR level of the risk-sensitive **training** policy, used only with the next knob |
+| `SNEK_DIST_RISK_TRAIN` | 0 | all | 1 trains the paper's risk-sensitive agent (Dabney et al. 2018 §4): acting and the target's argmax under the CVaR read at `SNEK_DIST_RISK_ALPHA`, the target's values undistorted. Stage A still measures the mean read; the CVaR read of a checkpoint is a pass's `--policy-variant` |
+
+Throughput on the laptop, stage A off, paper-cell plumbing (1 lane, batch 32, 0.25 gradient steps a
+move), 2026-09-17: dqn ~1,870 st/s, c51 ~1,700, fqf ~760, iqn ~640, qrdqn ~520. The local cell's four
+gradient steps a counted step at batch 128 cost IQN 15 st/s, so the heavy heads have no local cell.
 
 ### PPO — only under `SNEK_ALGO=ppo`
 

@@ -1,6 +1,6 @@
 # Group A: the return tail -- DQN, C51, QR-DQN, IQN, FQF, Munchausen
 
-**Status: planned 2026-09-16, nothing built.** Group A of [`algorithm-series.md`](algorithm-series.md);
+**Status: built 2026-09-17** (`algos/dist/`, the linear ε schedule and the Munchausen knobs on `algos/dqn/`, the sidecar's `head`, the `--policy-variant` read; tests `tests/test_dist_*.py`, mutants `tests/mut_dist.json`). Batches queue in the order of §3, A1 first. Group A of [`algorithm-series.md`](algorithm-series.md);
 conventions in [`README.md`](README.md). Phase 1 (A1) and phase 2 (A2-A6) of the running order.
 
 The question: does modelling the *distribution* of the return, rather than its mean, help a game whose

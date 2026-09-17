@@ -48,7 +48,7 @@ ETA_MIN_ROWS = 8
 
 
 def shard_command(policy, selector, episodes, label, shard, shards, width, seed, resume,
-                  stop_target=None):
+                  stop_target=None, variant=None):
     command = [sys.executable, '-u', '-m', 'tools.shard', policy,
                '--selector', selector, '--episodes', str(episodes),
                '--shard', str(shard), '--shards', str(shards), '--seed', str(seed)]
@@ -60,6 +60,8 @@ def shard_command(policy, selector, episodes, label, shard, shards, width, seed,
         command += ['--stop', '{0:g}'.format(stop_target)]
     if not resume:
         command.append('--no-resume')
+    if variant:
+        command += ['--policy-variant', variant]
     return command
 
 
@@ -100,10 +102,13 @@ class ArmWave(object):
     """
 
     def __init__(self, policy, selector='screen', episodes=500, shards=4, label=None, width=None,
-                 seed=0, resume=True, merge=True, stop_target=None):
+                 seed=0, resume=True, merge=True, stop_target=None, variant=None):
         self.policy, self.selector, self.episodes = policy, selector, episodes
         self.label, self.width, self.seed, self.resume, self.merge = label, width, seed, resume, merge
         self.stop_target = stop_target
+        self.variant = variant
+        if variant and not label:
+            raise ValueError('a policy variant needs a label, so its rows never overwrite the mean\'s')
         directory = restore.policy_dir(policy)
         self.steps, self.description = selectors.resolve(directory, selector, policy=policy)
         # An arm already merged is done: a rerun of the pass (a killed close-out relaunched, a
@@ -152,7 +157,8 @@ class ArmWave(object):
         self.logs.append((log_path, handle))
         self.processes.append(subprocess.Popen(
             shard_command(self.policy, self.selector, self.episodes, self.label, shard,
-                          self.shards, self.width, self.seed, self.resume, self.stop_target),
+                          self.shards, self.width, self.seed, self.resume, self.stop_target,
+                          variant=self.variant),
             stdout=handle, stderr=subprocess.STDOUT, cwd=constants.ROOT))
         return True
 
@@ -216,9 +222,9 @@ class ArmWave(object):
 
 
 def run(policy, selector='screen', episodes=500, shards=4, label=None, width=None, seed=0,
-        resume=True, merge=True):
+        resume=True, merge=True, variant=None):
     """One arm, all of its shards at once — `evaluate.py`'s wave. The pooled form is the close-out."""
-    wave = ArmWave(policy, selector, episodes, shards, label, width, seed, resume, merge)
+    wave = ArmWave(policy, selector, episodes, shards, label, width, seed, resume, merge, variant=variant)
     wave.announce(requested=shards)
     while wave.start_shard():
         pass

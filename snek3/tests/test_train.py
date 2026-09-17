@@ -117,7 +117,7 @@ def test_every_config_key_is_its_knob_lowercased():
     # algorithm-specific and `algos/dqn/algo.py` reads the rest; a test that looked at only one would pass
     # while every DQN row in the report was unmatched.
     source = open(train.__file__).read() + open(dqn_algo.__file__).read()
-    knobs = {name.lower() for name in re.findall(r"tuned\('([A-Z_]+)'", source)}
+    knobs = {name.lower() for name in re.findall(r"tuned\('([A-Z0-9_]+)'", source)}
     keys = set(train.build_config())
     # `algo` and `min_checkpoint_score` are not `tuned()` calls — one is fixed, the other is read in
     # `env/constants.py` so the eval workers inherit it.
@@ -285,9 +285,13 @@ def test_every_algorithm_object_offers_the_whole_seam(name, monkeypatch):
     monkeypatch.setenv('SNEK_ALGO', name)
     config = train.build_config()
     config.update({'seed': 3, 'replay_buffer_max_length': 500})
+    module = train.ALGOS[name]
+    # The optional hook the trainer itself uses: an algorithm with more head than the five fixed
+    # fields describe adds it here, and its sidecar carries it.
+    extra = getattr(module, 'arch_fields', lambda config: {})(config)
     arch = arch_tools.build_arch(config['fc_layers'], train.constants.NUM_ACTIONS,
-                                 train.constants.OBS_LEN, train.constants.OBS_ERA, algo=name)
-    algo = train.ALGOS[name].build(config, arch)
+                                 train.constants.OBS_LEN, train.constants.OBS_ERA, algo=name, **extra)
+    algo = module.build(config, arch)
     missing = [member for member in SEAM if not hasattr(algo, member)]
     assert not missing, missing
     assert int(algo.step_granularity) >= 1

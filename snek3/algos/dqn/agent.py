@@ -132,10 +132,25 @@ class DdqnAgent(object):
 
     def __init__(self, arch, learning_rate=1e-5, adam_epsilon=1e-7, target_update_period=8,
                  target_update_tau=1.0, gradient_clipping=0.0, use_is_weights=True,
-                 seed=None, device='cpu'):
+                 seed=None, device='cpu', munchausen_alpha=0.0, munchausen_tau=0.03,
+                 munchausen_l0=-1.0):
         self.arch = arch
         self.device = device
         self.num_actions = int(arch['num_actions'])
+        # Munchausen (Vieillard, Pietquin & Geist 2020): `alpha > 0` adds the clipped, scaled
+        # log-policy of the taken action to the reward and replaces the double-Q bootstrap with the
+        # soft (entropy-regularised) value of the next state, both computed from the **target** net's
+        # Q-values at temperature `tau`, as the paper does. **`alpha == 0` is plain double DQN, to the
+        # bit** -- the soft target is not used at all then, not used with a zero weight -- and a
+        # fixture pins that, because A1's control ran before this existed. Group A, row A6.
+        self.munchausen_alpha = float(munchausen_alpha)
+        self.munchausen_tau = float(munchausen_tau)
+        self.munchausen_l0 = float(munchausen_l0)
+        if self.munchausen_alpha < 0.0 or self.munchausen_alpha > 1.0:
+            raise ValueError('munchausen_alpha must be in [0, 1], got {0}'.format(munchausen_alpha))
+        if self.munchausen_alpha > 0.0 and self.munchausen_tau <= 0.0:
+            raise ValueError('munchausen_tau must be positive when alpha is on, got {0}'.format(
+                munchausen_tau))
         # The seed reaches the *initialisation*, not only the exploration coins. Without that two
         # arms launched with the same `SNEK_SEED` start from different weights.
         self.net = network.build(arch, device, seed=seed)
@@ -205,10 +220,7 @@ class DdqnAgent(object):
         chosen = self.net(obs).gather(1, action.unsqueeze(1)).squeeze(1)
 
         with torch.no_grad():
-            # The double-Q split: argmax from the online net, value from the target net.
-            best = self.net(next_obs).argmax(dim=1, keepdim=True)
-            bootstrap = self.target(next_obs).gather(1, best).squeeze(1)
-            target = reward + discount * bootstrap
+            target = self.scalar_target(obs, action, reward, discount, next_obs)
 
         td_error = target - chosen
         # Huber, element-wise, then a weighted mean — matching what snek2's agent did. Huber rather
@@ -235,6 +247,30 @@ class DdqnAgent(object):
         if grad_norm is not None:
             metrics['grad_norm'] = grad_norm
         return td_error.detach().cpu().numpy(), metrics
+
+    def scalar_target(self, obs, action, reward, discount, next_obs):
+        """The regression target for the chosen action, under `torch.no_grad()` by the caller.
+
+        Double DQN by default: argmax from the online net, value from the target net. With Munchausen
+        on, `r + alpha * clip(tau * log pi(a|s), l0, 0) + discount * sum_a' pi(a'|s') (q'(s',a') - tau
+        * log pi(a'|s'))`, every pi from the target net's Q at temperature tau (the paper's Eq. 7-8);
+        `discount` is already `gamma**n` or 0 at a terminal, so the soft term vanishes there as the
+        bootstrap does.
+        """
+        if self.munchausen_alpha <= 0.0:
+            best = self.net(next_obs).argmax(dim=1, keepdim=True)
+            bootstrap = self.target(next_obs).gather(1, best).squeeze(1)
+            return reward + discount * bootstrap
+        tau = self.munchausen_tau
+        # tau * log_softmax(q / tau) == q - tau * logsumexp(q / tau): the paper's scaled log-policy,
+        # computed in the stable form.
+        log_pi_s = tau * F.log_softmax(self.target(obs) / tau, dim=1)
+        munchausen = torch.clamp(log_pi_s.gather(1, action.unsqueeze(1)).squeeze(1),
+                                 min=self.munchausen_l0, max=0.0)
+        q_next = self.target(next_obs)
+        log_pi_next = tau * F.log_softmax(q_next / tau, dim=1)
+        soft_value = (torch.softmax(q_next / tau, dim=1) * (q_next - log_pi_next)).sum(dim=1)
+        return reward + self.munchausen_alpha * munchausen + discount * soft_value
 
     def maybe_update_target(self):
         """Copies the online weights into the target every `target_update_period` updates.

@@ -184,7 +184,7 @@ def measure_one(policy, episodes=500, width=None, seed=0):
 
 
 def run(policies, selector='screen', episodes=500, shards=4, label=None, width=None, seed=0,
-        resume=True, merge=True, redraw_interval=REDRAW_SECONDS, stop_target=None):
+        resume=True, merge=True, redraw_interval=REDRAW_SECONDS, stop_target=None, variant=None):
     """Measures every arm, shards pooled across them. Returns the last failing arm's status, or 0.
 
     The keyword defaults are `evaluate.py`'s, which are the protocol — `screen:97` at 500 episodes.
@@ -206,14 +206,14 @@ def run(policies, selector='screen', episodes=500, shards=4, label=None, width=N
                 print('--- {0} raised {1}: {2}'.format(policy, type(error).__name__, error), flush=True)
     else:
         status = run_pool(policies, selector, episodes, shards, label, width, seed, resume, merge,
-                          redraw_interval, stop_target=stop_target)
+                          redraw_interval, stop_target=stop_target, variant=variant)
     print('\n=== close-out done in {0:.1f}m, status {1}'.format(
         (time.time() - started) / 60.0, status), flush=True)
     return status
 
 
 def run_pool(policies, selector, episodes, pool, label, width, seed, resume, merge,
-             redraw_interval=REDRAW_SECONDS, poll=None, stop_target=None):
+             redraw_interval=REDRAW_SECONDS, poll=None, stop_target=None, variant=None):
     """Keeps up to `pool` shards running across the arms, in arm order, merging each arm as it ends.
 
     Every arm is resolved first, so a bad arm is reported at the top rather than an hour in, and the
@@ -228,7 +228,7 @@ def run_pool(policies, selector, episodes, pool, label, width, seed, resume, mer
     for index, policy in enumerate(policies, 1):
         try:
             wave = eval_wave.ArmWave(policy, selector, episodes, pool, label, width, seed, resume,
-                                     merge, stop_target=stop_target)
+                                     merge, stop_target=stop_target, variant=variant)
         except Exception as error:                    # noqa: BLE001 - one bad arm, not a bad batch
             status = 1
             print('--- [{0}/{1}] {2} raised {3}: {4}; the arms behind it still run'.format(
@@ -338,6 +338,9 @@ def build_parser():
                         help='retire a checkpoint once this perfect rate (percent) is out of reach; '
                              'the default is the pass\'s (hof5000 99.6, hof30k 99.8, stage B none)')
     parser.add_argument('--no-stop', action='store_true', help='measure every checkpoint to full length')
+    parser.add_argument('--policy-variant', default=None,
+                        help='a second greedy read of the same weights (cvar:0.25); needs --label, so the '
+                             'rows sit beside the mean\'s file rather than over it')
     return parser
 
 
@@ -345,9 +348,11 @@ def main(argv=None):
     args = build_parser().parse_args(argv)
     pass_ = pass_settings(args.pass_name, args.selector, args.episodes, args.label, args.seed,
                           args.stop, args.no_stop)
+    if args.policy_variant and not args.label:
+        build_parser().error('--policy-variant needs an explicit --label')
     return run(args.policies, pass_['selector'], pass_['episodes'], args.shards, pass_['label'],
                args.width, pass_['seed'], not args.no_resume, not args.no_merge,
-               stop_target=pass_['stop'])
+               stop_target=pass_['stop'], variant=args.policy_variant)
 
 
 if __name__ == '__main__':

@@ -27,7 +27,7 @@ reason.
 |---|---|---|---|
 | `env/` | the scalar game: constants, drawing, `Game`, the reference observation builder | **yes, and only here** | no |
 | `vectorized/` | `VecSnake` (N games in lockstep, pure numpy) plus the measurement engine and wave | no | no |
-| `algos/dqn/`, `algos/ppo/` | learning algorithms: the network, the replay, the agent, the collector | no | yes |
+| `algos/dqn/`, `algos/ppo/`, `algos/dist/` | learning algorithms: the network, the replay, the agent, the collector; `dist/` is the four distributional heads (c51, qrdqn, iqn, fqf) on `dqn/`'s replay and schedules | no | yes |
 | `tools/` | the tools and the libraries behind them: `arch`, `checkpoints`, `restore`, `eval_plan`, `run_report`, charts | no | yes, for checkpoint I/O |
 | `desktop/` | the git-bus job queue. stdlib only, imports nothing from this project | no | no |
 | `skills/` | the procedures an agent runs often: launching, queueing, stopping, progress updates. Markdown only | | |
@@ -264,6 +264,10 @@ And the training side, which is the other direction — from a knob to an arm:
 | `algos/ppo/collect.py` | one rollout: every lane steps T times, storing the value and log-prob the policy actually produced. No forking, no shield, no n-step |
 | `algos/ppo/agent.py` | the clipped surrogate, the value loss, the entropy bonus, and the epoch loop |
 | `algos/ppo/schedules.py` | the entropy coefficient, as a pure function of the step |
+| `algos/dist/net.py` | the distributional heads on `QNet`'s trunk -- C51's categorical, QR-DQN's fixed quantiles, IQN's implicit quantile function with the cosine embedding, FQF's fraction proposal -- and the module `tools/restore.py` loads any of the four through; `q_values` is the mean read, `cvar_values` the tail read a `--policy-variant` measures |
+| `algos/dist/losses.py` | the projection, the cross-entropy, the quantile Huber and FQF's fraction gradient, per sample |
+| `algos/dist/agent.py` | `DistAgent`: `DdqnAgent` with the distributional target (double-Q, or the Munchausen mixture) and loss per head; the priority is the loss |
+| `algos/dist/algo.py` + `c51.py`, `qrdqn.py`, `iqn.py`, `fqf.py` | one `DqnAlgo` subclass parameterised by the rung, the `SNEK_DIST_*` knobs, the `head` the sidecar records (`arch_fields`); four one-screen modules give each rung its `NAME` in `train.ALGOS` |
 
 **One `train.py` serves every algorithm, and that is a measurement rule rather than a tidiness one.**
 An arm's numbers are comparable across algorithms only if the same code screened its checkpoints, ran

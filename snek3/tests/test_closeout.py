@@ -27,7 +27,7 @@ class Waves(object):
         self.alive_now, self.peak = 0, 0
 
     def __call__(self, policy, selector='screen', episodes=500, shards=4, label=None, width=None,
-                 seed=0, resume=True, merge=True, stop_target=None):
+                 seed=0, resume=True, merge=True, stop_target=None, variant=None):
         self.calls.append(policy)
         self.settings[policy] = {'selector': selector, 'episodes': episodes, 'shards': shards,
                                  'label': label, 'seed': seed, 'stop_target': stop_target}
@@ -329,7 +329,8 @@ def test_an_explicit_flag_wins_over_the_preset_but_none_never_unsets_it():
 def test_main_hands_the_pass_to_run(monkeypatch):
     seen = {}
 
-    def run(policies, selector, episodes, shards, label, width, seed, resume, merge, stop_target=None):
+    def run(policies, selector, episodes, shards, label, width, seed, resume, merge, stop_target=None,
+            variant=None):
         seen.update(policies=policies, selector=selector, episodes=episodes, shards=shards,
                     label=label, seed=seed, stop_target=stop_target)
         return 0

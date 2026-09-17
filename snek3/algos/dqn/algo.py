@@ -43,6 +43,8 @@ from vectorized.vec_env import VecSnake
 
 NAME = 'dqn'
 
+EPSILON_SCHEDULES = ('eval', 'linear')
+
 
 def build_config(tuned):
     """The DQN knobs, read through the `tuned` the trainer hands over.
@@ -80,8 +82,22 @@ def build_config(tuned):
         'is_beta_final': tuned('IS_BETA_FINAL', 1.0),
         'beta_anneal_steps': int(tuned('BETA_ANNEAL_STEPS', 300000, int)),
         'is_weights': bool(int(tuned('IS_WEIGHTS', 1, int))),
+        # The exploration schedule: `eval` is `schedules.epsilon_for` off the eval history (the
+        # codebase's own, every batch to date); `linear` is the papers' straight line from
+        # `initial_epsilon` to `min_epsilon` over `epsilon_anneal_steps` **moves**, then held
+        # (`plans/algoExploration/a-return-tail.md` §1b). With `linear` the shield fraction is the
+        # configured value from move 0, since there is no bootstrap phase to hand over from.
+        'epsilon_schedule': str(tuned('EPSILON_SCHEDULE', 'eval', str)),
+        'epsilon_anneal_steps': int(tuned('EPSILON_ANNEAL_STEPS', 250000, int)),
+        # Munchausen, off at 0 (row A6). See `DdqnAgent.scalar_target`.
+        'munchausen_alpha': tuned('MUNCHAUSEN_ALPHA', 0.0),
+        'munchausen_tau': tuned('MUNCHAUSEN_TAU', 0.03),
+        'munchausen_l0': tuned('MUNCHAUSEN_L0', -1.0),
         'fork': fork,
     }
+    if config['epsilon_schedule'] not in EPSILON_SCHEDULES:
+        raise ValueError('SNEK_EPSILON_SCHEDULE={0!r} is not one of {1}'.format(
+            config['epsilon_schedule'], sorted(EPSILON_SCHEDULES)))
     if config['min_epsilon'] < schedules.EPSILON_HARD_FLOOR:
         raise ValueError('SNEK_MIN_EPSILON={0} is below the hard floor {1}'.format(
             config['min_epsilon'], schedules.EPSILON_HARD_FLOOR))
@@ -125,7 +141,10 @@ class DqnAlgo(object):
                                target_update_tau=config['target_update_tau'],
                                gradient_clipping=config['gradient_clipping'],
                                use_is_weights=config['is_weights'],
-                               seed=config['seed'], device=device)
+                               seed=config['seed'], device=device,
+                               munchausen_alpha=config['munchausen_alpha'],
+                               munchausen_tau=config['munchausen_tau'],
+                               munchausen_l0=config['munchausen_l0'])
         self.buffer = PrioritizedReplay(config['replay_buffer_max_length'], arch['obs_len'],
                                         alpha=config['priority_exponent'],
                                         initial_beta=config['is_beta'],
@@ -155,6 +174,11 @@ class DqnAlgo(object):
 
         self.epsilon = config['initial_epsilon']
         self.gradient_debt = 0.0
+        # Game moves banked so far, for the linear schedule. Persisted, so a resume continues the
+        # ramp where it stopped rather than restarting it.
+        self.moves = 0
+        if self.linear_schedule:
+            self.collector.set_guided_fraction(config['guided_fraction'])
 
     # ------------------------------------------------------------ what a checkpoint and an eval see
 
@@ -167,8 +191,17 @@ class DqnAlgo(object):
         return self.agent.policy_fn
 
     def describe(self):
-        return '{0} lane(s), replay ratio {1}'.format(self.collector.vec.n,
-                                                      self.config['replay_ratio'])
+        extra = ''
+        if self.linear_schedule:
+            extra += ', epsilon linear {0} -> {1} over {2:,} moves'.format(
+                self.config['initial_epsilon'], self.config['min_epsilon'],
+                self.config['epsilon_anneal_steps'])
+        if self.config['munchausen_alpha'] > 0.0:
+            extra += ', munchausen alpha {0} tau {1} l0 {2}'.format(
+                self.config['munchausen_alpha'], self.config['munchausen_tau'],
+                self.config['munchausen_l0'])
+        return '{0} lane(s), replay ratio {1}{2}'.format(self.collector.vec.n,
+                                                         self.config['replay_ratio'], extra)
 
     # ------------------------------------------------------------ the loop
 
@@ -185,6 +218,15 @@ class DqnAlgo(object):
             banked += self.collector.step(1.0)
         return banked
 
+    @property
+    def linear_schedule(self):
+        return self.config['epsilon_schedule'] == 'linear'
+
+    def _linear_epsilon(self):
+        return schedules.linear_epsilon(self.moves, self.config['initial_epsilon'],
+                                        self.config['min_epsilon'],
+                                        self.config['epsilon_anneal_steps'])
+
     def advance(self):
         """One collect step and the gradient steps it bought. Returns `(steps, transitions)`.
 
@@ -192,7 +234,10 @@ class DqnAlgo(object):
         `collector.step()` and a transition is one game move, and at the default width they differ by
         four. `train.py` caps on the first and charts both.
         """
+        if self.linear_schedule:
+            self.epsilon = self._linear_epsilon()
         transitions = self.collector.step(self.epsilon)
+        self.moves += int(transitions)
         self._learn(transitions)
         return 1, transitions
 
@@ -246,6 +291,11 @@ class DqnAlgo(object):
         Called in **both** queue modes, because it is what advances the schedule; which of its values
         reaches the row is `train.py`'s decision and is documented there.
         """
+        if self.linear_schedule:
+            # The ramp is a function of the move count, not of the eval; this only reports where it is.
+            self.epsilon = self._linear_epsilon()
+            return {'epsilon': round(float(self.epsilon), 5),
+                    'guided_fraction': round(float(self.collector.guided_fraction), 3)}
         reward_signal = schedules.trailing_reward(eval_rows, measured['avg_reward'])
         perfect_rate = schedules.trailing_perfect_rate(eval_rows, measured['perfect'])
         self.epsilon = schedules.epsilon_for(reward_signal, perfect_rate,
@@ -277,7 +327,8 @@ class DqnAlgo(object):
     def state_dict(self):
         return {'agent': self.agent.state_dict(),
                 'epsilon': float(self.epsilon),
-                'guided_fraction': float(self.collector.guided_fraction)}
+                'guided_fraction': float(self.collector.guided_fraction),
+                'moves': int(self.moves)}
 
     def load_state_dict(self, state):
         """Restores the agent and both schedules.
@@ -291,6 +342,7 @@ class DqnAlgo(object):
         self.agent.load_state_dict(state['agent'])
         self.epsilon = float(state['epsilon'])
         self.collector.set_guided_fraction(float(state.get('guided_fraction', 0.0)))
+        self.moves = int(state.get('moves', 0))
 
     def init_from(self, source_dir, step):
         """The net from another arm's checkpoint, and the target copied from it, as at a fresh build.

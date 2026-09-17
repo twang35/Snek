@@ -1,0 +1,178 @@
+{
+ "tests": [
+  "tests/test_dist_losses.py",
+  "tests/test_dist_net.py",
+  "tests/test_dist_agent.py",
+  "tests/test_dist_algo.py"
+ ],
+ "mutations": [
+  {
+   "desc": "the projection's floor and ceil swapped",
+   "file": "algos/dist/losses.py",
+   "from": "    lower = position.floor()\n    upper = position.ceil()",
+   "to": "    lower = position.ceil()\n    upper = position.floor()"
+  },
+  {
+   "desc": "the projection does not clip to the support",
+   "file": "algos/dist/losses.py",
+   "from": "    clipped = torch.clamp(values, v_min, v_max)",
+   "to": "    clipped = values"
+  },
+  {
+   "desc": "a value on an atom counts twice",
+   "file": "algos/dist/losses.py",
+   "from": "    weight_lower = torch.where(on_atom, torch.ones_like(weight_lower), weight_lower)\n    weight_upper = torch.where(on_atom, torch.zeros_like(weight_upper), weight_upper)",
+   "to": "    weight_lower = torch.where(on_atom, torch.ones_like(weight_lower), weight_lower)\n    weight_upper = torch.where(on_atom, torch.ones_like(weight_upper), weight_upper)"
+  },
+  {
+   "desc": "the quantile Huber's asymmetry weight dropped",
+   "file": "algos/dist/losses.py",
+   "from": "    rho = (taus.unsqueeze(2) - indicator).abs() * huber",
+   "to": "    rho = huber"
+  },
+  {
+   "desc": "the asymmetry indicator inverted",
+   "file": "algos/dist/losses.py",
+   "from": "    indicator = (u.detach() < 0.0).float()",
+   "to": "    indicator = (u.detach() > 0.0).float()"
+  },
+  {
+   "desc": "target weights ignored",
+   "file": "algos/dist/losses.py",
+   "from": "        per_online = (rho * target_weights.unsqueeze(1)).sum(dim=2)",
+   "to": "        per_online = rho.mean(dim=2)"
+  },
+  {
+   "desc": "the fraction gradient's midpoint index off by one",
+   "file": "algos/dist/losses.py",
+   "from": "    return (2.0 * values_at_taus - values_at_hats[:, 1:] - values_at_hats[:, :-1]).detach()",
+   "to": "    return (2.0 * values_at_taus - 2.0 * values_at_hats[:, 1:]).detach()"
+  },
+  {
+   "desc": "the categorical mean over the wrong axis",
+   "file": "algos/dist/net.py",
+   "from": "        return (self.probs(observations) * self.support).sum(dim=2)",
+   "to": "        return self.probs(observations).sum(dim=2) * self.support.mean()"
+  },
+  {
+   "desc": "the categorical CVaR is the mean",
+   "file": "algos/dist/net.py",
+   "from": "        return (mass * self.support).sum(dim=2) / max(alpha, 1e-8)",
+   "to": "        return (probs * self.support).sum(dim=2)"
+  },
+  {
+   "desc": "the quantile CVaR reads the top of the sort",
+   "file": "algos/dist/net.py",
+   "from": "        return sorted_q[:, :, :k].mean(dim=2)",
+   "to": "        return sorted_q[:, :, -k:].mean(dim=2)"
+  },
+  {
+   "desc": "the cosine embedding's pi dropped",
+   "file": "algos/dist/net.py",
+   "from": "        self.register_buffer('harmonics', math.pi * torch.arange(1, self.embedding + 1,",
+   "to": "        self.register_buffer('harmonics', 1.0 * torch.arange(1, self.embedding + 1,"
+  },
+  {
+   "desc": "the CVaR read ignores alpha",
+   "file": "algos/dist/net.py",
+   "from": "        return taus * float(alpha)",
+   "to": "        return taus"
+  },
+  {
+   "desc": "FQF's proposed fractions are the raw softmax, not its cumulative sum",
+   "file": "algos/dist/net.py",
+   "from": "        cumulative = probs.cumsum(dim=1)",
+   "to": "        cumulative = probs"
+  },
+  {
+   "desc": "the variant read is the mean read",
+   "file": "algos/dist/net.py",
+   "from": "            values = net.q_values(batch) if parsed is None else net.cvar_values(batch, parsed[1])",
+   "to": "            values = net.q_values(batch)"
+  },
+  {
+   "desc": "Munchausen's log-policy clip has the wrong sign",
+   "file": "algos/dqn/agent.py",
+   "from": "        munchausen = torch.clamp(log_pi_s.gather(1, action.unsqueeze(1)).squeeze(1),\n                                 min=self.munchausen_l0, max=0.0)\n        q_next = self.target(next_obs)",
+   "to": "        munchausen = torch.clamp(log_pi_s.gather(1, action.unsqueeze(1)).squeeze(1),\n                                 min=0.0, max=-self.munchausen_l0)\n        q_next = self.target(next_obs)"
+  },
+  {
+   "desc": "Munchausen's soft value drops the entropy term",
+   "file": "algos/dqn/agent.py",
+   "from": "        soft_value = (torch.softmax(q_next / tau, dim=1) * (q_next - log_pi_next)).sum(dim=1)",
+   "to": "        soft_value = (torch.softmax(q_next / tau, dim=1) * q_next).sum(dim=1)"
+  },
+  {
+   "desc": "Munchausen on at alpha 0",
+   "file": "algos/dqn/agent.py",
+   "from": "        if self.munchausen_alpha <= 0.0:\n            best = self.net(next_obs).argmax(dim=1, keepdim=True)",
+   "to": "        if False:\n            best = self.net(next_obs).argmax(dim=1, keepdim=True)"
+  },
+  {
+   "desc": "the distributional target's discount dropped",
+   "file": "algos/dist/agent.py",
+   "from": "            values = (reward + munchausen).view(batch, 1, 1) + discount.view(batch, 1, 1) * (",
+   "to": "            values = (reward + munchausen).view(batch, 1, 1) + 1.0 * ("
+  },
+  {
+   "desc": "the Munchausen mixture shifts by +tau log pi",
+   "file": "algos/dist/agent.py",
+   "from": "        return pi_next, -log_pi_next, munchausen",
+   "to": "        return pi_next, log_pi_next, munchausen"
+  },
+  {
+   "desc": "the risk-sensitive training policy acts on the mean",
+   "file": "algos/dist/agent.py",
+   "from": "            if self.risk_train and self.risk_alpha < 1.0:\n                values = self.net.cvar_values(tensor, self.risk_alpha)",
+   "to": "            if False:\n                values = self.net.cvar_values(tensor, self.risk_alpha)"
+  },
+  {
+   "desc": "the risk-sensitive target argmax is the mean's",
+   "file": "algos/dist/agent.py",
+   "from": "        if self.risk_train and self.risk_alpha < 1.0:\n            return self.net.cvar_values(next_obs, self.risk_alpha).argmax(dim=1)",
+   "to": "        if False:\n            return self.net.cvar_values(next_obs, self.risk_alpha).argmax(dim=1)"
+  },
+  {
+   "desc": "FQF's fraction net is in the value optimiser",
+   "file": "algos/dist/agent.py",
+   "from": "        value_parameters = [p for name, p in self.net.named_parameters() if not name.startswith('fraction.')]",
+   "to": "        value_parameters = list(self.net.parameters())"
+  },
+  {
+   "desc": "the value loss moves FQF's fraction net through the proposed fractions",
+   "file": "algos/dist/agent.py",
+   "from": "            online_taus = tau_hats.detach()",
+   "to": "            online_taus = tau_hats"
+  },
+  {
+   "desc": "the linear schedule never reaches its floor",
+   "file": "algos/dqn/schedules.py",
+   "from": "    if anneal_moves <= 0 or moves >= anneal_moves:\n        return float(min_epsilon)",
+   "to": "    if anneal_moves <= 0:\n        return float(min_epsilon)"
+  },
+  {
+   "desc": "the move count is not persisted",
+   "file": "algos/dqn/algo.py",
+   "from": "        self.moves = int(state.get('moves', 0))",
+   "to": "        self.moves = 0"
+  },
+  {
+   "desc": "the linear schedule's shield waits for a handover that never comes",
+   "file": "algos/dqn/algo.py",
+   "from": "        if self.linear_schedule:\n            self.collector.set_guided_fraction(config['guided_fraction'])",
+   "to": "        if False:\n            self.collector.set_guided_fraction(config['guided_fraction'])"
+  },
+  {
+   "desc": "the head is not part of the sidecar's signature",
+   "file": "tools/arch.py",
+   "from": "    return fixed + extra",
+   "to": "    return fixed"
+  },
+  {
+   "desc": "a variant on a scalar head measures the mean under the variant's label",
+   "file": "tools/restore.py",
+   "from": "    if not hasattr(module, 'variant_policy_fn'):\n        raise arch_tools.ArchMismatch(",
+   "to": "    if not hasattr(module, 'variant_policy_fn'):\n        return module.greedy_policy_fn(net, device=device)\n        raise arch_tools.ArchMismatch("
+  }
+ ]
+}

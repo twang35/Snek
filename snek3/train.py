@@ -43,6 +43,10 @@ import time
 import numpy as np
 import torch
 
+from algos.dist import c51 as c51_algo
+from algos.dist import fqf as fqf_algo
+from algos.dist import iqn as iqn_algo
+from algos.dist import qrdqn as qrdqn_algo
 from algos.dqn import algo as dqn_algo
 from algos.ppo import algo as ppo_algo
 # For `trailing_mean` only, which is a plain windowed average over the eval rows and is not about
@@ -64,7 +68,8 @@ from vectorized import engine
 # **The algorithms this build knows, by their `SNEK_ALGO` value.** A dict rather than an `if`, for the
 # reason `tools/restore.py` gives for the same shape: adding PPO is one line, and an unrecognised
 # value names itself in the error instead of falling through to a default.
-ALGOS = {dqn_algo.NAME: dqn_algo, ppo_algo.NAME: ppo_algo}
+ALGOS = {module.NAME: module for module in
+         (dqn_algo, ppo_algo, c51_algo, qrdqn_algo, iqn_algo, fqf_algo)}
 
 # ---------------------------------------------------------------- config
 
@@ -352,8 +357,14 @@ class Trainer(object):
         `SNEK_FC_LAYER_PARAMS` would load the old weights into a different network — which torch
         would refuse, but only after the run had started and only with a shape error.
         """
+        # An algorithm whose network has more shape than the five fixed fields describe -- a
+        # distributional head -- adds it through an optional `arch_fields(config)` on its module;
+        # `dqn` and `ppo` have none and their sidecars are what they were.
+        module = ALGOS[self.config['algo']]
+        extra = getattr(module, 'arch_fields', lambda config: {})(self.config)
         built = arch_tools.build_arch(self.config['fc_layers'], constants.NUM_ACTIONS,
-                                      constants.OBS_LEN, constants.OBS_ERA, algo=self.config['algo'])
+                                      constants.OBS_LEN, constants.OBS_ERA, algo=self.config['algo'],
+                                      **extra)
         if os.path.exists(arch_tools.arch_path(self.policy_dir)):
             existing = arch_tools.read_arch(self.policy_dir)
             arch_tools.assert_same_network(built, existing, '<config>', self.policy_dir)

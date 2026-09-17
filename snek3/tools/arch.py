@@ -26,6 +26,13 @@ ARCH_FILENAME = 'arch.json'
 # process at many policies.
 FIELDS = ('algo', 'fc_layer_params', 'num_actions', 'obs_len', 'obs_era')
 
+# Fields an algorithm may add when its network has more shape than the five above describe -- a
+# distributional head's atoms and support, its quantile count, its embedding width. Written only when
+# present, so every sidecar that predates them reads unchanged, and **part of the signature**, so a
+# checkpoint cannot load into a differently shaped head silently (2026-09-17, group A of
+# `plans/algoExploration/`). Absence means the scalar head every `dqn` and `ppo` checkpoint has.
+OPTIONAL_FIELDS = ('head',)
+
 
 class ArchMismatch(Exception):
     """A restore's environment or config disagrees with the recorded architecture.
@@ -38,17 +45,22 @@ def arch_path(policy_dir):
     return os.path.join(policy_dir, ARCH_FILENAME)
 
 
-def build_arch(fc_layer_params, num_actions, obs_len, obs_era, algo='dqn'):
+def build_arch(fc_layer_params, num_actions, obs_len, obs_era, algo='dqn', head=None):
     """The canonical dict.
 
     `fc_layer_params` is stored as a list of ints, because JSON has no tuples and every reader
-    iterates it — so the round trip compares list to list rather than list to tuple.
+    iterates it — so the round trip compares list to list rather than list to tuple. `head`, when
+    given, is a JSON-able dict describing the network's head beyond `num_actions` (see
+    `OPTIONAL_FIELDS`); it is left out of the dict when None, not written as null.
     """
-    return {'algo': str(algo),
+    arch = {'algo': str(algo),
             'fc_layer_params': [int(width) for width in fc_layer_params],
             'num_actions': int(num_actions),
             'obs_len': int(obs_len),
             'obs_era': str(obs_era)}
+    if head is not None:
+        arch['head'] = dict(head)
+    return arch
 
 
 def write_arch(policy_dir, arch):
@@ -72,7 +84,9 @@ def write_arch(policy_dir, arch):
         return path
     os.makedirs(policy_dir, exist_ok=True)
     with open(path, 'w') as handle:
-        json.dump({field: arch[field] for field in FIELDS}, handle, indent=2, sort_keys=True)
+        json.dump({field: arch[field] for field in FIELDS + tuple(
+            field for field in OPTIONAL_FIELDS if arch.get(field) is not None)},
+                  handle, indent=2, sort_keys=True)
         handle.write('\n')
     return path
 
@@ -99,8 +113,13 @@ def signature(arch):
     `fc_layer_params` is normalised to a tuple, or two identical arches would hash differently
     depending on which one came off disk.
     """
-    return tuple((field, tuple(arch[field]) if isinstance(arch[field], list) else arch[field])
-                 for field in FIELDS)
+    fixed = tuple((field, tuple(arch[field]) if isinstance(arch[field], list) else arch[field])
+                  for field in FIELDS)
+    # The optional fields, canonicalised through JSON so a dict read off disk and one built in memory
+    # hash alike; None for an absent one, which is what every pre-2026-09-17 sidecar has.
+    extra = tuple((field, json.dumps(arch[field], sort_keys=True) if arch.get(field) is not None else None)
+                  for field in OPTIONAL_FIELDS)
+    return fixed + extra
 
 
 def assert_restorable(policy_dir, obs_len, obs_era, num_actions):
@@ -146,7 +165,7 @@ def assert_same_network(built, target, built_dir='<built>', target_dir='<target>
     this as well.
     """
     if signature(built) != signature(target):
-        differing = [field for field in FIELDS if built[field] != target[field]]
+        differing = [field for field in FIELDS + OPTIONAL_FIELDS if built.get(field) != target.get(field)]
         raise ArchMismatch(
             'cannot restore {0} into a network built for {1}: {2} differ ({3} vs {4})'.format(
                 target_dir, built_dir, ', '.join(differing),

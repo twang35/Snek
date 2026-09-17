@@ -32,13 +32,14 @@ from vectorized import config
 from vectorized import engine
 
 
-def measure_one(policy, step=None, episodes=500, lanes=None, seed=0, out=None):
+def measure_one(policy, step=None, episodes=500, lanes=None, seed=0, out=None, variant=None):
     """One checkpoint, in this process. Prints the row and optionally writes it."""
     directory = restore.policy_dir(policy)
-    policy_fn, arch, resolved = restore.restore(directory, step)
+    policy_fn, arch, resolved = restore.restore(directory, step, variant=variant)
 
-    print('{0}  step {1}  fc {2}  era {3}'.format(
-        directory, resolved, arch['fc_layer_params'], arch['obs_era']))
+    print('{0}  step {1}  fc {2}  era {3}{4}'.format(
+        directory, resolved, arch['fc_layer_params'], arch['obs_era'],
+        '  variant {0}'.format(variant) if variant else ''))
     print(config.describe())
     print('measuring {0} episodes...'.format(episodes))
 
@@ -51,7 +52,8 @@ def measure_one(policy, step=None, episodes=500, lanes=None, seed=0, out=None):
     print('{0:.0f}s wall, {1:.1f} episodes/s'.format(elapsed, episodes / max(elapsed, 1e-9)))
     if out:
         results.write(out, {'policy': results.run_name(policy), 'arch': arch, 'seed': seed,
-                            'episodes': episodes, 'config': config.describe(), 'rows': [row]})
+                            'episodes': episodes, 'config': config.describe(), 'variant': variant,
+                            'rows': [row]})
         print('wrote {0}'.format(out))
     return row
 
@@ -82,6 +84,8 @@ def build_parser():
     parser.add_argument('--out', default=None, help="with 'one': write the row here")
     parser.add_argument('--no-resume', action='store_true')
     parser.add_argument('--no-merge', action='store_true')
+    parser.add_argument('--policy-variant', default=None,
+                        help='a second greedy read of the same weights (cvar:0.25); with a wave, needs --label')
     return parser
 
 
@@ -89,10 +93,14 @@ def main(argv=None):
     args = build_parser().parse_args(argv)
 
     if args.selector == 'one':
-        measure_one(args.policy, args.step, args.episodes, args.width, args.seed, args.out)
+        measure_one(args.policy, args.step, args.episodes, args.width, args.seed, args.out,
+                    variant=args.policy_variant)
         return 0
+    if args.policy_variant and not args.label:
+        build_parser().error('--policy-variant needs --label with a wave')
     return eval_wave.run(args.policy, args.selector, args.episodes, args.shards, args.label,
-                    args.width, args.seed, not args.no_resume, not args.no_merge)
+                    args.width, args.seed, not args.no_resume, not args.no_merge,
+                    variant=args.policy_variant)
 
 
 if __name__ == '__main__':

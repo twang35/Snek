@@ -39,7 +39,13 @@ def _ppo():
 # rather than an `if`, so adding PPO is one line and an unrecognised value names itself in the error
 # instead of falling through to a default — which is how snek2 would have watched a c51 checkpoint
 # as a scalar one.
-ALGORITHMS = {'dqn': _dqn, 'ppo': _ppo}
+def _dist():
+    # The four distributional rungs share one module; `arch['head']` says which network it builds.
+    from algos.dist import net as network
+    return network
+
+
+ALGORITHMS = {'dqn': _dqn, 'ppo': _ppo, 'c51': _dist, 'qrdqn': _dist, 'iqn': _dist, 'fqf': _dist}
 
 
 def _module_for(arch):
@@ -54,13 +60,24 @@ def build_net(arch, device='cpu'):
     return _module_for(arch).build(arch, device=device)
 
 
-def policy_fn_for(arch, net, device='cpu'):
+def policy_fn_for(arch, net, device='cpu', variant=None):
     """A greedy `policy_fn` over `net`.
 
     Separate from `build_net` because a caller that follows a live arm — `watch.py` — reloads weights
     into the *same* net between episodes and must keep the same callable.
+
+    `variant` names a second greedy read of the same weights (`cvar:0.25`, the risk-sensitive read
+    of a distributional head; `plans/algoExploration/a-return-tail.md` §5). None is the read every
+    checkpoint has. A module without a `variant_policy_fn` refuses a variant by name rather than
+    measuring the mean under a label that says otherwise.
     """
-    return _module_for(arch).greedy_policy_fn(net, device=device)
+    module = _module_for(arch)
+    if variant is None or variant == '':
+        return module.greedy_policy_fn(net, device=device)
+    if not hasattr(module, 'variant_policy_fn'):
+        raise arch_tools.ArchMismatch('algo {0!r} has no policy variant {1!r}; only the distributional '
+                                      'heads (c51, qrdqn, iqn, fqf) offer one'.format(arch['algo'], variant))
+    return module.variant_policy_fn(net, device=device, variant=variant)
 
 
 def policy_arch(policy_dir):
@@ -69,7 +86,7 @@ def policy_arch(policy_dir):
                                         constants.NUM_ACTIONS)
 
 
-def restore(policy_dir, step=None, device='cpu'):
+def restore(policy_dir, step=None, device='cpu', variant=None):
     """`(policy_fn, arch, step)` for one checkpoint. `step=None` takes the newest.
 
     The newest rather than the best: choosing *which* checkpoint to measure is the eval plan's job,
@@ -82,7 +99,7 @@ def restore(policy_dir, step=None, device='cpu'):
             raise checkpoints.CheckpointError('no checkpoints in {0}'.format(policy_dir))
     net = build_net(arch, device=device)
     checkpoints.load(checkpoints.path(policy_dir, step), net, device=device)
-    return policy_fn_for(arch, net, device=device), arch, int(step)
+    return policy_fn_for(arch, net, device=device, variant=variant), arch, int(step)
 
 
 def policy_dir(policy):
