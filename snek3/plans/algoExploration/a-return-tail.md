@@ -5,7 +5,11 @@ competence in 10M moves on either head -- DQN 7-16% perfect and C51 14-25%, both
 cell reaches 90% in 0.6-1.6M counted steps and plateaus at 71-88%. §6's first bullet is the case that applies: the ladder's
 rows are read on the local plumbing, with the paper cell kept at A4, unless the user prefers to give the paper cell its full
 50M-move budget (~18 h an arm on the desktop). b36's stability criterion never engaged (no arm reached 80%), so A2 carries its
-own stability read in its drawdown columns; 51 and 101 atoms were level, and 51 is the setting. Decision pending; nothing queued.
+own stability read in its drawdown columns; 51 and 101 atoms were level, and 51 is the setting. Queued the same day as b37 (C51 51 atoms, QR-DQN N 32) and b38 (IQN N = N′ 8, neutral and CVaR-0.25-trained, 2M cap), both
+on the local plumbing. **The quantile counts are not the papers'**: measured on this CPU one arm at a time (counted steps/s)
+DQN 484, C51 285, QR-DQN N 32 / 64 / 200 at 225 / 74 / 10, IQN N = N′ 64 / 32 / 16 / 8 at 14 / 23 / 52 / 92 -- the quantile
+Huber is N × N′ pairs and IQN's embedding is a `Linear` per (sample, τ), so 200 and 64 are days per arm. A5 takes FQF's 32
+and A6 inherits its rung's.
 
 **Status: built 2026-09-17** (`algos/dist/`, the linear ε schedule and the Munchausen knobs on `algos/dqn/`, the sidecar's `head`, the `--policy-variant` read; tests `tests/test_dist_*.py`, mutants `tests/mut_dist.json`). Batches queue in the order of §3, A1 first. Group A of [`algorithm-series.md`](algorithm-series.md);
 conventions in [`README.md`](README.md). Phase 1 (A1) and phase 2 (A2-A6) of the running order.

@@ -47,8 +47,8 @@ are in git history before 2026-09-10.
 
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
-| [b38](#b38--iqn-risk-neutral-beside-trained-under-cvar-025-on-the-local-plumbing) | IQN trained risk-neutral / under CVaR 0.25 (`SNEK_DIST_RISK_ALPHA` 0.25, `SNEK_DIST_RISK_TRAIN` 1) | b35's local cell, `SNEK_ALGO=iqn` | 2 × 4 | 3M steps | registered | — |
-| [b37](#b37--c51-and-qr-dqn-on-the-local-plumbing) | the head: C51 (51 atoms) / QR-DQN (N 200) | b35's local cell | 2 × 4 | 3M steps | registered | — |
+| [b38](#b38--iqn-risk-neutral-beside-trained-under-cvar-025-on-the-local-plumbing) | IQN (N = N′ 8) trained risk-neutral / under CVaR 0.25 (`SNEK_DIST_RISK_ALPHA` 0.25, `SNEK_DIST_RISK_TRAIN` 1) | b35's local cell, `SNEK_ALGO=iqn` | 2 × 4 | 2M steps | registered | — |
+| [b37](#b37--c51-and-qr-dqn-on-the-local-plumbing) | the head: C51 (51 atoms) / QR-DQN (N 32) | b35's local cell | 2 × 4 | 3M steps | registered | — |
 | [b36](#b36--c51-stability-two-supports-on-the-paper-cells-plumbing) | C51's support: 51 atoms / 101 atoms on [-10, 110] | b35's paper cell, C51 head, Adam 2.5e-4 | 2 × 2 | 10M moves | registered | — |
 | [b35](#b35--dqn-the-value-familys-control-paper-cell-beside-local-cell) | the plumbing: the DQN-Adam paper cell (batch 32, 1M uniform replay, target 2,000 updates, ε linear 1 → 0.01, no shield, no fork) beside snek3's DQN defaults (PER, fork 4, shield, eval-driven ε) | hist8 observation and b27's reward, `fc 320` | 2 × 4 | 10M moves / 3M steps | falsified on local, held on paper | paper: 7-16% perfect at 10M moves, still rising, no stage B; local: 90% by 0.6-1.6M then a 71-88% oscillation, 45 stage-B rows, best 96.6, none at 98. The plumbing is the whole gap; neither is near PPO's 95% |
 | [b34](#b34--zigzag-shaping-a-reversal-potential-beside-a-reversal-penalty) | `SNEK_ZIGZAG_SHAPING` 0.5 (potential, window 8) / `SNEK_REVERSAL_PENALTY` 0.5 (plain) | b27's `hist8`, verbatim | 2 × 4 | 100M | held for `zz`, falsified for `rp` | `zz` level with the base everywhere; `rp` the fastest onset and most stable cell on this base, 30k top level (`b34e` @3.6M, 29,954 /30k), but 90.1% density against 95.4 -- a standing penalty caps the plateau |
@@ -116,10 +116,10 @@ at complete separation (Mann-Whitney p=0.029). Details in [`protocol.md`](protoc
 
 | | |
 |---|---|
-| base | b35's local cell (`b35e`-`b35h`'s knobs, verbatim: hist8, b27's reward, `fc 320`, γ 0.99, lr 1e-5, batch 128, 100k PER 0.6, target every 8 updates, the eval-driven ε with shield 0.8 and fork 4), `SNEK_ALGO=iqn`: N = N′ 64, K 32, cosine embedding 64, κ 1 |
+| base | b35's local cell (`b35e`-`b35h`'s knobs, verbatim: hist8, b27's reward, `fc 320`, γ 0.99, lr 1e-5, batch 128, 100k PER 0.6, target every 8 updates, the eval-driven ε with shield 0.8 and fork 4), `SNEK_ALGO=iqn`: **N = N′ 8**, K 32, cosine embedding 64, κ 1. Not Dopamine's 64: IQN's cosine embedding is a `Linear` per (sample, τ), and 64 runs at 14 counted steps/s on this CPU against 92 at 8 -- the paper's own remark that 8 "appears to be sufficient" is what the plan quoted |
 | varies | the acting rule during training. **neutral** (`b38a`-`b38d`): τ uniform on [0, 1]. **cvar25** (`b38e`-`b38h`): `SNEK_DIST_RISK_ALPHA=0.25`, `SNEK_DIST_RISK_TRAIN=1` -- Dabney et al. 2018 §4's risk-sensitive agent, the distortion τ ← 0.25τ on the acting policy and on the target's argmax; every eval risk-neutral, as the paper scores it |
 | cells × seeds | 2 × 4, seeds 1-8 pinned to the letter |
-| cap | 3M counted steps = 12M moves, b35's local cap |
+| cap | **2M** counted steps = 8M moves: b35's local cell reached 90% by 0.6-1.6M and its plateau is what is read, and 3M at IQN's rate is a day an arm |
 | control | b35's local DQN cell; b37's two heads; the two cells against each other. The CVaR *read* of the neutral checkpoints (`tools.closeout --policy-variant cvar:0.25`) is a hand pass after the batch closes |
 | predicted | registered 2026-09-17 by the agent: the neutral cell sits with b37's heads; the CVaR-trained cell arrives later (it under-explores the food-seeking moves a neutral policy takes) but holds a steadier plateau -- fewer evals below 80, a higher stage-A share at ≥98 -- which is the tail-risk diagnosis showing through |
 
@@ -132,7 +132,7 @@ moves rather than noisy returns. It runs on the local plumbing for the reason b3
 | | |
 |---|---|
 | base | b35's local cell (`b35e`-`b35h`'s knobs, verbatim: hist8, b27's reward, `fc 320`, γ 0.99, lr 1e-5, batch 128, 100k PER 0.6, target every 8 updates, the eval-driven ε with shield 0.8 and fork 4) |
-| varies | the head. **c51local** (`b37a`-`b37d`): `SNEK_ALGO=c51`, 51 atoms on [−10, 110]. **qrdqnlocal** (`b37e`-`b37h`): `SNEK_ALGO=qrdqn`, N 200, κ 1 |
+| varies | the head. **c51local** (`b37a`-`b37d`): `SNEK_ALGO=c51`, 51 atoms on [−10, 110]. **qrdqnlocal** (`b37e`-`b37h`): `SNEK_ALGO=qrdqn`, **N 32**, κ 1. Not the paper's 200: the quantile Huber is N × N′ pairs, and 200 runs at 10 counted steps/s on this CPU against 225 at 32; 32 is also FQF's N, so A3 and A5 share the count |
 | cells × seeds | 2 × 4, seeds 1-8 pinned to the letter |
 | cap | 3M counted steps = 12M moves, b35's local cap |
 | control | b35's local DQN cell (90% by 0.6-1.6M, then 71-88%; 45 stage-B rows, best 96.6); the two heads against each other. C51's stability, which b36 could not read, reads off this cell's drawdown columns |
@@ -143,6 +143,9 @@ papers' recipe does not reach competence in 10M moves on this game for either DQ
 (`../plans/algoExploration/a-return-tail.md` §6, first bullet; decided with the user 2026-09-17). The
 local cell arrives in a million steps at 4.3 h an arm, so the heads can be compared where a head has
 something to act on; with the base fixed the two rows share one wave.
+**The rungs' CPU cost, measured 2026-09-17** (laptop, one arm at a time, 2,000 steps, counted steps/s): DQN 484, C51 285,
+QR-DQN N 32 / 64 / 200 at 225 / 74 / 10, IQN N = N′ 64 / 32 / 16 / 8 at 14 / 23 / 52 / 92. The papers' counts were set for a
+GPU; here they are days per arm, which is why b37 runs N 32 and b38 N 8 at a 2M cap.
 
 ## b36 — C51 stability: two supports on the paper cell's plumbing
 
