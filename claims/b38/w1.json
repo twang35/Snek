@@ -1,0 +1,18 @@
+{
+ "arms": [
+  "b38a-iqnlocal-seed1",
+  "b38b-iqnlocal-seed2",
+  "b38c-iqnlocal-seed3",
+  "b38d-iqnlocal-seed4",
+  "b38e-iqncvar25-seed5",
+  "b38f-iqncvar25-seed6",
+  "b38g-iqncvar25-seed7",
+  "b38h-iqncvar25-seed8"
+ ],
+ "batch": "b38",
+ "box": "desktop",
+ "claimed_iso": "2026-09-17T21:15:51",
+ "claimed_ts": 1789704951.7110376,
+ "kind": "wave",
+ "wave": 1
+}
