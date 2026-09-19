@@ -1,0 +1,33 @@
+{
+ "box": "desktop",
+ "env": {
+  "SNEK_ALGO": "fqf",
+  "SNEK_CHASE_SAFE_GATE": "75",
+  "SNEK_CHASE_SAFE_SHAPING": "0.1",
+  "SNEK_DISCOUNT": "0.99",
+  "SNEK_DIST_EMBEDDING": "64",
+  "SNEK_DIST_FRACTION_ENTROPY": "0.001",
+  "SNEK_DIST_FRACTION_LR": "2.5e-9",
+  "SNEK_DIST_KAPPA": "1",
+  "SNEK_DIST_POLICY_SAMPLES": "32",
+  "SNEK_DIST_QUANTILES": "8",
+  "SNEK_EVAL_INTERVAL": "1000",
+  "SNEK_EVAL_QUEUE": "1",
+  "SNEK_EVAL_QUEUE_DEPTH": "16",
+  "SNEK_EVAL_WORKERS": "8",
+  "SNEK_FC_LAYERS": "320",
+  "SNEK_FOOD_DISTANCE_REWARD": "0",
+  "SNEK_OBS_HISTORY": "8",
+  "SNEK_REWARD_PRESET": "b2",
+  "SNEK_SEED": "3",
+  "SNEK_STEP_PENALTY": "0.01"
+ },
+ "id": "b39c-fqflocal-seed3",
+ "label": "b39: FQF (N 8 learned fractions) on the local DQN plumbing, hist8 at 2M steps, read against b38's IQN N 8 and b37, FQF (row A5), risk-neutral: N 8, K 32, embedding 64, kappa 1, seed 3 of 4",
+ "max_steps": 2000000,
+ "notes": "Batch b39: row A5 of the algorithm series, FQF on the local plumbing (PER 0.6, fork 4, shield 0.8, target every 8 updates, lr 1e-5, batch 128, the eval-driven epsilon), one cell of 4 seeds. fqflocal (b39a-d): FQF, N 8 fractions proposed by a linear layer on the trunk feature (softmax, cumsum; its own RMSProp at 2.5e-9, entropy bonus 0.001, the released code's defaults), the quantile net IQN's with K 32 policy samples, cosine embedding 64, kappa 1, risk-neutral. N 8, not the paper's 32: FQF's cost grows like IQN's with N, and measured on the laptop 2026-09-18 (2,000 steps, one arm at a time, stage A off) FQF runs 16 / 31 / 68 counted steps/s at N 32 / 16 / 8; the desktop runs an 8-arm wave at about a seventh of the laptop's solo rate (b38's IQN N 8: 92 solo, 12.5 on the box), so N 32 is 250 h a wave and N 8 with 4 arms is about 40 h. N 8 also reads directly against b38's IQN at N = N' 8: the one difference is that FQF learns where the eight fractions go. One cell, not two: the paper cell is dropped (a-return-tail.md section 6, first bullet -- b35 and b37 both showed the local plumbing ahead), and a CVaR-trained cell is b38's question, not this row's. Every checkpoint is also read under CVaR 0.25 in a hand pass (tools.closeout --policy-variant cvar:0.25) after the batch closes. Read against b35's local DQN cell (best row 96.6, 72-87 after onset), b37's C51 and QR-DQN (best rows 96.8 / 98.0, 88-93 after onset, C51 onset 0.27-0.34M, QR-DQN 1.1-1.8M) and b38's neutral IQN cell. 2M counted steps = 8M moves, b38's cap; eval every 1,000. Gates passed 2026-09-18: a 5,000-step smoke checkpoints and restores through evaluate.py under the neutral and the cvar:0.25 read; tests/mut_dist.json 28 of 28 mutants killed. Not run: the plan's 500k-step laptop arm (the laptop is in use), so this batch is that gate -- a cell that never reads a non-zero perfect rate is stopped. Prediction (agent, 2026-09-18): onset with QR-DQN's, 1-2M, not C51's; the plateau at or above QR-DQN's 88-93 with the fewest evals below 80 of the quantile rungs; the best row within 2 points of 98.0 and no hof5000 candidate -- learned fractions sharpen the tail the loss already fits, and this game's ceiling is not in the loss. Pinned to the desktop, one wave of four; the laptop is not to train it while the user works there. Unpin by deleting the box field.",
+ "policy": "b39c-fqflocal-seed3",
+ "priority": 400,
+ "project": "snek3",
+ "type": "train"
+}
