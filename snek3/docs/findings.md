@@ -17,6 +17,17 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### A distributional head buys DQN's hold, not its ceiling: C51 and QR-DQN on snek3's plumbing keep the 90% plateau the scalar DQN loses, and neither raises the best row
+
+b37 (2026-09-18, `docs/runs.md`, `docs/results.md`): C51 (51 atoms on [−10, 110]) and QR-DQN (N 32, κ 1) on b35's local DQN
+cell, 4 seeds each, 3M counted steps. After reaching 90% the scalar DQN spends 12-76% of its evals below 80 and three of four
+seeds settle at a 72-76 mean; C51 spends 1-6% and QR-DQN 0.3-7%, both hold 88-93 to the cap, best30 94.2 / 94.5 against 88.3,
+and stage B is five to eight times denser (239 and 346 rows against 45). The best row does not move -- 96.8 and 98.0 against
+96.6 -- and no arm has a `hof5000` candidate, so the family is still 5 points of density below PPO on the same observation.
+Onset split: C51 at 0.27-0.34M steps (DQN 0.6-1.6M), QR-DQN at N 32 not until 1.1-1.8M. C51 is stable on this plumbing, no
+seed below 50 after onset, which b36's paper cell never reached the level to read. What is left for the group is whether
+*acting* on the distribution (b38's CVaR-trained IQN) moves the ceiling that representing it did not.
+
 ### The Dopamine-era DQN recipe does not reach competence on this game in 10M moves, snek3's own DQN plumbing does in a million steps and then plateaus at 70-88%, and neither is within reach of PPO on the same observation and reward
 
 b35 (2026-09-17, `docs/runs.md`): two DQN cells on the `hist8` observation and b27's reward. The **paper cell** -- the Munchausen

@@ -80,6 +80,13 @@ on why the arms stopped opening it, and [`findings.md`](findings.md) on the thre
 
 <!-- reading -->
 
+Look at the stage-A traces after each arm's onset, against `b35e`-`b35h` at the end of the strip: the
+DQN traces saw between 60 and 90 for two million steps and the two heads do not -- C51 (`b37a`-`d`) climbs
+past 90 by 0.27-0.34M and holds 88-91, QR-DQN (`b37e`-`h`) arrives late, between 1.1M and 1.8M, and then
+holds 87-93 with the fewest evals below 80 of any value cell so far. Neither head raises the top: 96.8 and
+98.0 against DQN's 96.6, no `hof5000` candidate. The reading is in `results.md`; the row that decides the
+group is b38, live on the same plumbing.
+
 <!-- /reading -->
 
 **knob c51local** — `b37a`-`b37d`:

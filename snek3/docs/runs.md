@@ -15,9 +15,10 @@ are in git history before 2026-09-10.
 
 - **Group A runs on the local plumbing** (decided 2026-09-17): b35 and b36 showed the papers' recipe does not reach
   competence in 10M moves on this game for DQN or C51, so rows A2-A4 are queued on b35's local cell (b37: C51 and QR-DQN;
-  b38: IQN neutral and CVaR-trained). Still open: whether the paper cell arrives at its full 50M-move budget (~18 h an arm),
-  and A5 (FQF) and A6 (Munchausen), which wait for b37/b38's reading. The CVaR read of b38's neutral checkpoints is a hand
-  pass (`--policy-variant cvar:0.25`) once the batch closes.
+  b38: IQN neutral and CVaR-trained). b37 closed 2026-09-18: the heads buy the hold, not the ceiling. Still open: whether
+  the paper cell arrives at its full 50M-move budget (~18 h an arm); A5 (FQF, b39, queued 2026-09-18) and A6 (Munchausen),
+  which wants b38's reading for its M-best arm. The CVaR read of b38's neutral checkpoints is a hand pass
+  (`--policy-variant cvar:0.25`) once the batch closes.
 - **`rp` annealed to zero after onset.** b34's per-reversal penalty gave the fastest onset and the best stability on the
   `hist8` base and cost 5 pp of plateau density; a penalty that decays to 0 by ~10M would say whether the two can be
   separated. The reversal-rate-by-fill measurement the b34 prediction named is still owed.
@@ -48,7 +49,7 @@ are in git history before 2026-09-10.
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
 | [b38](#b38--iqn-risk-neutral-beside-trained-under-cvar-025-on-the-local-plumbing) | IQN (N = N′ 8) trained risk-neutral / under CVaR 0.25 (`SNEK_DIST_RISK_ALPHA` 0.25, `SNEK_DIST_RISK_TRAIN` 1) | b35's local cell, `SNEK_ALGO=iqn` | 2 × 4 | 2M steps | registered | — |
-| [b37](#b37--c51-and-qr-dqn-on-the-local-plumbing) | the head: C51 (51 atoms) / QR-DQN (N 32) | b35's local cell | 2 × 4 | 3M steps | registered | — |
+| [b37](#b37--c51-and-qr-dqn-on-the-local-plumbing) | the head: C51 (51 atoms) / QR-DQN (N 32) | b35's local cell | 2 × 4 | 3M steps | held on the plateau, split on onset | both heads hold 88-93 after onset where DQN oscillates at 72-87 (evals below 80: C51 1-6%, QR-DQN 0.3-7%, DQN 12-76%); C51 reaches 90% at 0.27-0.34M, QR-DQN not until 1.1-1.8M; best rows 96.8 / 98.0 against 96.6, no `hof5000` candidate. The head buys the hold, not the ceiling |
 | [b36](#b36--c51-stability-two-supports-on-the-paper-cells-plumbing) | C51's support: 51 atoms / 101 atoms on [-10, 110] | b35's paper cell, C51 head, Adam 2.5e-4 | 2 × 2 | 10M moves | registered | — |
 | [b35](#b35--dqn-the-value-familys-control-paper-cell-beside-local-cell) | the plumbing: the DQN-Adam paper cell (batch 32, 1M uniform replay, target 2,000 updates, ε linear 1 → 0.01, no shield, no fork) beside snek3's DQN defaults (PER, fork 4, shield, eval-driven ε) | hist8 observation and b27's reward, `fc 320` | 2 × 4 | 10M moves / 3M steps | falsified on local, held on paper | paper: 7-16% perfect at 10M moves, still rising, no stage B; local: 90% by 0.6-1.6M then a 71-88% oscillation, 45 stage-B rows, best 96.6, none at 98. The plumbing is the whole gap; neither is near PPO's 95% |
 | [b34](#b34--zigzag-shaping-a-reversal-potential-beside-a-reversal-penalty) | `SNEK_ZIGZAG_SHAPING` 0.5 (potential, window 8) / `SNEK_REVERSAL_PENALTY` 0.5 (plain) | b27's `hist8`, verbatim | 2 × 4 | 100M | held for `zz`, falsified for `rp` | `zz` level with the base everywhere; `rp` the fastest onset and most stable cell on this base, 30k top level (`b34e` @3.6M, 29,954 /30k), but 90.1% density against 95.4 -- a standing penalty caps the plateau |
@@ -136,7 +137,7 @@ moves rather than noisy returns. It runs on the local plumbing for the reason b3
 | cells × seeds | 2 × 4, seeds 1-8 pinned to the letter |
 | cap | 3M counted steps = 12M moves, b35's local cap |
 | control | b35's local DQN cell (90% by 0.6-1.6M, then 71-88%; 45 stage-B rows, best 96.6); the two heads against each other. C51's stability, which b36 could not read, reads off this cell's drawdown columns |
-| predicted | registered 2026-09-17 by the agent: both heads reach 90% in DQN's 0.6-1.6M and plateau higher and steadier -- recent perfect above 71-88%, fewer evals below 80 -- with QR-DQN at or above C51; neither near PPO's 95% density, stage B in the tens of rows |
+| predicted | registered 2026-09-17 by the agent: both heads reach 90% in DQN's 0.6-1.6M and plateau higher and steadier -- recent perfect above 71-88%, fewer evals below 80 -- with QR-DQN at or above C51; neither near PPO's 95% density, stage B in the tens of rows -- **held on the plateau, split on onset** (closed 2026-09-18): both heads hold 88-93 after onset with 0.3-7% of evals below 80 against DQN's 12-76%, best30 94.2 / 94.5 against 88.3, QR-DQN's best row (98.0) above C51's (96.8); but C51 arrives at 0.27-0.34M and QR-DQN at 1.1-1.8M, and neither head has a `hof5000` candidate |
 
 **Why.** Rows A2 and A3, moved from the papers' plumbing to snek3's own because b35 and b36 showed the
 papers' recipe does not reach competence in 10M moves on this game for either DQN or C51
@@ -146,6 +147,13 @@ something to act on; with the base fixed the two rows share one wave.
 **The rungs' CPU cost, measured 2026-09-17** (laptop, one arm at a time, 2,000 steps, counted steps/s): DQN 484, C51 285,
 QR-DQN N 32 / 64 / 200 at 225 / 74 / 10, IQN N = N′ 64 / 32 / 16 / 8 at 14 / 23 / 52 / 92. The papers' counts were set for a
 GPU; here they are days per arm, which is why b37 runs N 32 and b38 N 8 at a 2M cap.
+
+**Learned.** The distribution buys the hold, not the ceiling. Both heads keep the 90% plateau the local DQN
+loses -- 88-93 to the cap against DQN's 72-87 oscillation, five to eight times the stage-B rows -- and C51
+gets there two to four times sooner than DQN, but the best row barely moves (96.8 / 98.0 against 96.6) and
+no checkpoint reached `hof5000`. The surprise was QR-DQN's late onset at N 32, a million steps behind C51,
+and its being the steadiest cell once there. C51 is stable on this plumbing, which b36 could not read. The
+ceiling now rests on b38's CVaR-trained cell.
 
 ## b36 — C51 stability: two supports on the paper cell's plumbing
 

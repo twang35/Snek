@@ -22,6 +22,77 @@ whose published artifacts are history, and the daemon's ledger, whose keys are t
 waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
 
 
+<!-- progress_update: batch b37 -->
+## Batch b37 — the `knob` sweep, 2 values x 4 seeds, 3M, closed 2026-09-18
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b35e-dqnlocal-seed5, b35f-dqnlocal-seed6, b35g-dqnlocal-seed7, b35h-dqnlocal-seed8`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| knob | rows | ≥98%/500 | per-seed share | ≥99.2 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| c51local | 239 | 0.0% | 0.0 0.0 0.0 0.0 | 0 | 96.8 | 94.17 (93.6-94.9) | 86.3 | 0.0% | 4.23% | 0.8% |
+| qrdqnlocal | 346 | 0.3% | 0.0 0.4 0.0 0.0 | 0 | 98.0 | 94.47 (92.4-96.9) | 56.2 | 0.0% | 13.41% | 1.3% |
+| **dqn** (reference) | 45 | 0.0% | 0.0 0.0 – – | 0 | 96.6 | 88.30 (83.1-95.6) | 27.2 | 1.46% | 74.52% | 0.1% |
+
+<!-- reading -->
+
+Read the drawdown columns first, against the reference row: the heads change the *hold*, not the top. After
+reaching 90% the local DQN cell spends 12-76% of its evals below 80 (three of four seeds settle into a 72-76
+oscillation); C51 spends 1-6% and QR-DQN 0.3-7%, both plateau at 88-93 to the cap, best30 is 94.2 and 94.5
+against 88.3, and the stage-B table is five to eight times denser (239 and 346 rows against 45). The top row
+does not move: 96.8 and 98.0 against 96.6, one row in 585 at 98, no `hof5000` candidate in either head, so
+nothing here is near PPO's 95% density and the ceiling question is still open. The prediction held on the
+plateau and split on onset: C51 reaches 90% at 0.27-0.34M steps, two to four times earlier than DQN's
+0.6-1.6M, while QR-DQN at N 32 arrives *later* than DQN (1.1-1.8M) and then holds the steadiest of the three;
+"QR-DQN at or above C51" holds on the best row and on the drawdown, not on onset. C51's instability, which b36
+could not read, is absent on this plumbing -- no seed dips below 50 after onset. What the ladder takes from
+this: the distribution buys stability at DQN's ceiling; whether *acting* on it (b38's CVaR-trained cell) buys
+the ceiling is the row that decides the group.
+
+<!-- /reading -->
+
+### Every arm
+
+| arm | knob | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b37a-c51local-seed1` | c51local | 85 | 0.0% | 0 | 96.8 | 94.1 @1.8M | 90.3 | 0.0% |
+| `b37b-c51local-seed2` | c51local | 35 | 0.0% | 0 | 95.4 | 93.6 @2.9M | 85.9 | 0.0% |
+| `b37c-c51local-seed3` | c51local | 50 | 0.0% | 0 | 96.2 | 94.1 @2.8M | 83.2 | 0.0% |
+| `b37d-c51local-seed4` | c51local | 69 | 0.0% | 0 | 95.8 | 94.9 @2.6M | 86.0 | 0.0% |
+| `b37e-qrdqnlocal-seed5` | qrdqnlocal | 10 | 0.0% | 0 | 95.8 | 93.3 @1.9M | 54.5 | 0.0% |
+| `b37f-qrdqnlocal-seed6` | qrdqnlocal | 240 | 0.4% | 0 | 98.0 | 96.9 @2.1M | 44.3 | 0.0% |
+| `b37g-qrdqnlocal-seed7` | qrdqnlocal | 86 | 0.0% | 0 | 96.4 | 95.3 @3.0M | 64.2 | 0.0% |
+| `b37h-qrdqnlocal-seed8` | qrdqnlocal | 10 | 0.0% | 0 | 93.0 | 92.4 @2.5M | 62.0 | 0.0% |
+
+<!-- /progress_update: batch b37 -->
+
+<!-- progress_update: batch b36 -->
+## Batch b36 — the `dist_atoms` sweep, 2 values x 2 seeds, 10M, closed 2026-09-18
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b27q-hist8-seed17, b27r-hist8-seed18, b27s-hist8-seed19, b27t-hist8-seed20, b27u-hist8-seed21, b27v-hist8-seed22, b27w-hist8-seed23, b27x-hist8-seed24`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| dist_atoms | rows | ≥98%/500 | per-seed share | ≥99.2 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| c51a51 | 0 | – | – – | 0 | – | 31.35 (30.3-32.4) | 0.0 | – | – | 0.0% |
+| c51a101 | 0 | – | – – | 0 | – | 29.20 (28.5-29.9) | 0.0 | – | – | 0.0% |
+| **ppo** (reference) | 22,192 | 95.4% | 95.7 94.3 95.6 95.6 95.5 95.6 95.1 95.7 | 12479 | 100.0 | 99.79 (99.7-99.9) | 95.5 | 0.0% | 0.68% | 85.4% |
+
+<!-- reading -->
+
+_Reading to be written: what the table says, what it does not settle, what is next._
+
+<!-- /reading -->
+
+### Every arm
+
+| arm | dist_atoms | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b36a-c51a51-seed1` | c51a51 | 0 | – | – | – | 32.4 @7.9M | 0.0 | – |
+| `b36b-c51a51-seed2` | c51a51 | 0 | – | – | – | 30.3 @9.5M | 0.0 | – |
+| `b36c-c51a101-seed3` | c51a101 | 0 | – | – | – | 29.9 @1.7M | 0.0 | – |
+| `b36d-c51a101-seed4` | c51a101 | 0 | – | – | – | 28.5 @9.6M | 0.0 | – |
+
+<!-- /progress_update: batch b36 -->
+
 <!-- progress_update: batch b35 -->
 ## Batch b35 — the `eval_interval` sweep, 2 values x 4 seeds, 10M, closed 2026-09-17
 
