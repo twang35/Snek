@@ -11,7 +11,7 @@ DQN 484, C51 285, QR-DQN N 32 / 64 / 200 at 225 / 74 / 10, IQN N = N′ 64 / 32 
 Huber is N × N′ pairs and IQN's embedding is a `Linear` per (sample, τ), so 200 and 64 are days per arm. A5 takes FQF's 32
 and A6 inherits its rung's.
 
-**Status: built 2026-09-17** (`algos/dist/`, the linear ε schedule and the Munchausen knobs on `algos/dqn/`, the sidecar's `head`, the `--policy-variant` read; tests `tests/test_dist_*.py`, mutants `tests/mut_dist.json`). Batches queue in the order of §3, A1 first. Group A of [`algorithm-series.md`](algorithm-series.md);
+**Status: built 2026-09-17** (`algos/dist/`, the linear ε schedule and the Munchausen knobs on `algos/dqn/`, the sidecar's `head`, the `--policy-variant` read; tests `tests/test_dist_*.py`, mutants `tests/mut_dist.json`). **Where each row stands is the `status` column of §3 and the gate table of §4** (added 2026-09-18, after FQF was found not to have run its smoke gate until the day it was queued). Batches queue in the order of §3, A1 first. Group A of [`algorithm-series.md`](algorithm-series.md);
 conventions in [`README.md`](README.md). Phase 1 (A1) and phase 2 (A2-A6) of the running order.
 
 The question: does modelling the *distribution* of the return, rather than its mean, help a game whose
@@ -194,15 +194,15 @@ Every row is two cells of four seeds -- one wave -- unless the table says otherw
 §1b's recipe and the **local** cell on `algos/dqn/`'s defaults. Both cells share the reward preset,
 `SNEK_OBS_HISTORY=8` and `SNEK_FC_LAYERS=320` of the PPO reference, and the rung's head values from §1b.
 
-| row | batch | arms | base | read against | judged on |
-|---|---|---|---|---|---|
-| A1 | **b35**, closed 2026-09-17 (`docs/runs.md`): paper 7-16% perfect at 10M moves, no stage B; local 90% by 0.6-1.6M then 71-88% | 4 seeds `dqn` **paper** (§1b: DQN-Adam 5e-5, batch 32, replay ratio 0.25, 1M uniform replay, target 2,000 updates, ε linear 1 → 0.01 over 250k moves, no shield, no fork) + 4 seeds `dqn` **local** (DQN's defaults) | the reference's reward, history and trunk; 50M moves, raised if still rising | PPO's `hist8` table (`docs/runs.md` b27); the two cells against each other | stage-B density, `hof5000`, `hof30k`, drawdown count |
-| A2 stability | **b36**, closed 2026-09-17: no arm reached 80%, so the criterion never engaged; 51 and 101 atoms level | paper cell, 2 × 2: 51 atoms on [−10, 110] / 101 atoms on [−10, 110], seeds 1-2 each; `v_max` 200 as a third pair only if both clip mass at the top atom in the smoke | A1 paper | -- | does the perfect rate hold after onset; `zero_since` never >200 evals after 80% |
-| A2 | **b37a-d**, queued 2026-09-17: `c51local`, 51 atoms on [−10, 110], local plumbing, 3M steps | 4 paper at the stable support + 4 local -- **ran as 4 local** | A1 | A1's two cells | as A1 |
-| A3 | **b37e-h**, queued 2026-09-17: `qrdqnlocal`, **N 32** (200 runs at 10 steps/s here), κ 1, local plumbing, 3M steps | 4 paper, N 200, κ 1, lr 5e-5 + 4 local -- **ran as 4 local at N 32**, sharing b37's wave with A2 | A1 | A2 | as A1 |
-| A4 | **b38**, queued 2026-09-17: `iqnlocal` + `iqncvar25`, **N = N′ 8** (64 runs at 14 steps/s here), K 32, local plumbing, **2M steps** | 4 paper neutral + 4 paper **CVaR 0.25 trained** (`SNEK_DIST_RISK_TRAIN=1`, the paper's risk-sensitive agent); the local cell and a CVaR 0.1 cell run in a second wave only if the first moves. Every neutral checkpoint is also *read* under CVaR 0.25 in stage B (§5) | A1 | A3 | as A1; the trained-CVaR cell against the neutral one, and the neutral-vs-CVaR *read* delta on the same checkpoints |
-| A5 | -- (waits for b37/b38; on the local plumbing, N 32) | 4 paper, N 32 + 4 local | A1 | A4 | as A1 |
-| A6 | -- (waits for A5; M-DQN on b35's local cell, M-best on the best of b37/b38) | 4 paper M-DQN (on A1 paper) + 4 paper M-best (on the best of A2-A5's paper cells) | A1; that rung | A1 paper; that rung | as A1 |
+| row | status | batch | arms | base | read against | judged on |
+|---|---|---|---|---|---|---|
+| A1 | **closed** 2026-09-17, read (`docs/runs.md`, `docs/findings.md`) | **b35**, closed 2026-09-17 (`docs/runs.md`): paper 7-16% perfect at 10M moves, no stage B; local 90% by 0.6-1.6M then 71-88% | 4 seeds `dqn` **paper** (§1b: DQN-Adam 5e-5, batch 32, replay ratio 0.25, 1M uniform replay, target 2,000 updates, ε linear 1 → 0.01 over 250k moves, no shield, no fork) + 4 seeds `dqn` **local** (DQN's defaults) | the reference's reward, history and trunk; 50M moves, raised if still rising | PPO's `hist8` table (`docs/runs.md` b27); the two cells against each other | stage-B density, `hof5000`, `hof30k`, drawdown count |
+| A2 stability | **closed** 2026-09-17, read | **b36**, closed 2026-09-17: no arm reached 80%, so the criterion never engaged; 51 and 101 atoms level | paper cell, 2 × 2: 51 atoms on [−10, 110] / 101 atoms on [−10, 110], seeds 1-2 each; `v_max` 200 as a third pair only if both clip mass at the top atom in the smoke | A1 paper | -- | does the perfect rate hold after onset; `zero_since` never >200 evals after 80% |
+| A2 | **closed** 2026-09-18, read (`docs/results.md`) | **b37a-d**, queued 2026-09-17: `c51local`, 51 atoms on [−10, 110], local plumbing, 3M steps | 4 paper at the stable support + 4 local -- **ran as 4 local** | A1 | A1's two cells | as A1 |
+| A3 | **closed** 2026-09-18, read | **b37e-h**, queued 2026-09-17: `qrdqnlocal`, **N 32** (200 runs at 10 steps/s here), κ 1, local plumbing, 3M steps | 4 paper, N 200, κ 1, lr 5e-5 + 4 local -- **ran as 4 local at N 32**, sharing b37's wave with A2 | A1 | A2 | as A1 |
+| A4 | **live** on the desktop, 46% at 2026-09-18 18:00, ~26 h + stage B; the CVaR hand pass owed after | **b38**, queued 2026-09-17: `iqnlocal` + `iqncvar25`, **N = N′ 8** (64 runs at 14 steps/s here), K 32, local plumbing, **2M steps** | 4 paper neutral + 4 paper **CVaR 0.25 trained** (`SNEK_DIST_RISK_TRAIN=1`, the paper's risk-sensitive agent); the local cell and a CVaR 0.1 cell run in a second wave only if the first moves. Every neutral checkpoint is also *read* under CVaR 0.25 in stage B (§5) | A1 | A3 | as A1; the trained-CVaR cell against the neutral one, and the neutral-vs-CVaR *read* delta on the same checkpoints |
+| A5 | **queued** 2026-09-18 as **b39**, pinned to the desktop behind b38 (~30 h); gates 1 and 3 passed, gate 5 not run (the batch is that gate) | **b39**: `fqflocal`, **N 8** (32 runs at 16 counted steps/s on the laptop alone, 8 at 68, and the desktop's 8-arm wave runs at a seventh of that), K 32, local plumbing, **2M steps**, one cell of 4 seeds | 4 local at N 8 -- the paper cell dropped by §6's first bullet, a CVaR-trained cell left to A4; every checkpoint read under CVaR 0.25 by hand after | A1 | A4 | as A1 |
+| A6 | **waiting**: for b38's reading (the M-best arm's base) and for gates 1, 3 and 5 on `SNEK_MUNCHAUSEN_*` (none run) | -- (M-DQN on b35's local cell, M-best on the best of b37-b39) | 4 paper M-DQN (on A1 paper) + 4 paper M-best (on the best of A2-A5's paper cells) | A1; that rung | A1 paper; that rung | as A1 |
 
 Each row waits for the one above to close. Every arm is a `train` spec on the shared queue with
 `SNEK_ALGO` naming the rung; `SNEK_OBS_HISTORY=8` is one depth per wave, as the queue rule requires.
@@ -211,6 +211,21 @@ PER and the fast target copy are worth on this game, and it is dropped from a ro
 row have shown the same sign.
 
 ## 4. Smoke and stability gates before a batch is queued
+
+**Where each rung stands** (2026-09-18; a rung's column is filled in the pass that runs the gate, and an empty
+cell means *not run*, not *passed*):
+
+| gate | A1 DQN | A2 C51 | A3 QR-DQN | A4 IQN | A5 FQF | A6 Munchausen |
+|---|---|---|---|---|---|---|
+| 1 smoke, checkpoint, restore | ran (b35 trained and measured) | ran (b36, b37) | ran (b37) | ran (b38 is training and its stage A measures every checkpoint) | **passed 2026-09-18**: 5,000 steps, `ckpt-5000.pt`, restored through `evaluate.py fqf-smoke one` under the neutral and the `cvar:0.25` read; `watch.py` not run (no window while the laptop is in use) | not run |
+| 2 C51 support brackets the return, no end-atom mass | -- | ran with b36 (no clipping reported) | -- | -- | -- | -- |
+| 3 mutation spec kills every mutant | `mut_seam.json` | **passed 2026-09-18**: `mut_dist.json` 28 / 28 killed, covering every rung's head | same run | same run | same run | same run (the three Munchausen mutants are in the spec) |
+| 4 paper cell's ε ramp, shield 0, fork 1 read off the log | ran for b35's paper cell | b36 | -- (no paper cell ran) | -- | -- (no paper cell) | not run |
+| 5 a 500k laptop arm reads a non-zero perfect rate | b35's local cell (90% by 0.6-1.6M) | b37 | b37 (onset 1.1-1.8M) | b38's stage A | **not run** (the laptop is in use, 2026-09-18); b39 itself is the gate -- a cell still at zero at 500k is stopped | not run |
+
+The rows A1-A4 were queued before this table existed; their cells record what the batches themselves
+showed rather than a separate gate run.
+
 
 1. `PYTHONPATH=. SNEK_ALGO=<rung> SNEK_MAX_STEPS=5000 ... train.py smoke` runs, checkpoints, and the
    checkpoint restores through `evaluate.py smoke one` and `watch.py`.

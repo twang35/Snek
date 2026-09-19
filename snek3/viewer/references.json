@@ -379,5 +379,17 @@
   "after": "iqncvar25",
   "value": "dqn",
   "knob": "name"
+ },
+ "b39": {
+  "arms": [
+   "b38a-iqnlocal-seed1",
+   "b38b-iqnlocal-seed2",
+   "b38c-iqnlocal-seed3",
+   "b38d-iqnlocal-seed4"
+  ],
+  "label": "reference: b38's risk-neutral IQN cell at N = N' 8 on the same plumbing -- b39 is FQF at N 8, the one difference being that the eight fractions are learned",
+  "after": "fqflocal",
+  "value": "iqn",
+  "knob": "name"
  }
 }

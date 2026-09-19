@@ -48,6 +48,7 @@ are in git history before 2026-09-10.
 
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
+| [b39](#b39--fqf-at-n-8-on-the-local-plumbing) | the head: FQF, 8 learned fractions (`SNEK_DIST_QUANTILES` 8) | b35's local cell, `SNEK_ALGO=fqf` | 1 × 4 | 2M steps | registered | — |
 | [b38](#b38--iqn-risk-neutral-beside-trained-under-cvar-025-on-the-local-plumbing) | IQN (N = N′ 8) trained risk-neutral / under CVaR 0.25 (`SNEK_DIST_RISK_ALPHA` 0.25, `SNEK_DIST_RISK_TRAIN` 1) | b35's local cell, `SNEK_ALGO=iqn` | 2 × 4 | 2M steps | registered | — |
 | [b37](#b37--c51-and-qr-dqn-on-the-local-plumbing) | the head: C51 (51 atoms) / QR-DQN (N 32) | b35's local cell | 2 × 4 | 3M steps | held on the plateau, split on onset | both heads hold 88-93 after onset where DQN oscillates at 72-87 (evals below 80: C51 1-6%, QR-DQN 0.3-7%, DQN 12-76%); C51 reaches 90% at 0.27-0.34M, QR-DQN not until 1.1-1.8M; best rows 96.8 / 98.0 against 96.6, no `hof5000` candidate. The head buys the hold, not the ceiling |
 | [b36](#b36--c51-stability-two-supports-on-the-paper-cells-plumbing) | C51's support: 51 atoms / 101 atoms on [-10, 110] | b35's paper cell, C51 head, Adam 2.5e-4 | 2 × 2 | 10M moves | registered | — |
@@ -112,6 +113,26 @@ evals below 50% and 80%), then best30. `hof5000` re-measures the top rows at 5,0
 at complete separation (Mann-Whitney p=0.029). Details in [`protocol.md`](protocol.md).
 
 ---
+
+## b39 — FQF at N 8 on the local plumbing
+
+| | |
+|---|---|
+| base | b35's local cell (`b35e`-`b35h`'s knobs, verbatim: hist8, b27's reward, `fc 320`, γ 0.99, lr 1e-5, batch 128, 100k PER 0.6, target every 8 updates, the eval-driven ε with shield 0.8 and fork 4), `SNEK_ALGO=fqf`: **N 8** fractions, K 32, cosine embedding 64, κ 1; the fraction proposal's own RMSProp at 2.5e-9 with entropy bonus 0.001 (the released code's defaults) |
+| varies | nothing within the batch: one cell, `fqflocal` (`b39a`-`b39d`), risk-neutral. The head is what varies against b38's neutral IQN cell at the same N |
+| cells × seeds | 1 × 4, seeds 1-4 pinned to the letter |
+| cap | **2M** counted steps = 8M moves, b38's cap, so the two N 8 rungs read on one x-axis |
+| control | b38's neutral IQN cell (N = N′ 8, the reference row in the viewer); b37's C51 and QR-DQN; b35's local DQN. The CVaR *read* of every checkpoint (`tools.closeout --policy-variant cvar:0.25`) is a hand pass after the batch closes |
+| predicted | registered 2026-09-18 by the agent: onset with QR-DQN's (1-2M), not C51's; the plateau at or above QR-DQN's 88-93 with the fewest evals below 80 of the quantile rungs; the best row within 2 points of 98.0 and no `hof5000` candidate -- learned fractions sharpen a tail the loss already fits, and this game's ceiling is not in the loss |
+
+**Why.** Row A5, the last head of the ladder: FQF learns *where* the quantiles sit, which should matter
+most when the return is bimodal, and a perfect game against a fatal move is that shape. N is 8, not the
+paper's 32, for b38's reason: measured on the laptop 2026-09-18 (2,000 steps, one arm, stage A off) FQF runs
+16 / 31 / 68 counted steps/s at N 32 / 16 / 8, and the desktop's 8-arm wave runs at about a seventh of the
+solo rate, so N 32 is 250 h a wave and N 8 with four arms about 40 h. N 8 also makes b38's IQN the exact
+control. One cell: the paper cell is dropped by the plan's §6 rule after b35 and b37, and a CVaR-trained cell
+is b38's question. Gates: smoke and restore passed, 28 / 28 mutants killed; the 500k laptop arm was not run,
+so a cell still at zero perfect at 500k is stopped.
 
 ## b38 — IQN, risk-neutral beside trained under CVaR 0.25, on the local plumbing
 
