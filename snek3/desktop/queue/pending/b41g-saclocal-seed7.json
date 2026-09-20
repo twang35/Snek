@@ -20,7 +20,8 @@
   "SNEK_SAC_TARGET_ENTROPY_RATIO": "0.1",
   "SNEK_SAC_TARGET_UPDATE_PERIOD": "8",
   "SNEK_SEED": "7",
-  "SNEK_STEP_PENALTY": "0.01"
+  "SNEK_STEP_PENALTY": "0.01",
+  "SNEK_SAC_CRITIC_LOSS": "huber"
  },
  "id": "b41g-saclocal-seed7",
  "label": "b41: discrete SAC (row B1), 16 lanes, hist8 at 50M moves (3.125M counted steps), paper replay beside local replay, local cell: target entropy 0.1 ln|A|, batch 128, PER 0.6, 100k, 0.5 updates a move, target every 8, seed 7 of 8",
