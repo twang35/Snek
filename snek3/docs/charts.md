@@ -39,13 +39,15 @@ on why the arms stopped opening it, and [`findings.md`](findings.md) on the thre
 
 <!-- reading -->
 
-Wave 1 is the paper cell (`b41a`-`d`) on the desktop, at 0.57M of 3.125M counted steps (18%). It is doing what the
-prediction said the paper's 0.98 · ln 3 target does on three actions: the policy entropy sits pinned at the target
-(1.0766 nats on every seed, a near-uniform policy), α has run to 2.4-2.5 × 10⁸ and is still climbing, and the
-perfect rate has not left zero -- trailing 0.04-0.05, average score 0.02-0.07 a game. Nothing to read against PPO yet
-and nothing expected from this cell; the plan's question is whether it moves at all by its 50M-move budget. The local
-cell (`b41e`-`h`, target 0.1 · ln 3, snek3's replay) is the four unclaimed arms in the pool and is the one the row
-is really asking about; the desktop takes it as wave 2 after this wave's passes, around 15:00.
+**The paper cell (`b41a`-`d`) was stopped 2026-09-20 at 0.57M counted steps** (2.3M moves, 18% of the cap): dead by
+every column and going to stay so. Zero perfect games in every eval on all four seeds; the average score peaked at
+47-59 in the first 100k moves and collapsed to 0.02-0.07 a game; α ran from 1.0 to 2.4-2.5 × 10⁸ and was still
+climbing; the policy entropy sat pinned at the paper's target, 1.0766 nats on every seed, a near-uniform policy over
+three actions. That is the spec's prediction for this cell, held, and the gate's 500k-move failure four times over.
+Its four charts are archived in `runs/` and stay in the strip below as the record; the table's `sacpaper` row will
+stay empty. The local cell (`b41e`-`h`, target 0.1 · ln 3, snek3's replay) began on the desktop at 12:49 as the
+batch's next wave, ~6 h of training and then its passes; it is the row's real question, and PPO's strip is its
+reference.
 
 <!-- /reading -->
 

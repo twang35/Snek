@@ -56,7 +56,7 @@ are in git history before 2026-09-10.
 
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
-| [b41](#b41--discrete-sac-paper-cell-beside-local-cell) | the algorithm: discrete SAC (`SNEK_ALGO=sac`). Paper cell as written (target entropy 0.98 ln 3, batch 64, 1M uniform, 0.25 updates a move) / local cell (target 0.1 ln 3, batch 128, PER 0.6, 100k, 0.5 updates a move, target every 8) | PPO's reward, hist8, `fc 320`; 16 lanes | 2 × 4 | 3.125M steps = 50M moves | registered | — |
+| [b41](#b41--discrete-sac-paper-cell-beside-local-cell) | the algorithm: discrete SAC (`SNEK_ALGO=sac`). Paper cell as written (target entropy 0.98 ln 3, batch 64, 1M uniform, 0.25 updates a move) / local cell (target 0.1 ln 3, batch 128, PER 0.6, 100k, 0.5 updates a move, target every 8) | PPO's reward, hist8, `fc 320`; 16 lanes | 2 × 4 | 3.125M steps = 50M moves | paper half held; local cell live | paper cell stopped at 0.57M counted steps: zero perfect games on all four seeds, α 2.5 × 10⁸, entropy pinned at the 0.98 ln 3 target (1.077 nats); the local cell (0.1 ln 3) started 12:49 on the desktop |
 | [b40](#b40--munchausen-on-the-local-plumbing-m-dqn-beside-m-qr-dqn) | the value target: Munchausen's log-policy reward term and soft target (`SNEK_MUNCHAUSEN_ALPHA` 0.9, `_TAU` 0.03, `_L0` -1) on DQN / on QR-DQN N 32 | b35's local cell / b37's QR-DQN cell | 2 × 4 | 3M steps | held (the M-DQN best row 97.8, 0.8 over the line) | the target is not where the ceiling is: M-QR-DQN is QR-DQN with a slightly tighter hold (onset 1.13-1.54M, 89-93 after onset with 0-3% below 80, 436 rows, best 98.0 against 346 / 98.0), M-DQN is DQN with shallower drawdowns (73-87 after onset, 13-59% below 80 against 12-76%; 100 rows, 93 of them one seed's, best 97.8 against 96.6). No arm reached 99.2; both passes empty. Group A closes with every rung at 96.6-98.0 |
 | [b39](#b39--fqf-at-n-8-on-the-local-plumbing) | the head: FQF, 8 learned fractions (`SNEK_DIST_QUANTILES` 8) | b35's local cell, `SNEK_ALGO=fqf` | 1 × 4 | 2M steps | falsified on onset, held on the rest | not IQN's band: three of four seeds cross 90 at 1.25-1.65M (IQN at N 8 never did), best30 85 against 65, but none holds -- 71-82 after onset, 27-84% of evals below 80 -- and no checkpoint reached 97, so stage B is empty. Eight learned fractions beat eight sampled ones and still trail N 32 fixed |
 | [b38](#b38--iqn-risk-neutral-beside-trained-under-cvar-025-on-the-local-plumbing) | IQN (N = N′ 8) trained risk-neutral / under CVaR 0.25 (`SNEK_DIST_RISK_ALPHA` 0.25, `SNEK_DIST_RISK_TRAIN` 1) | b35's local cell, `SNEK_ALGO=iqn` | 2 × 4 | 2M steps | falsified | no checkpoint reached 97: the neutral cell climbs to 50% by 0.1-0.2M and sits at 55-65% to the cap (max eval 82); the CVaR-trained cell 40-54%, one seed dead from 0.9M. Zero stage-B rows, the first value batch with none. FQF at the same N 8 (b39) is drawing the same band |
@@ -133,7 +133,7 @@ at complete separation (Mann-Whitney p=0.029). Details in [`protocol.md`](protoc
 | cells × seeds | 2 × 4, seeds 1-8 pinned to the letter |
 | cap | 3,125,000 counted steps = 50M moves at 16 lanes, the plan's budget; ~5 h for the paper cell's four arms, ~10 h for the local cell's |
 | control | PPO's hist8 cell (`b27q`-`x`, the viewer's reference strip), b35's local DQN, b40's M-DQN (the entropy-regularised value target). Judged on stage-B density, the passes, drawdowns, and the **policy entropy trace** beside PPO's |
-| predicted | registered 2026-09-20 by the agent: the paper cell's α runs away within 100k moves and the cell never reads a non-zero perfect rate -- the paper's own failure on three actions; the local cell reaches 90% before 0.3M counted steps, the fastest onset of any value agent yet, holds steadier than DQN, does not reach PPO's 95% stage-B density, and its entropy settles at 0.05-0.12 nats, an order above PPO's 0.001-0.009 |
+| predicted | registered 2026-09-20 by the agent: the paper cell's α runs away within 100k moves and the cell never reads a non-zero perfect rate -- the paper's own failure on three actions; the local cell reaches 90% before 0.3M counted steps, the fastest onset of any value agent yet, holds steadier than DQN, does not reach PPO's 95% stage-B density, and its entropy settles at 0.05-0.12 nats, an order above PPO's 0.001-0.009 -- **paper half held** (stopped 2026-09-20 at 0.57M: zero perfect games on every seed, α 2.5 × 10⁸, entropy pinned at 1.0766 nats); the local half is live |
 
 **Why.** Group B asks whether PPO's advantage on this game is the entropy bonus rather than the policy
 gradient; SAC learns a maximum-entropy policy off-policy, so it separates the two. The series' rule
@@ -144,6 +144,18 @@ full rate to 66,000 while the score fell from 46 to 3. At 0.1 the same 500k-move
 entropy sat at 0.1, and it read 50-64% perfect -- faster than any DQN cell. That target is the local
 cell's first tweak; the replay plumbing is its second, halved to 0.5 updates a move so its four arms land
 near the 8-hour budget.
+
+**Learned (paper cell, stopped 2026-09-20 at 0.57M counted steps, 2.3M moves).** The paper cell was stopped
+early, by the user's call, because it was dead by every column and was going to stay dead: at 0.57M all four
+seeds had read zero perfect games in every eval, the average score had peaked at 47-59 in the first 100k moves
+and collapsed to 0.02-0.07 a game, α had run from 1.0 to 2.4-2.5 × 10⁸ and was still climbing at Adam's full
+rate, and the policy entropy sat pinned at the target, 1.0766 nats on every seed -- a near-uniform policy over
+three actions, the gate's 500k-move failure reproduced four times at 2.3M moves. The prediction's first half
+held exactly ("α runs away within 100k moves, never a non-zero perfect rate"). Two and a half hours of training
+and 2.3 h of passes that would have measured nothing were returned to the local cell, which the desktop began
+at 12:49. What it cost: the paper cell never reached its 50M-move budget, so "does the paper cell arrive by
+50M" (`## Open`) is answered by extrapolation, not measurement -- with α at 10⁸ and rising there is no
+mechanism by which it could. The arms' charts and evals at 0.57M are archived in `runs/`.
 
 ## b40 — Munchausen on the local plumbing: M-DQN beside M-QR-DQN
 

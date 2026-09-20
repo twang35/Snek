@@ -95,7 +95,14 @@ daemon re-adopts them by pid.
 **A killed arm short of its cap is relaunched by its scheduler**, up to three times inside its wave,
 resuming from `resume.pt` -- unless the box is paused, in which case the relaunch waits for the hold to
 lift. So "stop an arm for good" is: pause, kill, and then either remove its spec from `ops` (the
-`queue-batch` worktree) or release its wave (below) before unpausing. A close-out killed by hand is
+`queue-batch` worktree) or release its wave (below) before unpausing. **And unpausing is not enough on its own: the
+running scheduler holds its wave in memory** and re-reads `ops` and `claims` only at its next start, so a spec
+removed and a wave released while it waits are invisible to it, and it relaunches the killed arms the moment
+the hold lifts (2026-09-20: b41's paper cell, released and dropped from `ops`, was relaunched 30 s after the
+unpause). So after the release and before the unpause takes effect, **kill the scheduler too**, by the pid in
+the fetched `status.json`, then `trigger`: the daemon starts a fresh one that syncs first and finds the wave
+gone. Order that worked: pause, kill the arms, drop the specs and release, kill any relaunched arm and the
+scheduler in one `ssh`, verify in another, unpause, `trigger`. A close-out killed by hand is
 relaunched twice and then marked `.failed-<label>` beside the batch's specs in the box's queue mirror;
 delete the marker to retry. Say which you did in your report.
 
