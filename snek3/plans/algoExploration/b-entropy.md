@@ -10,7 +10,7 @@ now it does; one gradient step of staleness at these learning rates, so no readi
 cell ran Huber** -- a stated departure, and not what killed it (α ran to 2.5 × 10⁸ with the entropy pinned at the target, a temperature failure the
 critic loss cannot produce). The local cell keeps Huber by knob. **B1 queued 2026-09-20 as b41** (`docs/runs.md`), 4 paper seeds as written + 4 local seeds
 (target entropy **0.1 · ln|A|** and snek3's replay at 0.5 updates a move), unpinned -- gate 2 found the paper's 0.98 target
-degenerate on three actions (§4), and by the series' rule (`algorithm-series.md` §0) the paper cell runs it anyway. B2 waits for B1. Gates: 1 passed (smokes of both names checkpoint and restore), 3 passed, 2 passed at
+degenerate on three actions (§4), and by the series' rule (`algorithm-series.md` §0) the paper cell runs it anyway. **B2 queued 2026-09-20 as b42** (`docs/runs.md`) without waiting for b41 to close: 4 paper seeds as written (2 × 512, lr 1e-5, α 0.05) + 4 seeds of b41's local cell plus the two fixes, the `α auto at 0.98` cell of §3 dropped after b41 showed that target degenerate. Gate 2 for `sac2` was rerun the same day on the per-state penalty: non-zero on every eval of both cells (paper 0.0004-0.018, local 0.01-0.066), the clip binding on at most 0.8% of samples at lr 1e-5 and not yet at 3e-4 by 11k steps. Gates: 1 passed (smokes of both names checkpoint and restore), 3 passed, 2 passed at
 0.1 and **failed at 0.98** (α 1.0 → 66,000 in 500k moves, entropy pinned at 1.077, score 46 → 3), sac2's half of 2 passed
 on the penalty (non-zero) and **not on the clip** (0.0 of critic samples; at lr 1e-5 the Q-clip never binds), 4 not yet.
 Originally: planned 2026-09-16, nothing built. Group B of [`algorithm-series.md`](algorithm-series.md);
@@ -109,7 +109,7 @@ tuning wave (§4) is over α ∈ {0.05, 0.2, 1.0}, and `auto` is the comparison.
 | batch | arms | base | read against | judged on |
 |---|---|---|---|---|
 | B1 | 4 seeds `sac` on the 2019 paper's settings (§2b) + 4 seeds `sac` at D1's 500k-step cap (the paper's own regime, scaled) | the PPO reference's reward preset, `SNEK_OBS_HISTORY=8`, `SNEK_FC_LAYERS=320` | A1 paper (DQN) and PPO's `hist8` table | stage-B density, `hof5000`, `hof30k`, drawdowns; **and the policy entropy trace** beside PPO's, which is in every PPO row already |
-| B2 | 4 seeds `sac2` on the 2022 paper's settings (§2b) + 4 seeds `sac2` with `SNEK_SAC_ALPHA=auto` | B1's | B1 | as B1; the fixed-vs-auto α pair says whether the temperature was a fix |
+| B2 (**b42**) | 4 seeds `sac2` on the 2022 paper's settings (§2b, network 2 × 512 as the paper's) + 4 seeds of **b41's local cell plus the two fixes** (α auto at 0.1 · ln 3, PER, batch 128, lr 3e-4; entropy-penalty 0.5, avg-Q + Q-clip 0.5). The α-auto-at-0.98 cell of the first draft was dropped 2026-09-20: b41 showed that target degenerate on three actions, so it would have died as b41a-d did and attributed nothing | B1's | b41e-h for the local pair, b41a-d for the paper cell | as B1, and the **hold** first: b41e-h's best30 89-93 by 0.1M then 67-72% at 1M is the drift the fixes exist for |
 | B2 halves | 4 seeds entropy-penalty only, 4 seeds avg-Q + Q-clip only (the paper's two ablations) | B2's | B1, B2 | which fix did it |
 
 The halves run only if B2 differs from B1 by more than noise (`n=4` resolves ~10 pp, `CLAUDE.md`);

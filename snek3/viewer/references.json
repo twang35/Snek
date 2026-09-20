@@ -419,5 +419,29 @@
   "after": "saclocal",
   "value": "ppo",
   "knob": "name"
+ },
+ "b42": {
+  "arms": [
+   "b41e-saclocal-seed5",
+   "b41f-saclocal-seed6",
+   "b41g-saclocal-seed7",
+   "b41h-saclocal-seed8"
+  ],
+  "label": "reference: b41's local SAC cell (b41e-h, target entropy 0.1 ln|A|, 3.125M) -- b42e-h is the same cell with Zhou et al.'s two fixes; b42a-d is the 2022 paper as written",
+  "after": "sac2local",
+  "value": "saclocal",
+  "knob": "name"
+ },
+ "b43": {
+  "arms": [
+   "b40e-mqrdqnlocal-seed5",
+   "b40f-mqrdqnlocal-seed6",
+   "b40g-mqrdqnlocal-seed7",
+   "b40h-mqrdqnlocal-seed8"
+  ],
+  "label": "reference: b40's M-QR-DQN N 32 cell (b40e-h, 3M) -- b43 is the same cell with BBF's resets every 600k / 2.4M gradient steps",
+  "after": "reset2400k",
+  "value": "mqrdqnlocal",
+  "knob": "name"
  }
 }

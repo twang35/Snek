@@ -4,7 +4,7 @@
 `algos/dqn/algo.py`, `maybe_reset` on both agents; tests `tests/test_resets.py`, mutants `tests/mut_resets.json`
 10 / 10 killed). **Where the row stands is the `status` column of §2 and the gate table of §3.** Group D of
 [`algorithm-series.md`](algorithm-series.md); conventions in [`README.md`](README.md). Phase 5 of the running
-order, after Group C (the value stack) and before Group E (memory); its batch queues when b40 closes.
+order, after Group C (the value stack) and before Group E (memory). **Queued 2026-09-20 as b43** (`docs/runs.md`), the day b40 closed: 4 seeds every 600k gradient steps + 4 seeds every 2.4M, α 0.5, stop after 10.5M, on b40e-h's spec.
 
 **What changed on 2026-09-20, and why.** This plan was phase 1, "how many steps does any of this need": BBF at
 100k and 500k moves, its onset step against A1's, and a rule that halved every later value row's cap if it came in
@@ -51,7 +51,7 @@ not cleared.
 
 | batch | status | arms | base | read against | judged on |
 |---|---|---|---|---|---|
-| D1 | **built 2026-09-20, waiting on b40 closing** (the base cell must have its stage-B and hof numbers first) | 4 seeds `mqrdqnlocal` + `SNEK_RESET_INTERVAL=600000` + 4 seeds at `2400000`, both `SNEK_RESET_ALPHA=0.5`, `SNEK_RESET_STOP_AFTER=10500000`, 3M steps, one 8-arm wave | b40's `mqrdqnlocal` spec, verbatim, plus the three knobs | **b40e-h**, the same cell without resets | **hold**: the perfect rate after each reset's dip and in the reset-free tail, drawdown count, `zero_since`; then stage-B density, `hof5000`, `hof30k` against b40's |
+| D1 | **queued 2026-09-20 as b43** (b40 closed the same day: 436 stage-B rows, best 98.0, no `hof5000` candidate) | 4 seeds `mqrdqnlocal` + `SNEK_RESET_INTERVAL=600000` + 4 seeds at `2400000`, both `SNEK_RESET_ALPHA=0.5`, `SNEK_RESET_STOP_AFTER=10500000`, 3M steps, one 8-arm wave | b40's `mqrdqnlocal` spec, verbatim, plus the three knobs | **b40e-h**, the same cell without resets | **hold**: the perfect rate after each reset's dip and in the reset-free tail, drawdown count, `zero_since`; then stage-B density, `hof5000`, `hof30k` against b40's |
 | D1 anneal | not planned unless D1's dip is the problem | the 600k cell with n-step and γ annealed within each cycle | D1 | D1 | whether the anneal removes the dip without losing the hold |
 
 The prediction to register when it is queued: the 600k cell shows a visible dip after each reset and a higher
@@ -68,7 +68,7 @@ reset is not the lever here and the group closes.
 | 1 smoke, checkpoint, restore; the log says `resets N` | **passed 2026-09-20**: `qrdqn` N 32 + Munchausen, `SNEK_RESET_INTERVAL=1000`, 5,000 steps (4 lanes, ~4 gradient steps a step): the log printed `resets 4 (every 1,000 gradient steps, at 4,000)`, `ckpt-1000` … `ckpt-5000` written (`SNEK_MIN_CHECKPOINT_SCORE=0` for the smoke), `ckpt-5000` restored through `evaluate.py smoke one` (500 episodes), and a relaunch resumed at 5,000 with the reset count in `resume.pt`. Run in a worktree so the live b40 wave never imported a half-edited module |
 | 2 mutation spec kills every mutant | **passed 2026-09-20**: `mut_resets.json` 10 / 10 |
 | 3 the default is unchanged | **passed 2026-09-20**: interval 0 adds one `due()` check that returns False; the whole suite (1,317 tests) passes with the knob wired into both agents |
-| 4 the base cell closed | **waiting**: b40 live on the laptop (M-QR-DQN at 2.4M+ of 3M on 2026-09-20) |
+| 4 the base cell closed | **passed 2026-09-20**: b40 closed on the laptop, both waves, all three passes (`docs/results.md`) |
 
 1. `SNEK_ALGO=qrdqn SNEK_DIST_QUANTILES=32 SNEK_MUNCHAUSEN_ALPHA=0.9 SNEK_RESET_INTERVAL=1000 SNEK_MAX_STEPS=2500 ...
    train.py smoke` runs, resets several times, checkpoints, and the checkpoint restores through

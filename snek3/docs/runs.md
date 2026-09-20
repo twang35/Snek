@@ -24,9 +24,16 @@ are in git history before 2026-09-10.
   Group A closes with seven rungs at 96.6-98.0 against PPO's 99.8 best30. Still open, and both now second-order: FQF at N 16
   or 32 in waves of 4 (a steadier plateau at best, not the ceiling), and whether the paper cell arrives at its full 50M-move
   budget (~18 h an arm).
-- **Group B's temperature target** (queued 2026-09-20 as b41): the 2019 paper's 0.98 · ln|A| forces a near-uniform policy on
-  three actions and α runs away; b41's paper cell runs it as written and its local cell runs 0.1. Whether the target should track PPO's 0.001-0.009 nats instead, and whether
-  B2's Q-clip ever binds at lr 1e-5 (0.0 of samples in the gate arm), are the questions B2 and its tuning wave carry.
+- **Group B's temperature target and hold** (b41 queued 2026-09-20, its paper cell stopped dead the same day; b42 queued 2026-09-20): the
+  2019 paper's 0.98 · ln|A| forces a near-uniform policy on three actions and α runs away, confirmed four times over in b41a-d. b41's local
+  cell at 0.1 gave the fastest onset in the project (best30 89-93 by 60k-78k steps) and then drifted to 67-72% by 1M -- the hold, not the
+  onset, is Group B's question now, and b42 puts Zhou et al.'s two hold mechanisms on exactly that cell. Whether the target should track
+  PPO's 0.001-0.009 nats instead, and whether the Q-clip binds at all at lr 1e-5 (0.8% of samples at most in the gate arm), stay open.
+- **Group D's reset probe** (b43 queued 2026-09-20 on b40's close): whether BBF's shrink-and-perturb resets hold where b40's M-QR-DQN
+  drifts. If they do, `SNEK_RESET_*` goes to every later value row; if not, late drift is not a plasticity problem here.
+- **Queue what does not depend** (2026-09-20, the user's rule): a batch waits for another only when it reads that batch's numbers to be
+  specified or judged. b42 and b43 were queued together with b41 still live for that reason; Groups C, E, F, G and H have nothing built yet
+  and are the next implementation work, in the series' order.
 - **`rp` annealed to zero after onset.** b34's per-reversal penalty gave the fastest onset and the best stability on the
   `hist8` base and cost 5 pp of plateau density; a penalty that decays to 0 by ~10M would say whether the two can be
   separated. The reversal-rate-by-fill measurement the b34 prediction named is still owed.
@@ -56,6 +63,8 @@ are in git history before 2026-09-10.
 
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
+| [b43](#b43--bbfs-resets-on-b40s-m-qr-dqn-cell) | BBF's shrink-and-perturb resets (`SNEK_RESET_INTERVAL` 600k / 2.4M gradient steps, `_ALPHA` 0.5, `_STOP_AFTER` 10.5M) | b40's M-QR-DQN cell (`b40e`-`h`) | 2 × 4 | 3M steps | registered | — |
+| [b42](#b42--revisiting-discrete-sac-paper-cell-beside-b41s-local-cell-with-the-fixes) | Zhou et al. 2022's fixes: per-state entropy-penalty 0.5, double average Q with Q-clip 0.5. Paper cell as written (lr 1e-5, α 0.05 fixed, batch 64, 1e5 uniform, 0.1 updates a move, Polyak 0.005, 3-step, 2 × 512, MSE) / b41's local cell plus the two fixes | PPO's reward, hist8, 16 lanes / `b41e`-`h` | 2 × 4 | 3.125M steps = 50M moves | registered | — |
 | [b41](#b41--discrete-sac-paper-cell-beside-local-cell) | the algorithm: discrete SAC (`SNEK_ALGO=sac`). Paper cell as written (target entropy 0.98 ln 3, batch 64, 1M uniform, 0.25 updates a move) / local cell (target 0.1 ln 3, batch 128, PER 0.6, 100k, 0.5 updates a move, target every 8) | PPO's reward, hist8, `fc 320`; 16 lanes | 2 × 4 | 3.125M steps = 50M moves | paper half held; local cell live | paper cell stopped at 0.57M counted steps: zero perfect games on all four seeds, α 2.5 × 10⁸, entropy pinned at the 0.98 ln 3 target (1.077 nats); the local cell (0.1 ln 3) started 12:49 on the desktop |
 | [b40](#b40--munchausen-on-the-local-plumbing-m-dqn-beside-m-qr-dqn) | the value target: Munchausen's log-policy reward term and soft target (`SNEK_MUNCHAUSEN_ALPHA` 0.9, `_TAU` 0.03, `_L0` -1) on DQN / on QR-DQN N 32 | b35's local cell / b37's QR-DQN cell | 2 × 4 | 3M steps | held (the M-DQN best row 97.8, 0.8 over the line) | the target is not where the ceiling is: M-QR-DQN is QR-DQN with a slightly tighter hold (onset 1.13-1.54M, 89-93 after onset with 0-3% below 80, 436 rows, best 98.0 against 346 / 98.0), M-DQN is DQN with shallower drawdowns (73-87 after onset, 13-59% below 80 against 12-76%; 100 rows, 93 of them one seed's, best 97.8 against 96.6). No arm reached 99.2; both passes empty. Group A closes with every rung at 96.6-98.0 |
 | [b39](#b39--fqf-at-n-8-on-the-local-plumbing) | the head: FQF, 8 learned fractions (`SNEK_DIST_QUANTILES` 8) | b35's local cell, `SNEK_ALGO=fqf` | 1 × 4 | 2M steps | falsified on onset, held on the rest | not IQN's band: three of four seeds cross 90 at 1.25-1.65M (IQN at N 8 never did), best30 85 against 65, but none holds -- 71-82 after onset, 27-84% of evals below 80 -- and no checkpoint reached 97, so stage B is empty. Eight learned fractions beat eight sampled ones and still trail N 32 fixed |
@@ -123,6 +132,45 @@ evals below 50% and 80%), then best30. `hof5000` re-measures the top rows at 5,0
 at complete separation (Mann-Whitney p=0.029). Details in [`protocol.md`](protocol.md).
 
 ---
+
+## b43 — BBF's resets on b40's M-QR-DQN cell
+
+| | |
+|---|---|
+| base | `b40e`-`h`'s spec verbatim: QR-DQN N 32, κ 1, Munchausen α 0.9 τ 0.03 l₀ −1, the local DQN plumbing (fork 4, shield, PER 0.6, target every 8, replay ratio 1, batch 128, lr 1e-5), hist8, `fc 320`, 3M counted steps (~12M gradient steps at ~4 a step) |
+| varies | the reset cadence. **reset600k** (`b43a`-`d`): `SNEK_RESET_INTERVAL=600000`, ~20 cycles, the paper's count. **reset2400k** (`b43e`-`h`): `2400000`, ~5 cycles. Both `SNEK_RESET_ALPHA=0.5` (the trunk pulled halfway to a fresh init, the quantile head re-initialised, the target copied, Adam cleared) and `SNEK_RESET_STOP_AFTER=10500000` (the last eighth reset-free) |
+| cells × seeds | 2 × 4, seeds 1-8 pinned to the letter |
+| cap | 3M counted steps, b40's, so the reset cells read on b40's x-axis |
+| control | `b40e`-`h`, the same cell without resets (89-93 after onset, 0-3% of evals below 80, 436 stage-B rows, best 98.0, no `hof5000` candidate). Judged on the **hold**: the perfect rate after each reset's dip and in the reset-free tail, drawdowns, `zero_since`; then the three passes |
+| predicted | registered 2026-09-20 by the agent, from the plan: the 600k cell shows a visible dip after each reset and a higher late perfect rate than `b40e`-`h`'s; the 2.4M cell fewer, deeper dips. If neither holds better than b40 the reset is not the lever here and Group D closes as a null |
+
+**Why.** Row D1, re-planned 2026-09-20 from "how many steps does BBF need" to the late-plasticity probe: every
+Group A cell reached 88-94% and then drifted or never held, late drift is the shape of most of this project's
+collapses, and BBF's shrink-and-perturb reset is the one mechanism in the series aimed at exactly that. The
+rest of BBF (the ×4 net, replay ratio 8, AdamW, EMA target, SPR) is data-efficiency machinery and stays out
+until the reset earns a second wave; the within-cycle n-step / γ anneal is that wave, if the cells dip but do
+not hold. Queued on b40's close, the same day, since the base cell's numbers are in. Gates: smoke with resets
+every 1,000 gradient steps checkpoints, restores and resumes with the count; `mut_resets.json` 10 / 10.
+
+## b42 — Revisiting Discrete SAC, paper cell beside b41's local cell with the fixes
+
+| | |
+|---|---|
+| base | `sac2` (`algos/sac/`): discrete SAC with Zhou et al. 2022's two fixes -- the **entropy-penalty**, β · ½ E_s[(H_old(s) − H(s))²] with H_old the collecting policy's entropy at that state, stored in the replay with the transition (rewritten to this per-state form 2026-09-20 after a review); and **double average Q with a Q-clip**, the target on avg(Q′₁, Q′₂) and the critic loss max((Q − y)², (Q′ + clip(Q − Q′, ±0.5) − y)²). PPO's reward preset, hist8, 16 lanes, γ 0.99, prefill 20k |
+| varies | **sac2paper** (`b42a`-`d`): the paper's Table 3 as written -- Adam 1e-5 actor and critics, batch 64, 1e5 uniform replay, 0.1 updates a move, Polyak 0.005 every update, 3-step, α fixed 0.05, MSE, network **2 × 512**. Not the paper's: snek3's unclipped reward (the paper clips to ±1), the 26-value observation, 50M moves against 10M Atari steps. **sac2local** (`b42e`-`h`): `b41e`-`h`'s cell -- α auto toward 0.1 · ln 3, batch 128, PER 0.6, 100k, 0.5 updates a move, hard target every 8, lr 3e-4, 1-step, `fc 320` -- plus the two fixes and nothing else; the clip puts the critics on squared error where b41 used Huber |
+| cells × seeds | 2 × 4, seeds 1-8 pinned to the letter; the local cell shares seeds 5-8 with `b41e`-`h` |
+| cap | 3,125,000 counted steps = 50M moves, b41's |
+| control | `b41e`-`h` for the local cell (best30 89-93 by 59k-78k steps, then 67-72% perfect at 1.03M with a strong-eval fraction of 15-20%: the fastest onset in the project and no hold); PPO's hist8 strip; b41's paper cell for the paper cell (dead at 0.57M, α 2.5 × 10⁸) |
+| predicted | registered 2026-09-20 by the agent: the paper cell reads a non-zero perfect rate -- the temperature is fixed, so b41's α runaway cannot recur -- but at lr 1e-5 its onset is late, after 1.5M if within the budget at all, its plateau below `b41e`-`h`'s and its Q-clip fraction near 0. The local cell has `b41e`-`h`'s onset (best30 above 85 by 0.1M) and the test is the hold: entropy within 0.02 nats of the 0.11 target, perfect rate after 1M above 80 against b41's 67-72, a higher strong-eval fraction at the same horizon, the clip binding on 1-5% of samples at 3e-4; still short of PPO's 95% stage-B density |
+
+**Why.** Row B2 asks whether B1's result was the idea or the implementation, and b41's local cell has just
+given it a sharp question: the fastest onset the project has seen followed by a drift the two 2022 fixes are
+built to stop. The paper cell runs as written by the series' rule, expected weak (lr 1e-5; the gate arm's
+clip bound on under 1% of samples). The plan's earlier second cell, α auto at the paper's 0.98 target, was
+dropped after b41 showed that target degenerate on three actions; the local cell's α auto at 0.1 stands in,
+and differs from `b41e`-`h` by the fixes alone, so the pair attributes. Gates 2026-09-20: `mut_sac.json` 16 / 16
+after the penalty rewrite and the post-critic-step actor evaluation; 500k-move laptop arms of both cells log a
+non-zero per-state penalty on every eval. Queued before b41 closes: nothing in it reads a b41 number to run.
 
 ## b41 — Discrete SAC, paper cell beside local cell
 
