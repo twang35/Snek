@@ -152,7 +152,7 @@ def test_different_seeds_sample_differently():
 def test_the_batch_carries_the_fields_the_bellman_target_needs():
     buffer = filled(capacity=16, obs_len=3, count=16)
     batch, _, _ = buffer.sample(4, 0)
-    assert set(batch) == {'obs', 'action', 'reward', 'next_obs', 'discount'}
+    assert set(batch) == {'obs', 'action', 'reward', 'next_obs', 'discount', 'aux'}
     assert batch['obs'].shape == (4, 3) and batch['next_obs'].shape == (4, 3)
     assert batch['action'].dtype == np.int64
 

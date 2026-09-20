@@ -28,6 +28,7 @@ from algos.dqn.agent import build_adam
 from algos.sac import net as network
 
 COMBINES = ('min', 'avg')
+CRITIC_LOSSES = ('mse', 'huber')
 
 
 # ---------------------------------------------------------------- the arithmetic
@@ -65,11 +66,16 @@ def clipped_critic_loss(q, q_old, y, clip):
     return torch.maximum(plain, clipped), (clipped > plain)
 
 
-def entropy_penalty(previous_entropy, entropy, beta):
-    """`beta * 1/2 (H_prev - H)^2`; zero until there is a previous update to compare with."""
-    if previous_entropy is None or beta <= 0.0:
+def entropy_penalty(old_entropy, entropy, beta):
+    """Zhou et al.'s entropy-penalty, per replayed state: `beta * 1/2 (H_old(s) - H(s))^2`, `H_old(s)`
+    the entropy the *collecting* policy had at `s`, stored with the transition (`replay.aux`), `H(s)` the
+    current policy's. Returns one value per row; the caller averages. The per-state form is the point:
+    a mean-to-mean difference lets two states whose entropies moved in opposite directions cancel, and
+    penalises a change in which states were sampled rather than a change in the policy (an earlier
+    version here compared consecutive minibatches' means and was wrong, 2026-09-20)."""
+    if beta <= 0.0:
         return entropy * 0.0
-    return float(beta) * 0.5 * (float(previous_entropy) - entropy) ** 2
+    return float(beta) * 0.5 * (old_entropy.detach() - entropy) ** 2
 
 
 def target_entropy_for(num_actions, ratio):
@@ -119,6 +125,9 @@ class SacAgent(object):
         if self.combine not in COMBINES:
             raise ValueError('SNEK_SAC_CRITIC_COMBINE={0!r} is not one of {1}'.format(self.combine, COMBINES))
         self.q_clip = float(config['sac_q_clip'])
+        self.critic_loss_kind = str(config['sac_critic_loss'])
+        if self.critic_loss_kind not in CRITIC_LOSSES:
+            raise ValueError('SNEK_SAC_CRITIC_LOSS={0!r} is not one of {1}'.format(self.critic_loss_kind, CRITIC_LOSSES))
         self.entropy_penalty = float(config['sac_entropy_penalty'])
         self.target_update_period = int(config['sac_target_update_period'])
         self.tau = float(config['sac_tau'])
@@ -130,7 +139,9 @@ class SacAgent(object):
         if seed is not None:
             self.torch_rng.manual_seed(int(seed))
         self.train_step = 0
-        self.previous_entropy = None
+        # The policy's entropy at each lane's state on the last `act()`, one float per lane: the collector
+        # stores it with the transition, and the entropy-penalty reads it back as `H_old(s)`.
+        self.act_aux = None
         self.last_metrics = {}
 
     # ---------------------------------------------------------------- acting
@@ -150,7 +161,10 @@ class SacAgent(object):
         self.actor.eval()
         with torch.no_grad():
             tensor = torch.as_tensor(np.asarray(observations, dtype=np.float32), device=self.device)
-            actions, _ = network.sample(self.actor(tensor), generator=self.torch_rng)
+            logits = self.actor(tensor)
+            actions, _ = network.sample(logits, generator=self.torch_rng)
+            log_pi = network.log_softmax(logits)
+            self.act_aux = (-(log_pi.exp() * log_pi).sum(dim=1)).cpu().numpy().astype(np.float32)
         return actions.cpu().numpy().astype(np.int64)
 
     # ---------------------------------------------------------------- learning
@@ -164,6 +178,7 @@ class SacAgent(object):
         action = torch.as_tensor(batch['action'], device=self.device).long().unsqueeze(1)
         reward = torch.as_tensor(batch['reward'], device=self.device).float()
         discount = torch.as_tensor(batch['discount'], device=self.device).float()
+        old_entropy = torch.as_tensor(batch['aux'], device=self.device).float()
         alpha = self.alpha
         is_weights = None
         if weights is not None and self.use_is_weights:
@@ -185,10 +200,14 @@ class SacAgent(object):
             loss_1, won_1 = clipped_critic_loss(q1_a, q1_old, y, self.q_clip)
             loss_2, won_2 = clipped_critic_loss(q2_a, q2_old, y, self.q_clip)
             clip_wins = float(torch.cat([won_1, won_2]).float().mean())
-        else:
-            # Huber, as `algos/dqn/agent.py` argues for a +100 terminal against ~0.01 steps.
+        elif self.critic_loss_kind == 'huber':
+            # The local departure, as `algos/dqn/agent.py` argues for a +100 terminal against ~0.01 steps.
             loss_1 = F.huber_loss(q1_a, y, reduction='none', delta=1.0)
             loss_2 = F.huber_loss(q2_a, y, reduction='none', delta=1.0)
+        else:
+            # MSE, both papers' critic loss; the default.
+            loss_1 = (q1_a - y) ** 2
+            loss_2 = (q2_a - y) ** 2
         critic_losses = loss_1 + loss_2
         if is_weights is not None:
             critic_losses = critic_losses * is_weights
@@ -202,12 +221,11 @@ class SacAgent(object):
         q_pi = combine(q1_all.detach(), q2_all.detach(), self.combine)
         entropy = -(log_pi.exp() * log_pi).sum(dim=1)
         mean_entropy = entropy.mean()
-        penalty = entropy_penalty(self.previous_entropy, mean_entropy, self.entropy_penalty)
+        penalty = entropy_penalty(old_entropy, entropy, self.entropy_penalty).mean()
         policy_loss = actor_loss(log_pi, q_pi, alpha).mean() + penalty
         self.actor_optimizer.zero_grad(set_to_none=True)
         policy_loss.backward()
         self.actor_optimizer.step()
-        self.previous_entropy = float(mean_entropy.detach())
 
         # -- the temperature
         temperature_loss = None
@@ -224,7 +242,7 @@ class SacAgent(object):
             'alpha': self.alpha, 'entropy': float(mean_entropy.detach()),
             'critic_loss': float(critic_loss.detach()), 'actor_loss': float(policy_loss.detach()),
             'alpha_loss': None if temperature_loss is None else float(temperature_loss.detach()),
-            'entropy_penalty': float(penalty.detach()) if torch.is_tensor(penalty) else float(penalty),
+            'entropy_penalty': float(penalty.detach()),
             'clip_fraction': clip_wins, 'target_entropy': self.target_entropy,
             'train_step': self.train_step, 'mean_abs_td': float(td_error.abs().mean())}
         return td_error.cpu().numpy(), self.last_metrics
@@ -250,7 +268,7 @@ class SacAgent(object):
                  'actor_optimizer': self.actor_optimizer.state_dict(),
                  'critic_optimizer': self.critic_optimizer.state_dict(),
                  'log_alpha': self.log_alpha.detach().clone(), 'train_step': self.train_step,
-                 'previous_entropy': self.previous_entropy, 'torch_rng': self.torch_rng.get_state()}
+                 'torch_rng': self.torch_rng.get_state()}
         if self.alpha_optimizer is not None:
             state['alpha_optimizer'] = self.alpha_optimizer.state_dict()
         return state
@@ -266,6 +284,6 @@ class SacAgent(object):
         if self.alpha_optimizer is not None and 'alpha_optimizer' in state:
             self.alpha_optimizer.load_state_dict(state['alpha_optimizer'])
         self.train_step = int(state.get('train_step', 0))
-        self.previous_entropy = state.get('previous_entropy')
+        # `previous_entropy` in a checkpoint from before 2026-09-20 is ignored: the penalty reads the replay.
         if state.get('torch_rng') is not None:
             self.torch_rng.set_state(state['torch_rng'].cpu())

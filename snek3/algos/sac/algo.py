@@ -16,7 +16,7 @@ import os
 
 from algos.dqn import collect
 from algos.dqn.replay import PrioritizedReplay
-from algos.sac.agent import SacAgent, COMBINES
+from algos.sac.agent import SacAgent, COMBINES, CRITIC_LOSSES
 from tools import checkpoints
 from vectorized.vec_env import VecSnake
 
@@ -26,9 +26,9 @@ NAME = 'sac'
 # put alpha back on `auto` for the ablation that asks whether the fixed temperature is itself a fix.
 DEFAULTS = {
     'sac': {'lr': 3e-4, 'period': 2000, 'tau': 1.0, 'alpha': 'auto', 'ratio': 0.25, 'n_step': 1,
-            'penalty': 0.0, 'combine': 'min', 'q_clip': 0.0, 'replay': 1000000},
+            'penalty': 0.0, 'combine': 'min', 'q_clip': 0.0, 'replay': 1000000, 'critic_loss': 'mse'},
     'sac2': {'lr': 1e-5, 'period': 1, 'tau': 0.005, 'alpha': '0.05', 'ratio': 0.1, 'n_step': 3,
-             'penalty': 0.5, 'combine': 'avg', 'q_clip': 0.5, 'replay': 100000},
+             'penalty': 0.5, 'combine': 'avg', 'q_clip': 0.5, 'replay': 100000, 'critic_loss': 'mse'},
 }
 
 REJECTED = (
@@ -55,7 +55,7 @@ SAC_KNOBS = (
     'SAC_TARGET_UPDATE_PERIOD', 'SAC_TAU', 'SAC_ALPHA', 'SAC_TARGET_ENTROPY_RATIO', 'SAC_INIT_ALPHA',
     'SAC_ALPHA_LEARNING_RATE', 'SAC_REPLAY_RATIO', 'SAC_N_STEP', 'SAC_ENTROPY_PENALTY',
     'SAC_CRITIC_COMBINE', 'SAC_Q_CLIP', 'SAC_REPLAY_BUFFER_MAX_LENGTH', 'SAC_PRIORITY_EXPONENT',
-    'SAC_PREFILL',
+    'SAC_PREFILL', 'SAC_CRITIC_LOSS',
 )
 
 
@@ -96,6 +96,9 @@ def build_config(tuned, name='sac'):
         'sac_entropy_penalty': tuned('SAC_ENTROPY_PENALTY', d['penalty']),
         'sac_critic_combine': str(tuned('SAC_CRITIC_COMBINE', d['combine'], str)).strip(),
         'sac_q_clip': tuned('SAC_Q_CLIP', d['q_clip']),
+        # Both papers' critic loss is MSE (the Q-clip, when on, is on the squared error regardless);
+        # `huber` is the local departure for the unclipped +100 terminal, the local cell's choice.
+        'sac_critic_loss': str(tuned('SAC_CRITIC_LOSS', d['critic_loss'], str)).strip().lower(),
         'sac_replay_buffer_max_length': int(tuned('SAC_REPLAY_BUFFER_MAX_LENGTH', d['replay'], int)),
         # 0 is uniform replay, the papers'; 0.6 is the local plumbing's PER, with DQN's beta anneal.
         'sac_priority_exponent': tuned('SAC_PRIORITY_EXPONENT', 0.0),
@@ -105,6 +108,9 @@ def build_config(tuned, name='sac'):
     if config['sac_critic_combine'] not in COMBINES:
         raise ValueError('SNEK_SAC_CRITIC_COMBINE={0!r} is not one of {1}'.format(
             config['sac_critic_combine'], COMBINES))
+    if config['sac_critic_loss'] not in CRITIC_LOSSES:
+        raise ValueError('SNEK_SAC_CRITIC_LOSS={0!r} is not one of {1}'.format(
+            config['sac_critic_loss'], CRITIC_LOSSES))
     if config['sac_alpha'].lower() != 'auto':
         try:
             fixed = float(config['sac_alpha'])
@@ -181,10 +187,11 @@ class SacAlgo(object):
             fixes.append('Q-clip {0}'.format(self.agent.q_clip))
         if self.agent.entropy_penalty > 0.0:
             fixes.append('entropy-penalty {0}'.format(self.agent.entropy_penalty))
-        return '{0} lane(s), {1} updates a move, batch {2}, {3}{4}, replay {5:,}{6}'.format(
+        return '{0} lane(s), {1} updates a move, batch {2}, {3}{4}, critic {7}, replay {5:,}{6}'.format(
             self.collector.vec.n, self.config['sac_replay_ratio'], self.config['sac_batch_size'], alpha,
             (', ' + ', '.join(fixes)) if fixes else '', self.config['sac_replay_buffer_max_length'],
-            ' PER {0}'.format(self.config['sac_priority_exponent']) if self.config['sac_priority_exponent'] > 0 else '')
+            ' PER {0}'.format(self.config['sac_priority_exponent']) if self.config['sac_priority_exponent'] > 0 else '',
+            self.agent.critic_loss_kind)
 
     # ------------------------------------------------------------ the loop
 

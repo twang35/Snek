@@ -157,12 +157,68 @@ def test_the_q_clip_is_the_plain_error_inside_the_clip_and_the_larger_branch_out
     assert float(loss2[0]) == pytest.approx(2.5 ** 2) and bool(won2[0])
 
 
-def test_the_entropy_penalty_is_zero_for_a_still_policy_and_grows_as_the_square():
-    h = torch.tensor(1.0)
-    assert float(sac_agent.entropy_penalty(1.0, h, 0.5)) == 0.0
-    assert float(sac_agent.entropy_penalty(None, h, 0.5)) == 0.0
-    assert float(sac_agent.entropy_penalty(0.8, h, 0.5)) == pytest.approx(0.5 * 0.5 * 0.04)
-    assert float(sac_agent.entropy_penalty(0.6, h, 0.5)) == pytest.approx(0.5 * 0.5 * 0.16)
+def test_the_entropy_penalty_is_per_state_zero_when_still_and_not_cancelled_by_opposite_moves():
+    """Zhou et al.'s term is E_s[(H_old(s) - H(s))^2]: two states whose entropies moved by the same amount in
+    opposite directions must be penalised, where a mean-to-mean difference would read zero."""
+    old = torch.tensor([1.0, 0.6])
+    assert torch.all(sac_agent.entropy_penalty(old, old.clone(), 0.5) == 0.0)
+    assert torch.all(sac_agent.entropy_penalty(old, torch.tensor([0.8, 0.8]), 0.0) == 0.0), 'beta 0 is off'
+    per_row = sac_agent.entropy_penalty(old, torch.tensor([0.8, 0.8]), 0.5)
+    assert per_row.tolist() == pytest.approx([0.5 * 0.5 * 0.04, 0.5 * 0.5 * 0.04])
+    assert float(per_row.mean()) > 0.0 and float((old.mean() - 0.8) ** 2) == pytest.approx(0.0)
+    # the gradient flows to the current entropy, not the stored one
+    h = torch.tensor([0.9, 0.7], requires_grad=True)
+    sac_agent.entropy_penalty(old, h, 0.5).sum().backward()
+    assert h.grad.tolist() == pytest.approx([0.5 * (0.9 - 1.0), 0.5 * (0.7 - 0.6)])
+
+
+def _entropy_of(actor, obs):
+    with torch.no_grad():
+        log_pi = torch.log_softmax(actor(torch.as_tensor(np.asarray(obs, dtype=np.float32))), dim=1)
+        return (-(log_pi.exp() * log_pi).sum(dim=1)).numpy()
+
+
+def test_collection_stores_each_states_entropy_and_the_replay_returns_it_with_the_transition(monkeypatch):
+    algo, config, _ = build(monkeypatch, 'sac2', SAC_N_STEP='1')
+    banked = algo.collector.step(0.0)
+    assert banked == config['collect_envs']
+    stored = algo.buffer.aux[:banked]
+    expected = _entropy_of(algo.agent.actor, algo.buffer.obs[:banked])
+    assert stored == pytest.approx(expected, abs=1e-5), 'the collecting policy\'s entropy at that state'
+    assert stored.std() >= 0.0 and np.all(stored > 0.0)
+    algo.prefill()
+    batch, indexes, _ = algo.buffer.sample(8, 0)
+    assert batch['aux'] == pytest.approx(algo.buffer.aux[indexes])
+    # and the penalty in an update reads it: with the actor unchanged since collection it is ~0
+    td, metrics = algo.agent.update(batch, None)
+    assert metrics['entropy_penalty'] == pytest.approx(0.0, abs=1e-6)
+    # after the actor moves, the same rows carry a positive penalty
+    with torch.no_grad():
+        for p in algo.agent.actor.parameters():
+            p.add_(0.5)
+    _, metrics2 = algo.agent.update(batch, None)
+    assert metrics2['entropy_penalty'] > 0.0
+
+
+def test_the_critic_loss_is_mse_by_default_huber_by_knob_and_refuses_anything_else(monkeypatch):
+    assert small_config(monkeypatch, 'sac')['sac_critic_loss'] == 'mse'
+    assert small_config(monkeypatch, 'sac2')['sac_critic_loss'] == 'mse'
+    assert small_config(monkeypatch, 'sac', SAC_CRITIC_LOSS='Huber')['sac_critic_loss'] == 'huber'
+    with pytest.raises(ValueError, match='SAC_CRITIC_LOSS'):
+        small_config(monkeypatch, 'sac', SAC_CRITIC_LOSS='l1')
+    monkeypatch.delenv('SNEK_SAC_CRITIC_LOSS')
+    # a large error is quadratic under mse and linear under huber: two agents, one batch, the critic loss differs.
+    # The mse agent is built first: monkeypatch leaves the knob set for the rest of the test.
+    algo_mse, _, _ = build(monkeypatch, 'sac')
+    assert 'critic mse' in algo_mse.describe()
+    algo, _, _ = build(monkeypatch, 'sac', SAC_CRITIC_LOSS='huber')
+    assert 'critic huber' in algo.describe()
+    algo.prefill(); algo_mse.prefill()
+    batch, _, _ = algo.buffer.sample(8, 0)
+    batch['reward'] = batch['reward'] + 100.0
+    _, m_h = algo.agent.update(dict(batch), None)
+    _, m_m = algo_mse.agent.update(dict(batch), None)
+    assert m_m['critic_loss'] > 10 * m_h['critic_loss']
 
 
 def test_polyak_at_tau_one_is_a_hard_copy_and_below_it_is_not(monkeypatch):

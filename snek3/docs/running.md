@@ -160,9 +160,10 @@ and distributional knob is **refused by name**, as under PPO; `SNEK_COLLECT_ENVS
 | `SNEK_SAC_TARGET_ENTROPY_RATIO`, `SNEK_SAC_INIT_ALPHA`, `SNEK_SAC_ALPHA_LEARNING_RATE` | 0.98, 1.0, 3e-4 | same | `auto` only: the target is `ratio · ln 3 = 1.0766` |
 | `SNEK_SAC_REPLAY_RATIO` | 0.25 | 0.1 | gradient updates per game move, carried as a fraction |
 | `SNEK_SAC_N_STEP` | 1 | 3 | |
-| `SNEK_SAC_ENTROPY_PENALTY` | 0 (off) | 0.5 | β · ½ (H_prev − H)², H_prev the previous update's mean entropy |
+| `SNEK_SAC_ENTROPY_PENALTY` | 0 (off) | 0.5 | β · ½ E_s[(H_old(s) − H(s))²], H_old(s) the collecting policy's entropy at that state, stored with the transition (the replay's `aux` column) and read back per row. Before 2026-09-20 it compared consecutive minibatches' *mean* entropies, which is a different term; no arm ran it |
 | `SNEK_SAC_CRITIC_COMBINE` | `min` | `avg` | how the two critics' Q(s, ·) are read, in the target and the actor loss |
-| `SNEK_SAC_Q_CLIP` | 0 (off) | 0.5 | the critic loss becomes max((Q − y)², (Q′ + clip(Q − Q′, ±c) − y)²) on the squared error; off, it is Huber |
+| `SNEK_SAC_Q_CLIP` | 0 (off) | 0.5 | the critic loss becomes max((Q − y)², (Q′ + clip(Q − Q′, ±c) − y)²) on the squared error; off, it is `SNEK_SAC_CRITIC_LOSS` |
+| `SNEK_SAC_CRITIC_LOSS` | `mse` | `mse` | both papers' critic loss. `huber` (δ 1) is the local departure for the unclipped +100 terminal; b41's paper cell ran Huber before this knob existed (2026-09-20), the local cell keeps it |
 | `SNEK_SAC_REPLAY_BUFFER_MAX_LENGTH` | 1,000,000 | 100,000 | 100,000 in the local cell |
 | `SNEK_SAC_PRIORITY_EXPONENT` | 0 (uniform) | 0 | 0.6 is the local plumbing's PER, with DQN's β anneal 0.4 → 1 over 300k |
 | `SNEK_SAC_PREFILL` | 20,000 | 20,000 | transitions from the untrained actor before the first update |

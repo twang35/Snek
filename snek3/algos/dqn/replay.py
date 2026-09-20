@@ -173,6 +173,11 @@ class PrioritizedReplay(object):
         self.action = np.zeros(self.capacity, dtype=np.int64)
         self.reward = np.zeros(self.capacity, dtype=np.float32)
         self.discount = np.zeros(self.capacity, dtype=np.float32)
+        # One float a transition that the agent may attach at collection time and read back with the
+        # row: SAC's entropy-penalty (Zhou et al. 2022) needs the *collecting* policy's entropy at this
+        # state, per state, and nothing else in the stack stores per-transition policy state. DQN
+        # leaves it at 0.
+        self.aux = np.zeros(self.capacity, dtype=np.float32)
 
         tree_size = 1
         while tree_size < self.capacity:
@@ -182,14 +187,16 @@ class PrioritizedReplay(object):
         self.write = 0
         self.max_priority = 1.0
 
-    def add(self, obs, action, reward, next_obs, discount):
-        """Stores one transition at the write cursor, evicting the oldest when full."""
+    def add(self, obs, action, reward, next_obs, discount, aux=0.0):
+        """Stores one transition at the write cursor, evicting the oldest when full. `aux` is the
+        agent's per-transition side value (`self.aux`), 0 when it has none."""
         slot = self.write
         self.obs[slot] = obs
         self.action[slot] = action
         self.reward[slot] = reward
         self.next_obs[slot] = next_obs
         self.discount[slot] = discount
+        self.aux[slot] = aux
         self.tree.set_one(slot, self.max_priority ** self.alpha)
         self.write = (slot + 1) % self.capacity
         self.size = min(self.size + 1, self.capacity)
@@ -224,7 +231,7 @@ class PrioritizedReplay(object):
         weights = (self.size * probabilities) ** (-self.beta_for(step))
         batch = {'obs': self.obs[indexes], 'action': self.action[indexes],
                  'reward': self.reward[indexes], 'next_obs': self.next_obs[indexes],
-                 'discount': self.discount[indexes]}
+                 'discount': self.discount[indexes], 'aux': self.aux[indexes]}
         return batch, indexes, normalize_is_weights(weights)
 
     def update_priorities(self, indexes, td_errors):
@@ -241,7 +248,7 @@ class PrioritizedReplay(object):
         np.savez(staging,
                  obs=self.obs[:self.size], next_obs=self.next_obs[:self.size],
                  action=self.action[:self.size], reward=self.reward[:self.size],
-                 discount=self.discount[:self.size],
+                 discount=self.discount[:self.size], aux=self.aux[:self.size],
                  # Priorities are saved too, unlike snek2's, where cpprb's exporter dropped them and
                  # a restart re-learned them over a few thousand steps. Saving them costs one array.
                  priorities=self.tree.nodes[self.tree.size:self.tree.size + self.size],
@@ -264,6 +271,8 @@ class PrioritizedReplay(object):
             self.action[:size] = data['action']
             self.reward[:size] = data['reward']
             self.discount[:size] = data['discount']
+            # A buffer saved before the column existed (2026-09-20) loads with zeros in it.
+            self.aux[:size] = data['aux'] if 'aux' in data.files else 0.0
             self.size = size
             self.write = int(data['write']) % self.capacity
             self.max_priority = float(data['max_priority'])

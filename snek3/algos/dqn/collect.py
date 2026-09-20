@@ -49,6 +49,13 @@ interleaved games fabricated transitions.
 **A terminal step emits every transition still in the window**, each with `discount=0`, because the
 episode's outcome is what a shorter tail is for and dropping it would discard exactly the deaths and
 wins that matter most.
+
+## The agent's side value
+
+An agent that sets `act_aux` in `act()` -- one float per lane, SAC's policy entropy at the state it just
+acted in -- has it stored with that state's transition (`buffer.add(..., aux=)`), through the n-step
+window: the value banked is the one from the window's *first* step, the state the transition is about.
+An agent without the attribute stores 0.
 """
 
 import numpy as np
@@ -139,6 +146,7 @@ class Collector(object):
         self.branching = np.zeros(vec.n, dtype=bool)
         self.branch_age = np.zeros(vec.n, dtype=np.int64)
         self.guided = self.rng.random(vec.n) < self.guided_fraction
+        self.aux = np.zeros(vec.n, dtype=np.float32)
         self.counters = {name: 0 for name in
                          ('forks', 'retired', 'truncated', 'terminated', 'eligible',
                           'skipped_full', 'episodes', 'transitions', 'perfect_games')}
@@ -158,6 +166,8 @@ class Collector(object):
         ratio exact whether forking is on or off.
         """
         actions = self.agent.act(self.obs, epsilon, self.guided)
+        aux = getattr(self.agent, 'act_aux', None)
+        self.aux = np.zeros(self.vec.n, dtype=np.float32) if aux is None else np.asarray(aux, dtype=np.float32)
         self._maybe_fork(actions)
 
         forced = self.pending >= 0
@@ -180,7 +190,7 @@ class Collector(object):
         banked = 0
         for lane in range(self.vec.n):
             window = self.windows[lane]
-            window.append((previous[lane], int(actions[lane]), float(rewards[lane])))
+            window.append((previous[lane], int(actions[lane]), float(rewards[lane]), float(self.aux[lane])))
             if done[lane]:
                 # Every transition still in the window is emitted, each bootstrapping off nothing.
                 # A shorter tail is exactly what an episode's outcome needs, and dropping it would
@@ -205,11 +215,11 @@ class Collector(object):
         would bootstrap is multiplied out. `tests/test_collect.py` pins that discount at 0 for every
         terminal transition, which is the property this rests on.
         """
-        obs, action, _ = window[start]
+        obs, action, _, aux = window[start]
         total = 0.0
         for offset in range(start, len(window)):
             total += (self.discount ** (offset - start)) * window[offset][2]
-        self.buffer.add(obs, action, total, next_obs, discount)
+        self.buffer.add(obs, action, total, next_obs, discount, aux)
 
     # ---------------------------------------------------------------- episodes and the shield
 

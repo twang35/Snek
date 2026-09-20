@@ -1,7 +1,12 @@
 # Group B: entropy -- Discrete SAC, Revisiting Discrete SAC
 
-**Status: built 2026-09-20** (`algos/sac/`, `sac` and `sac2` in `train.ALGOS` and `tools/restore.py`; tests `tests/test_sac.py`,
-mutants `tests/mut_sac.json` 10/10). **B1 queued 2026-09-20 as b41** (`docs/runs.md`), 4 paper seeds as written + 4 local seeds
+**Status: built 2026-09-20; entropy-penalty rewritten the same day** (`algos/sac/`, `sac` and `sac2` in `train.ALGOS` and `tools/restore.py`; tests `tests/test_sac.py`,
+mutants `tests/mut_sac.json` 15/15). A review (2026-09-20, another agent) found the first build's entropy-penalty was not the paper's term -- it compared
+consecutive minibatches' *mean* entropies, where the paper penalises the per-state difference between the collecting policy's entropy and the
+current one -- so B2 had not implemented Stable Discrete SAC; the replay now carries each transition's collection-time entropy and the penalty is
+per row (§B2). The same review asked for MSE in the paper cell: `SNEK_SAC_CRITIC_LOSS` (default `mse`, both papers') was added, and **b41's paper
+cell ran Huber** -- a stated departure, and not what killed it (α ran to 2.5 × 10⁸ with the entropy pinned at the target, a temperature failure the
+critic loss cannot produce). The local cell keeps Huber by knob. **B1 queued 2026-09-20 as b41** (`docs/runs.md`), 4 paper seeds as written + 4 local seeds
 (target entropy **0.1 · ln|A|** and snek3's replay at 0.5 updates a move), unpinned -- gate 2 found the paper's 0.98 target
 degenerate on three actions (§4), and by the series' rule (`algorithm-series.md` §0) the paper cell runs it anyway. B2 waits for B1. Gates: 1 passed (smokes of both names checkpoint and restore), 3 passed, 2 passed at
 0.1 and **failed at 0.98** (α 1.0 → 66,000 in 500k moves, entropy pinned at 1.077, score 46 → 3), sac2's half of 2 passed
@@ -57,7 +62,7 @@ on the critic's update rather than a clip of the target to a running range.
 
 | fix | what it is | knob | `sac` | `sac2` |
 |---|---|---|---|---|
-| **entropy-penalty** | β · ½ E[(H(π_old) − H(π))²] added to the policy loss, π_old the policy before the update; β swept {0.1, 0.2, 0.5, 1} | `SNEK_SAC_ENTROPY_PENALTY` | 0 | 0.5 |
+| **entropy-penalty** | β · ½ E_{s∼D}[(H(π_old(·\|s)) − H(π(·\|s)))²] added to the policy loss, **per state**: π_old is the policy that *collected* the transition, its entropy at s stored in the replay with the transition (the `aux` column) and read back with the row, as PPO carries old log-probs. Not "the policy before this gradient step": on the same states that difference and its gradient are identically zero at the moment the loss is formed, so the term could do nothing. β swept {0.1, 0.2, 0.5, 1} | `SNEK_SAC_ENTROPY_PENALTY` | 0 | 0.5 |
 | **double average Q** | the target is r + γ · avg(Q′₁, Q′₂) instead of the min | `SNEK_SAC_CRITIC_COMBINE` | `min` | `avg` |
 | **Q-clip** | the critic loss is max((Q − y)², (Q′ + clip(Q − Q′, −c, c) − y)²), Q′ the target critic; c swept {0.5, 1, 2, 5} | `SNEK_SAC_Q_CLIP` | 0 | 0.5 |
 | fixed temperature | α is a constant, no target entropy and no α optimiser | `SNEK_SAC_ALPHA` | `auto` | 0.05 |
@@ -67,9 +72,13 @@ put α back on `auto` for the ablation that asks whether the fixed temperature i
 
 Tests: with `avg` and two equal critics the target equals the `min` target; the Q-clip term equals the
 plain squared error when \|Q − Q′\| < c and is the larger of the two branches otherwise; the entropy
-penalty is zero when the policy did not move and grows as its square; with `SNEK_SAC_ALPHA` fixed the
-α optimiser is not built. Mutants: `avg` computed as a sum, the clip applied to the target instead of
-the online-minus-target difference, the penalty using the entropy's sign rather than its square.
+penalty is zero when the policy did not move and grows as its square, **per state**: collection stores each
+state's entropy, the replay returns it with that transition through the n-step window, equal stored and
+current entropies give zero loss, and two opposite state-wise changes do not cancel through the batch mean;
+with `SNEK_SAC_ALPHA` fixed the α optimiser is not built. Mutants: `avg` computed as a sum, the clip applied
+to the target instead of the online-minus-target difference, the penalty using the entropy's sign rather
+than its square, the penalty on the batch means, collection storing no entropy, the window banking the
+last step's entropy instead of the first's.
 
 ## 2b. The papers' settings, and how each lands here
 
@@ -83,7 +92,7 @@ the online-minus-target difference, the penalty using the entropy's sign rather 
 | n-step | 1 | 3 | per row |
 | temperature | auto, target 0.98 · log \|A\| | fixed 0.05 | per row |
 | network | Nature CNN → 512 | 2 × 512 | `fc 320` actor and critics, the reference's trunk; a 2 × 512 cell is the local departure worth one wave if B2 is short |
-| critic loss | MSE | (Eq. 17 above) | Huber for B1 (the +100 terminal, as `algos/dqn/agent.py` argues) -- **a stated departure**; B2's clip is on the squared error as the paper writes it |
+| critic loss | MSE | (Eq. 17 above) | `SNEK_SAC_CRITIC_LOSS`, **`mse` by default for both rows** (since 2026-09-20; b41's paper cell ran Huber, the default before); `huber` is the local cell's, for the unclipped +100 terminal as `algos/dqn/agent.py` argues. B2's clip is on the squared error regardless |
 | discount | 0.99 | 0.99 | 0.99 |
 | reward | clipped [−1, 1] | clipped | not clipped |
 | budget | 100k agent steps, 5 seeds | 10M env steps, 3 seeds | 50M moves a cell, raised if still rising; B1's paper budget is tiny and is the reason it also runs at D1's 500k-step cap |

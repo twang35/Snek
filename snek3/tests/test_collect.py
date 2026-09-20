@@ -30,9 +30,9 @@ class RecordingBuffer(object):
     def __init__(self):
         self.added = []
 
-    def add(self, obs, action, reward, next_obs, discount):
+    def add(self, obs, action, reward, next_obs, discount, aux=0.0):
         self.added.append({'obs': np.array(obs), 'action': int(action), 'reward': float(reward),
-                           'next_obs': np.array(next_obs), 'discount': float(discount)})
+                           'next_obs': np.array(next_obs), 'discount': float(discount), 'aux': float(aux)})
         return len(self.added) - 1
 
 
@@ -234,7 +234,7 @@ def test_the_discounted_sum_is_hand_computed_for_a_synthetic_window():
     """
     collector, buffer, _, _ = make(width=1, collect_envs=1, n_step=3, discount=0.5)
     obs = np.zeros(constants.observation_length(), dtype=np.float32)
-    window = [(obs, 0, 1.0), (obs, 1, 1.0), (obs, 2, 1.0)]
+    window = [(obs, 0, 1.0, 0.0), (obs, 1, 1.0, 0.0), (obs, 2, 1.0, 0.0)]     # (obs, action, reward, aux)
     collector._emit(window, 0, obs, 0.125)
     assert buffer.added[-1]['reward'] == pytest.approx(1.0 + 0.5 + 0.25)
     collector._emit(window, 1, obs, 0.125)
@@ -760,3 +760,46 @@ def test_the_snapshot_reports_what_an_eval_row_needs():
     for key in ('forks', 'retired', 'truncated', 'terminated', 'eligible', 'skipped_full',
                 'episodes', 'transitions', 'perfect_games', 'live_branches', 'free_slots'):
         assert key in snapshot, key
+
+
+class CountingAuxAgent(SurvivalAgent):
+    """`SurvivalAgent` (so a lane lives long enough to fill a window) that also reports a side value per
+    lane, `10 * call + lane`, so a stored value names the call it came from, and keeps each call's obs."""
+
+    def __init__(self):
+        SurvivalAgent.__init__(self)
+        self.act_aux = None
+        self.seen = []
+
+    def act(self, observations, epsilon, guided=False):
+        actions = SurvivalAgent.act(self, observations, epsilon, guided)
+        self.seen.append(np.array(observations, copy=True))
+        call = len(self.seen)
+        self.act_aux = np.array([10.0 * call + lane for lane in range(len(observations))], dtype=np.float32)
+        return actions
+
+
+def test_the_agents_side_value_is_stored_with_its_own_state_through_the_n_step_window():
+    """SAC's entropy-penalty needs the collecting policy's entropy *at the state the transition is about*,
+    so with n_step 3 the value banked is the window's first step's, not the third's."""
+    vec = VecSnake(2, seed=5)
+    buffer = RecordingBuffer()
+    agent = CountingAuxAgent()
+    collector = collect.Collector(vec, agent, buffer, discount=0.9, n_step=3, collect_envs=2,
+                                  fork=collect.ForkConfig(branches=1), seed=1)
+    for _ in range(3):
+        collector.step(0.0)
+    banked = [entry for entry in buffer.added if entry['discount'] > 0.0]
+    assert banked, 'three non-terminal steps fill a 3-step window once per lane'
+    for entry in banked:
+        lane = int(entry['aux']) % 10
+        assert entry['aux'] == 10.0 * 1 + lane, 'the first call (call 1) is the state stored'
+        assert np.array_equal(entry['obs'], agent.seen[0][lane])
+
+
+def test_an_agent_without_a_side_value_stores_zero():
+    vec = VecSnake(1, seed=5)
+    buffer = RecordingBuffer()
+    collector = collect.Collector(vec, FixedAgent(), buffer, collect_envs=1, fork=collect.ForkConfig(branches=1), seed=1)
+    collector.step(0.0)
+    assert buffer.added and all(entry['aux'] == 0.0 for entry in buffer.added)
