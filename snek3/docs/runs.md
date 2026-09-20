@@ -22,6 +22,9 @@ are in git history before 2026-09-10.
   FQF at N 16 or 32 in waves of 4 (a wave, if b40 says the target is not where the ceiling is); whether the paper cell
   arrives at its full 50M-move budget (~18 h an arm); and b40 (Munchausen), live -- M-DQN closed with 100 stage-B rows and
   a 97.8 best, M-QR-DQN at 2.4M is the steadiest value cell yet.
+- **Group B's temperature target** (queued 2026-09-20 as b41): the 2019 paper's 0.98 · ln|A| forces a near-uniform policy on
+  three actions and α runs away; b41's paper cell runs it as written and its local cell runs 0.1. Whether the target should track PPO's 0.001-0.009 nats instead, and whether
+  B2's Q-clip ever binds at lr 1e-5 (0.0 of samples in the gate arm), are the questions B2 and its tuning wave carry.
 - **`rp` annealed to zero after onset.** b34's per-reversal penalty gave the fastest onset and the best stability on the
   `hist8` base and cost 5 pp of plateau density; a penalty that decays to 0 by ~10M would say whether the two can be
   separated. The reversal-rate-by-fill measurement the b34 prediction named is still owed.
@@ -51,6 +54,7 @@ are in git history before 2026-09-10.
 
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
+| [b41](#b41--discrete-sac-paper-cell-beside-local-cell) | the algorithm: discrete SAC (`SNEK_ALGO=sac`). Paper cell as written (target entropy 0.98 ln 3, batch 64, 1M uniform, 0.25 updates a move) / local cell (target 0.1 ln 3, batch 128, PER 0.6, 100k, 0.5 updates a move, target every 8) | PPO's reward, hist8, `fc 320`; 16 lanes | 2 × 4 | 3.125M steps = 50M moves | registered | — |
 | [b40](#b40--munchausen-on-the-local-plumbing-m-dqn-beside-m-qr-dqn) | the value target: Munchausen's log-policy reward term and soft target (`SNEK_MUNCHAUSEN_ALPHA` 0.9, `_TAU` 0.03, `_L0` -1) on DQN / on QR-DQN N 32 | b35's local cell / b37's QR-DQN cell | 2 × 4 | 3M steps | registered | — |
 | [b39](#b39--fqf-at-n-8-on-the-local-plumbing) | the head: FQF, 8 learned fractions (`SNEK_DIST_QUANTILES` 8) | b35's local cell, `SNEK_ALGO=fqf` | 1 × 4 | 2M steps | falsified on onset, held on the rest | not IQN's band: three of four seeds cross 90 at 1.25-1.65M (IQN at N 8 never did), best30 85 against 65, but none holds -- 71-82 after onset, 27-84% of evals below 80 -- and no checkpoint reached 97, so stage B is empty. Eight learned fractions beat eight sampled ones and still trail N 32 fixed |
 | [b38](#b38--iqn-risk-neutral-beside-trained-under-cvar-025-on-the-local-plumbing) | IQN (N = N′ 8) trained risk-neutral / under CVaR 0.25 (`SNEK_DIST_RISK_ALPHA` 0.25, `SNEK_DIST_RISK_TRAIN` 1) | b35's local cell, `SNEK_ALGO=iqn` | 2 × 4 | 2M steps | falsified | no checkpoint reached 97: the neutral cell climbs to 50% by 0.1-0.2M and sits at 55-65% to the cap (max eval 82); the CVaR-trained cell 40-54%, one seed dead from 0.9M. Zero stage-B rows, the first value batch with none. FQF at the same N 8 (b39) is drawing the same band |
@@ -117,6 +121,27 @@ evals below 50% and 80%), then best30. `hof5000` re-measures the top rows at 5,0
 at complete separation (Mann-Whitney p=0.029). Details in [`protocol.md`](protocol.md).
 
 ---
+
+## b41 — Discrete SAC, paper cell beside local cell
+
+| | |
+|---|---|
+| base | discrete SAC (Christodoulou 2019, `algos/sac/`): a categorical actor (PPO's `QNet`-as-logits, the checkpoint), two Q critics with target copies, the temperature tuned by gradient from 1.0 toward a target entropy; off-policy from DQN's replay and collector with the fork and shield off, the agent sampling from π. PPO's reward preset, hist8, `fc 320`, 16 lanes, γ 0.99, Adam 3e-4, prefill 20k moves |
+| varies | **sacpaper** (`b41a`-`b41d`): the paper as written -- target entropy 0.98 · ln 3, batch 64, 1M uniform replay, 0.25 updates a move, hard target copy every 2,000 updates. **saclocal** (`b41e`-`b41h`): two local tweaks -- target entropy **0.1 · ln 3** = 0.11 nats, and snek3's replay settings (batch 128, PER 0.6 with DQN's β anneal, 100k replay, 0.5 updates a move, target every 8) |
+| cells × seeds | 2 × 4, seeds 1-8 pinned to the letter |
+| cap | 3,125,000 counted steps = 50M moves at 16 lanes, the plan's budget; ~5 h for the paper cell's four arms, ~10 h for the local cell's |
+| control | PPO's hist8 cell (`b27q`-`x`, the viewer's reference strip), b35's local DQN, b40's M-DQN (the entropy-regularised value target). Judged on stage-B density, the passes, drawdowns, and the **policy entropy trace** beside PPO's |
+| predicted | registered 2026-09-20 by the agent: the paper cell's α runs away within 100k moves and the cell never reads a non-zero perfect rate -- the paper's own failure on three actions; the local cell reaches 90% before 0.3M counted steps, the fastest onset of any value agent yet, holds steadier than DQN, does not reach PPO's 95% stage-B density, and its entropy settles at 0.05-0.12 nats, an order above PPO's 0.001-0.009 |
+
+**Why.** Group B asks whether PPO's advantage on this game is the entropy bonus rather than the policy
+gradient; SAC learns a maximum-entropy policy off-policy, so it separates the two. The series' rule
+(`plans/algoExploration/algorithm-series.md` §0) is four arms as the paper wrote them, even where that is
+known to be worse, beside four with local tweaks. The gate found the paper's target degenerate on three
+actions: 0.98 · ln|A| is 1.077 nats against a maximum of 1.099, a near-uniform policy, so α rose at Adam's
+full rate to 66,000 while the score fell from 46 to 3. At 0.1 the same 500k-move arm's α fell to 0.03, its
+entropy sat at 0.1, and it read 50-64% perfect -- faster than any DQN cell. That target is the local
+cell's first tweak; the replay plumbing is its second, halved to 0.5 updates a move so its four arms land
+near the 8-hour budget.
 
 ## b40 — Munchausen on the local plumbing: M-DQN beside M-QR-DQN
 

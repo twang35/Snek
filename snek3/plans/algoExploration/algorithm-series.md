@@ -12,6 +12,18 @@ rewards hardest, sparse exploration and pixel perception, are the two things Sna
 The question is **which property of a learning algorithm matters for this game**, and the series is
 ordered so that each result changes what the next one is expected to show.
 
+## 0. What every group runs, and how long (the user's three objectives, 2026-09-20)
+
+| objective | rule |
+|---|---|
+| **1. Explore the paper's algorithm** | four arms **as close to the paper's settings as possible** -- its optimiser, batch, replay, target, temperature, schedule -- translated to this game only where a setting has no meaning here (`README.md`, "Translating a paper's setting"). **This may read worse than the tuned PPO reference, and that is accepted**: the paper cell is the row's headline and it is run as written even when a gate has shown it will fail (b41's 0.98 entropy target) |
+| **2. Local tweaks** | four arms with the settings this codebase has found to matter -- the replay plumbing (PER, batch 128, the fast target copy), a target or temperature scaled to three actions, the fork and shield where the algorithm can take them -- to see whether they make a **significant** improvement. `n=4` resolves ~10 pp; smaller differences are noise |
+| **3. Time** | **four arms in about 8 hours, at most about 24**, on the desktop's 4-arm waves. Some algorithms need more and are the exception; the usual levers are the update ratio, N, the cap and the lane count, sized from a 2,000-step solo benchmark (`tools/`'s rule: an 8-arm desktop wave runs each arm at ~0.15x the solo rate, a 4-arm wave at ~0.7x) |
+
+So a new paper algorithm's first batch is **4 paper + 4 local**, one wave of two cells, and the later rows of a
+group (a paper's own fixes, an ablation) follow the same shape. Where the plan below says "paper cell" and
+"local cell", this is what it means.
+
 ## 1. What the game is, and what that asks of an algorithm
 
 | property of Snake here | where it is established | the algorithmic axis it points at |

@@ -1,6 +1,12 @@
 # Group B: entropy -- Discrete SAC, Revisiting Discrete SAC
 
-**Status: planned 2026-09-16, nothing built.** Group B of [`algorithm-series.md`](algorithm-series.md);
+**Status: built 2026-09-20** (`algos/sac/`, `sac` and `sac2` in `train.ALGOS` and `tools/restore.py`; tests `tests/test_sac.py`,
+mutants `tests/mut_sac.json` 10/10). **B1 queued 2026-09-20 as b41** (`docs/runs.md`), 4 paper seeds as written + 4 local seeds
+(target entropy **0.1 · ln|A|** and snek3's replay at 0.5 updates a move), unpinned -- gate 2 found the paper's 0.98 target
+degenerate on three actions (§4), and by the series' rule (`algorithm-series.md` §0) the paper cell runs it anyway. B2 waits for B1. Gates: 1 passed (smokes of both names checkpoint and restore), 3 passed, 2 passed at
+0.1 and **failed at 0.98** (α 1.0 → 66,000 in 500k moves, entropy pinned at 1.077, score 46 → 3), sac2's half of 2 passed
+on the penalty (non-zero) and **not on the clip** (0.0 of critic samples; at lr 1e-5 the Q-clip never binds), 4 not yet.
+Originally: planned 2026-09-16, nothing built. Group B of [`algorithm-series.md`](algorithm-series.md);
 conventions in [`README.md`](README.md). Phase 3 of the running order; waits for A1.
 
 The question: is PPO's advantage on this game the entropy bonus rather than the policy gradient? PPO
