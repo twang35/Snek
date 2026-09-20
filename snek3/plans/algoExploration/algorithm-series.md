@@ -21,7 +21,7 @@ ordered so that each result changes what the next one is expected to show.
 | the transition is deterministic except the food spawn, and the simulator is exact and cheap | `env/game.py`, `vectorized/` | **planning against the true simulator** is available and a learned world model is the wrong version of it. The fixed-path references (100.00% / 30,000, `hallOfFame/HOF.md`) already show lookahead wins here |
 | the food is always reachable and the tour proves it | the Hamiltonian-cycle reference | there is **no hard-exploration problem**. Intrinsic-reward agents answer a question this game does not ask, and are in the series to confirm that, not to win |
 | two boxes, 8 trainers each, 4 seeds a cell (`docs/protocol.md`) | root `CLAUDE.md` | **sample cost per run** bounds how many rows the series can afford, so the data-efficiency probe runs early |
-| PPO is the incumbent at 98.7% (snek2) and is the snek3 default (`algos/ppo/`) | `hallOfFame/HOF.md` | PPO is the **control** every row is read against, on the same observation, reward and eval protocol |
+| PPO is the incumbent and the snek3 default (`algos/ppo/`): **snek3's record is 99.89% /30k** (`b32g`, warm-started from a `hist8` hold) and its plain `hist8` cell reads 99.81% (`b27t`); snek2's 98.7% is the historical mark under the old 30-value observation, not a number any row is read against | `hallOfFame/HOF.md`, `docs/runs.md` b27 | **snek3's PPO is the control** every row is read against -- b27's `hist8` table, on the same 26-value observation, reward preset and eval protocol. snek2 is frozen, its observation era is gone, and its champion no longer loads, so it cannot serve |
 
 The value-based side has its own control already: `algos/dqn/` is in snek3 behind the same algo seam as
 `algos/ppo/`, so vanilla DQN is the first row to run, not the first to build.
@@ -102,7 +102,7 @@ F1 is early in the ordering (§3) because its answer sizes every later row's bud
 
 | order | row | what it isolates |
 |---|---|---|
-| G1 | **AlphaZero-style MCTS on the real `Game`** | search with an exact model, a learned policy and value prior. This is the row most likely to beat 98.7%, and the row whose result the fixed-path references most nearly predict |
+| G1 | **AlphaZero-style MCTS on the real `Game`** | search with an exact model, a learned policy and value prior. This is the row most likely to beat the PPO record (99.89% /30k), and the row whose result the fixed-path references most nearly predict |
 | G2 | **MuZero** | the same search with a *learned* model. Read against G1: what learning the model costs when the true one was free |
 | G3 | **EfficientZero V2** | MuZero's data-efficient form. Read against G2 and F1: whether the search or the sample-efficiency tricks carry it at low step counts |
 | G4 | **Muesli** | the policy-gradient relative: MuZero's model used for a regularised policy update instead of search at act time. Whether the model helps the *update* even when there is no search at play time |
