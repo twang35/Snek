@@ -1,7 +1,7 @@
 # Group D: the value stack -- Rainbow, Beyond the Rainbow
 
 **Status: planned 2026-09-16, nothing built** (no `algos/rainbow/`, no `DuelingTrunk`, no `NoisyLinear`, no tests). **Where each piece and each row stands is the `status` column of §1 and §3 and the gate table of §4** (added 2026-09-20, on the same rule as `a-return-tail.md`: a cell is filled in the pass that does the work, and an empty cell means *not done*, not *passed*). Group D of [`algorithm-series.md`](algorithm-series.md);
-conventions in [`README.md`](README.md). Phase 4 of the running order; waits for Group A to close -- as of 2026-09-20 A1-A4 are closed, A5 (b39) is live and A6 (b40) is live.
+conventions in [`README.md`](README.md). Phase 4 of the running order; waits for Group A to close -- as of 2026-09-20 A1-A5 are closed (b39 closed today: FQF climbs where IQN flattened but never holds, stage B empty) and A6 (b40) is live on the laptop.
 
 **Decided 2026-09-20, before implementation** (the questions raised when the plan was re-read against the code):
 
