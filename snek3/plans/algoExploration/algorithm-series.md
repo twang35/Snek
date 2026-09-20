@@ -2,7 +2,7 @@
 
 **Status: agreed 2026-09-16, nothing built.** This is the ordering and the reasoning only. Each group has
 its implementation plan beside this file -- [`README.md`](README.md) indexes them and holds the conventions
-every plan leans on: `a-return-tail.md`, `b-data-efficiency.md`, `c-entropy.md`, `d-value-stack.md`,
+every plan leans on: `a-return-tail.md`, `b-entropy.md`, `c-value-stack.md`, `d-data-efficiency.md`,
 `e-memory.md`, `f-exploration.md`, `g-planning.md`, `h-gdi.md`.
 
 The question behind the series is not "which algorithm has the highest Atari score". Atari
@@ -54,37 +54,37 @@ was on the 30-value observation with a different reward configuration. The A4 ri
 one property in this whole family that a scalar critic cannot have, and it is the single most direct
 test of the "one rare fatal move" diagnosis.
 
-### Group B -- how much compute does any of this need
+### Group B -- does entropy regularisation on a value agent match PPO's
 
 | order | row | what it isolates |
 |---|---|---|
-| B1 | **BBF** | the data-efficiency probe: a value agent tuned for 100k steps (bigger net, reset schedules, annealed n-step and gamma). Whether Snake at 26 features needs anywhere near the steps the incumbent uses |
+| B1 | **Discrete SAC** | maximum-entropy value learning; whether PPO's advantage here is the entropy bonus rather than the policy gradient |
+| B2 | **Revisiting Discrete SAC** | the fixes (entropy-penalty scaling, double average Q clipping) that made it competitive on Atari; whether the B1 result was the idea or the implementation |
 
-B1 is early in the ordering (§3) because its answer sizes every later row's budget.
-
-### Group C -- does entropy regularisation on a value agent match PPO's
-
-| order | row | what it isolates |
-|---|---|---|
-| C1 | **Discrete SAC** | maximum-entropy value learning; whether PPO's advantage here is the entropy bonus rather than the policy gradient |
-| C2 | **Revisiting Discrete SAC** | the fixes (entropy-penalty scaling, double average Q clipping) that made it competitive on Atari; whether the C1 result was the idea or the implementation |
-
-### Group D -- does the strongest single-box value stack beat the incumbent
+### Group C -- does the strongest single-box value stack beat the incumbent
 
 | order | row | what it isolates |
 |---|---|---|
-| D1 | **Rainbow** | C51 plus double, dueling, prioritised replay, n-step and noisy nets. Whether the classic stack of value tricks, on this game, closes the gap to PPO |
-| D2 | **Beyond the Rainbow** | Rainbow's stack rebuilt around IQN, Munchausen, an IMPALA-style trunk and vectorised collection. The practical ceiling of the value family on one box |
+| C1 | **Rainbow** | C51 plus double, dueling, prioritised replay, n-step and noisy nets. Whether the classic stack of value tricks, on this game, closes the gap to PPO |
+| C2 | **Beyond the Rainbow** | Rainbow's stack rebuilt around IQN, Munchausen, an IMPALA-style trunk and vectorised collection. The practical ceiling of the value family on one box |
 
-D is read against A: if D2 beats D1 by about what A4 plus A6 beat A2 by, the stack adds nothing beyond
+C is read against A: if C2 beats C1 by about what A4 plus A6 beat A2 by, the stack adds nothing beyond
 its parts. If it beats it by more, the trunk or the collection is doing work worth isolating.
+
+### Group D -- is the late drift a plasticity problem
+
+**Re-planned 2026-09-20.** BBF was in phase 1 as the budget probe (how many steps does any of this need); Group A answered that empirically (onset at 0.3-1.8M steps, batches queued at 2-3M), and BBF's lever, a replay ratio of 8, buys data efficiency with compute on a game whose simulator is free. What Group A left open is the other end of the curve: every value cell reached 88-94% and then drifted or never held. BBF's resets are a late-plasticity mechanism, so the row is now that probe.
+
+| row | what | the question it answers |
+|---|---|---|
+| D1 | **BBF's shrink-and-perturb resets** as a knob on A6's best cell (`SNEK_RESET_*`, `algos/dqn/resets.py`) | whether periodically pulling the trunk toward a fresh initialisation, and re-initialising the head, lets a value net hold what it reaches. Read against the cell without resets (b40), on hold and drawdowns rather than onset. If it holds, the knob is offered to E2 and re-run on C's best |
 
 ### Group E -- does memory over the body matter given 26 features
 
 | order | row | what it isolates |
 |---|---|---|
 | E1 | **Recurrent PPO** | recurrence alone, on the incumbent. The `hist8` result (making the last eight turns visible was the largest lever in the project, `docs/findings.md`) is the prior that says memory should matter |
-| E2 | **R2D2** | recurrence on a value agent, with the burn-in and stored-state machinery. Read against E1 and D1: whether the gain is the memory or the agent |
+| E2 | **R2D2** | recurrence on a value agent, with the burn-in and stored-state machinery. Read against E1 and C1: whether the gain is the memory or the agent |
 
 E2 is R2D2 the algorithm -- recurrent replay with stored states and burn-in -- not R2D2 the 256-actor
 deployment. Run it at the actor count the box has.
@@ -104,7 +104,7 @@ Both are built on E2, so they cannot run before it.
 |---|---|---|
 | G1 | **AlphaZero-style MCTS on the real `Game`** | search with an exact model, a learned policy and value prior. This is the row most likely to beat the PPO record (99.89% /30k), and the row whose result the fixed-path references most nearly predict |
 | G2 | **MuZero** | the same search with a *learned* model. Read against G1: what learning the model costs when the true one was free |
-| G3 | **EfficientZero V2** | MuZero's data-efficient form. Read against G2 and B1: whether the search or the sample-efficiency tricks carry it at low step counts |
+| G3 | **EfficientZero V2** | MuZero's data-efficient form. Read against G2 and D1: whether the search or the sample-efficiency tricks carry it at low step counts |
 | G4 | **Muesli** | the policy-gradient relative: MuZero's model used for a regularised policy update instead of search at act time. Whether the model helps the *update* even when there is no search at play time |
 
 G1 has a wrinkle the others do not: **the eval protocol measures a policy network, and G1's agent is a
@@ -126,14 +126,15 @@ finish fastest: a row that could run earlier on its dependencies alone still wai
 
 | phase | rows | why here |
 |---|---|---|
-| 1 | **A1** DQN, **B1** BBF | A1 is already built and is the control for every value row. B1 says how many steps every later row needs. Both are cheap and neither depends on anything |
+| 1 | **A1** DQN | already built, and the control for every value row |
 | 2 | **A2 → A3 → A4 → A5**, then **A6** | the distributional ladder, one rung at a time, with A2 stabilised on this reward before A3 starts. A4's risk-sensitive arm is the series' most direct test of the diagnosis in §1 |
-| 3 | **C1 → C2** discrete SAC | one change to a value agent that exists, read against A1 and PPO |
-| 4 | **D1 → D2** Rainbow, Beyond the Rainbow | read against A, so they wait for A. D2 also wants A6's Munchausen result |
-| 5 | **E1** recurrent PPO, then **E2** R2D2 | the memory question in one phase. E1 is the cheaper form with the `hist8` prior behind it and is read against PPO; E2 is read against E1 and D1, the value stack it is built on |
-| 6 | **F1 → F2** | built on E2; the expected result is a null, so they run once the value rows they are read against have closed |
-| 7 | **G1**, then **G2 → G3**, **G4** | the planning group in one phase. G1 is the row most likely to beat the record and needs the eval-protocol decision in Group G made first; the learned-model rows are read against G1's number |
-| 8 | **H1** | a reproduction gate first, then the row if it passes |
+| 3 | **B1 → B2** discrete SAC | one change to a value agent that exists, read against A1 and PPO |
+| 4 | **C1 → C2** Rainbow, Beyond the Rainbow | read against A, so they wait for A. C2 also wants A6's Munchausen result |
+| 5 | **D1** BBF's resets | the reset probe on A6's best cell: whether the late drift every A cell showed is a plasticity problem. Placed after C so its answer is read beside the strongest value stack, and offered to E2 |
+| 6 | **E1** recurrent PPO, then **E2** R2D2 | the memory question in one phase. E1 is the cheaper form with the `hist8` prior behind it and is read against PPO; E2 is read against E1 and C1, the value stack it is built on |
+| 7 | **F1 → F2** | built on E2; the expected result is a null, so they run once the value rows they are read against have closed |
+| 8 | **G1**, then **G2 → G3**, **G4** | the planning group in one phase. G1 is the row most likely to beat the record and needs the eval-protocol decision in Group G made first; the learned-model rows are read against G1's number |
+| 9 | **H1** | a reproduction gate first, then the row if it passes |
 
 Two ordering rules that hold across phases: **no row starts until the row it is read against has a
 closed stage-B number** (`docs/protocol.md`), and **a row that fails to stabilise is closed as a

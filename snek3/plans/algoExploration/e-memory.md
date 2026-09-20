@@ -1,14 +1,14 @@
 # Group E: memory -- recurrent PPO, R2D2
 
 **Status: planned 2026-09-16, nothing built.** Group E of [`algorithm-series.md`](algorithm-series.md);
-conventions in [`README.md`](README.md). Phase 5 of the running order; waits for Group D.
+conventions in [`README.md`](README.md). Phase 6 of the running order; waits for Group C, and Group D (the reset probe) runs before it.
 
 The question: does memory over the body matter, given that the 26-value observation summarises the
 body rather than showing it? The prior is strong: making the last eight turns visible (`hist8`) was
 the largest lever in the project, 49 → 94-95% stage-B density (`docs/findings.md`). A recurrent policy
 can carry an arbitrarily long history without widening the observation. E1 is recurrence alone, on
 the incumbent, read against PPO; E2 is recurrence on a value agent with R2D2's stored-state and burn-in
-machinery, read against E1 and D1 so the gain can be attributed to the memory or to the agent.
+machinery, read against E1 and C1 so the gain can be attributed to the memory or to the agent.
 
 ## 1. The seam change this group needs, designed once
 
@@ -80,7 +80,7 @@ reward. Here it is R2D2 the algorithm, at the box's actor count.
 
 | module | contents |
 |---|---|
-| `algos/r2d2/net.py` | trunk → concat(previous action one-hot, previous reward) → LSTM(`hidden`) → dueling scalar head (Group D's `DuelingTrunk`, scalar form). `SNEK_R2D2_HEAD=c51` puts D1's dueling C51 head there instead, for the **local** variant that asks whether the memory and the distribution compound |
+| `algos/r2d2/net.py` | trunk → concat(previous action one-hot, previous reward) → LSTM(`hidden`) → dueling scalar head (Group C's `DuelingTrunk`, scalar form). `SNEK_R2D2_HEAD=c51` puts C1's dueling C51 head there instead, for the **local** variant that asks whether the memory and the distribution compound |
 | `algos/r2d2/replay.py` | a sequence buffer over `algos/dqn/replay.py`'s sum tree: entries are `(burn_in + length)`-step windows with the stored initial state; priorities per sequence. New; the transition buffer is reused for the tree only |
 | `algos/r2d2/collect.py` | `algos/dqn/collect.py`'s lanes carrying an LSTM state and the previous action and reward, cutting sequences at `SNEK_R2D2_SEQ_LENGTH` with overlap `SNEK_R2D2_SEQ_OVERLAP`, never across an episode boundary; **no fork** (a forked lane would need a copied state and a copied sequence prefix; refused by name) |
 | `algos/r2d2/agent.py` | burn-in replay under `no_grad`, the n-step double-Q target on the remainder, the rescaling and its inverse, the sequence priority |
@@ -99,7 +99,7 @@ skipped on the target, overlap producing a gap instead, the previous reward fed 
 | setting | R2D2 (Table 2 and §2; "missing parameters follow Ape-X") | here |
 |---|---|---|
 | LSTM | 512, after the conv trunk's 512 features; previous action and reward as extra inputs | **512** (`SNEK_R2D2_HIDDEN`), over `fc 320`; a 256 cell is the tuning wave |
-| head | dueling, scalar, 512-wide streams | dueling scalar (B1's module); the C51 head is the local variant |
+| head | dueling, scalar, 512-wide streams | dueling scalar (D1's module); the C51 head is the local variant |
 | sequence, burn-in, overlap | 80, 40, 40; never across an episode boundary | 80, 40, 40 |
 | n-step | 5, double Q | `SNEK_N_STEP_UPDATE=5` |
 | discount | 0.997 | **0.997** (`SNEK_DISCOUNT`); the local cell takes the reference's |
@@ -116,7 +116,7 @@ skipped on the target, overlap producing a gap instead, the previous reward fed 
 E2's **local** cell keeps everything above and swaps in this codebase's plumbing where it exists: PER
 0.6, the eval-driven ε, the shield, the fast target. Because R2D2 has no fork and the per-lane ε ladder
 is its own exploration answer, the local cell's difference is smaller than Group A's, and it runs only
-if the paper cell trails D1.
+if the paper cell trails C1.
 
 ## 3. The batches
 
@@ -124,8 +124,8 @@ if the paper cell trails D1.
 |---|---|---|---|---|
 | E1 | 4 seeds `SNEK_PPO_RECURRENT=lstm` (the `ppo2` reference form, hidden 128) + 4 seeds `gru` | b27's `hist8` PPO config verbatim (the reference; `plans/zigzag-shaping.md` §6 states it) | PPO `hist8` | stage-B density, `hof5000`, `hof30k`, drawdowns; the onset step |
 | E1 no-window | 4 seeds of the better cell at `SNEK_OBS_HISTORY=0` | E1 | PPO `hist0` (b7) and E1 | does recurrence replace the window; only if E1 moved |
-| E2 | 4 seeds `r2d2` **paper** (§2b: LSTM 512, scalar dueling head, 5-step, Adam 1e-4, target 2,500, the Ape-X ε ladder) + 4 seeds `r2d2` with `SNEK_R2D2_HEAD=c51` (D1's head under the memory) | A1's reward and history | E1, A1 paper and D1 paper | as E1; the scalar cell against A1 is memory alone, the C51 cell against D1 is memory on the stack |
-| E2 local | 4 seeds paper with the codebase's PER, ε and target | E2 paper | E2 paper | only if E2 paper trails D1 |
+| E2 | 4 seeds `r2d2` **paper** (§2b: LSTM 512, scalar dueling head, 5-step, Adam 1e-4, target 2,500, the Ape-X ε ladder) + 4 seeds `r2d2` with `SNEK_R2D2_HEAD=c51` (C1's head under the memory) | A1's reward and history | E1, A1 paper and C1 paper | as E1; the scalar cell against A1 is memory alone, the C51 cell against C1 is memory on the stack |
+| E2 local | 4 seeds paper with the codebase's PER, ε and target | E2 paper | E2 paper | only if E2 paper trails C1 |
 
 ## 4. Gates
 
@@ -140,7 +140,7 @@ if the paper cell trails D1.
 
 - **E1 beats `hist8`.** Memory beyond eight moves matters; the E1 no-window cell says whether the
   window was a proxy for it, and every later row (F, G's policy prior) is offered the GRU.
-- **E1 is level and E2 beats D1.** The memory needs the value agent's machinery -- most likely the
+- **E1 is level and E2 beats C1.** The memory needs the value agent's machinery -- most likely the
   stored-state replay lets it learn from long endgames the on-policy rollout truncates. F1 and F2 are
   built on E2 as planned.
 - **Neither moves.** The 26 features plus eight moves are sufficient statistics for this policy class,

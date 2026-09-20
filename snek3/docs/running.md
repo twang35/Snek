@@ -88,6 +88,9 @@ existed, b2's shaping dose had to be confirmed by reading `/proc/<pid>/environ` 
 | `SNEK_MUNCHAUSEN_ALPHA` | 0 (off) | Munchausen RL (Vieillard, Pietquin & Geist 2020) on any DQN-family algorithm: the clipped, `tau`-scaled log-policy of the taken action is added to the reward and the bootstrap becomes the soft value under the target net's policy at temperature `tau`. Paper 0.9. **0 is plain double DQN to the bit**; the fixture says so. Group A, row A6 |
 | `SNEK_MUNCHAUSEN_TAU` | 0.03 | the temperature, in reward units (the paper's value against a unit reward; food here is 1) |
 | `SNEK_MUNCHAUSEN_L0` | -1 | the log-policy clip's floor |
+| `SNEK_RESET_INTERVAL` | 0 (off) | BBF's shrink-and-perturb resets (Schwarzer et al. 2023) on any DQN-family algorithm, every this many **gradient steps**: the trunk (every hidden linear) is pulled toward a fresh initialisation, the head (and IQN's embedding, FQF's fraction net) is re-initialised, the target becomes a copy of the reset net and every optimiser's state is cleared. `algos/dqn/resets.py`; `plans/algoExploration/d-data-efficiency.md` |
+| `SNEK_RESET_ALPHA` | 0.5 | how much of the old trunk survives a reset: θ ← α θ + (1 − α) θ_fresh. 1 keeps the trunk and still re-initialises the head; 0 is a full re-initialisation |
+| `SNEK_RESET_STOP_AFTER` | 0 (never) | the gradient step after which no reset fires, so the final stretch of training settles |
 
 ### Replay
 

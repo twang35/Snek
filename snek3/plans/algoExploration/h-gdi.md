@@ -1,7 +1,7 @@
 # Group H: the outlier -- GDI / LBC
 
 **Status: planned 2026-09-16, nothing built.** Group H of [`algorithm-series.md`](algorithm-series.md);
-conventions in [`README.md`](README.md). Phase 8, the last row, behind a reproduction gate.
+conventions in [`README.md`](README.md). Phase 9, the last row, behind a reproduction gate.
 
 GDI -- Generalized Data-distribution Iteration (Fan & Xiao 2022) -- and its successor LBC -- Learnable
 Behavior Control (Fan, Xiao et al. 2023) -- report the highest mean human-normalised scores on Atari.
@@ -57,7 +57,7 @@ unclipped, a bandit's count not incremented on the point it chose, the behaviour
 
 | batch | arms | base | read against | judged on |
 |---|---|---|---|---|
-| H1 | 4 seeds of `gdi` on GDI-I3's settings above, fresh (the paper's form) + 4 seeds with the actor seeded from a PPO `hist8` checkpoint (the local variant) | the PPO reference's reward preset and `hist8` | PPO `hist8`, C1 (the other off-policy actor-critic in the series), F2 (the other bandit over behaviours) | stage-B density, `hof5000`, `hof30k`, drawdowns; **the selector's trace** -- which family points it settles on, which is the row's mechanistic reading |
+| H1 | 4 seeds of `gdi` on GDI-I3's settings above, fresh (the paper's form) + 4 seeds with the actor seeded from a PPO `hist8` checkpoint (the local variant) | the PPO reference's reward preset and `hist8` | PPO `hist8`, B1 (the other off-policy actor-critic in the series), F2 (the other bandit over behaviours) | stage-B density, `hof5000`, `hof30k`, drawdowns; **the selector's trace** -- which family points it settles on, which is the row's mechanistic reading |
 | H1 selector | 4 seeds with the selector replaced by a uniform draw over the family + 4 seeds with a single fixed point (τ → 0, ε 1: the greedy learner, which is plain V-trace/Retrace actor-critic) | H1 | H1 | is it the family or the selection, and is either worth anything over the learner alone |
 
 ## 4. Gates

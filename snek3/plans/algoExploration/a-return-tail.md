@@ -89,7 +89,7 @@ Already built. Nothing to implement; the row's work is the batch. This is the fi
 26-value observation with the current reward preset and the `hist8` history, and the last DQN batches
 (`b1`, `b2`, snek3's phase-3 gates) ran under the 30-value observation and the `b2` preset. It also has
 to answer whether DQN's step budget is right: `docs/runs.md` b2 crossed 90% at 324k counted steps; the
-cap here is chosen from that and B1's answer once B1 has one.
+cap here is chosen from that and D1's answer once D1 has one.
 
 ### A2 -- C51 (Bellemare, Dabney & Munos 2017)
 
@@ -262,7 +262,7 @@ and it is what G1's search-versus-network decision (`g-planning.md` §5) reuses.
 - **A2 cannot be made stable within its stability batch.** Then A3 runs as the base of the ladder and
   the finding is written; QR-DQN has no support to mis-set and is the usual modern default anyway.
 - **A4's CVaR read beats its own neutral read on the 30k top.** That is the group's headline and it
-  changes D2 (Beyond the Rainbow acts neutrally; the plan would add the CVaR read to it) and the
+  changes C2 (Beyond the Rainbow acts neutrally; the plan would add the CVaR read to it) and the
   ordering (the CVaR read would be measured on every later value row).
 - **The whole ladder is level with A1.** The distribution is not the lever, the tail diagnosis stands
   unexplained by value modelling, and Group E (memory) and Group G (planning) become the candidates.

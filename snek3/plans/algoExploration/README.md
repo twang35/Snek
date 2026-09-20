@@ -6,9 +6,9 @@ implementation plan here, and every plan leans on the conventions below rather t
 | plan | group | rows |
 |---|---|---|
 | [`a-return-tail.md`](a-return-tail.md) | A | DQN, C51, QR-DQN, IQN, FQF, Munchausen |
-| [`b-data-efficiency.md`](b-data-efficiency.md) | B | BBF |
-| [`c-entropy.md`](c-entropy.md) | C | Discrete SAC, Revisiting Discrete SAC |
-| [`d-value-stack.md`](d-value-stack.md) | D | Rainbow, Beyond the Rainbow |
+| [`b-entropy.md`](b-entropy.md) | B | Discrete SAC, Revisiting Discrete SAC |
+| [`c-value-stack.md`](c-value-stack.md) | C | Rainbow, Beyond the Rainbow |
+| [`d-data-efficiency.md`](d-data-efficiency.md) | D | BBF's resets, as the late-drift probe |
 | [`e-memory.md`](e-memory.md) | E | recurrent PPO, R2D2 |
 | [`f-exploration.md`](f-exploration.md) | F | NGU, Agent57 |
 | [`g-planning.md`](g-planning.md) | G | AlphaZero-style MCTS, MuZero, EfficientZero V2, Muesli |
@@ -48,7 +48,7 @@ ones below do not, and every plan translates them the same way so the rows stay 
 | **batch 32, one update per 4 agent steps** (8 replayed samples per transition) | batch 32, `SNEK_REPLAY_RATIO` set for 8 samples per transition | the paper's replay ratio is a load-bearing setting (BBF is *about* it), so the paper cell matches samples per transition rather than gradient steps |
 | **a CNN trunk (Nature DQN, IMPALA, ResNet)** | the reference's `fc 320` MLP over the 26+16-value observation for the paper cell; a plan that needs a trunk with more shape (a residual stack, a wider net) states the MLP analogue and its budget | there is no image; the trunk substitution is stated per row so it is not mistaken for the paper's |
 | **an LSTM of 512 (R2D2) or a 256-wide recurrent core** | the paper's width where the trunk is comparable, otherwise the width the plan states with the paper's as the reference | the observation is 42 values, not 3136 CNN features; a plan says which |
-| **200M frames, 5 seeds; 100k steps, 10-50 seeds** | 4 seeds a cell as everywhere here; a plan budgets the moves per arm from the paper's frames when the paper's budget is the question (B1, G3) and from the reference's 100M transitions otherwise | the protocol's seed count is fixed by the boxes |
+| **200M frames, 5 seeds; 100k steps, 10-50 seeds** | 4 seeds a cell as everywhere here; a plan budgets the moves per arm from the paper's frames when the paper's budget is the question (D1, G3) and from the reference's 100M transitions otherwise | the protocol's seed count is fixed by the boxes |
 
 ## What every plan decides
 

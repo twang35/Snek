@@ -1,7 +1,7 @@
 # Group G: planning -- AlphaZero-style MCTS, MuZero, EfficientZero V2, Muesli
 
 **Status: planned 2026-09-16, nothing built.** Group G of [`algorithm-series.md`](algorithm-series.md);
-conventions in [`README.md`](README.md). Phase 7 of the running order, all four rows in one phase.
+conventions in [`README.md`](README.md). Phase 8 of the running order, all four rows in one phase.
 
 The question: does planning with the true simulator win outright? The transition is deterministic
 except the food spawn, the simulator is exact and cheap, and the fixed-path references already show
@@ -87,7 +87,7 @@ MuZero for the low-data regime: a self-supervised consistency loss between the p
 g(h(o_t), a) and h(o_{t+1}), a value-prefix head predicting the summed reward over the unroll with
 an LSTM, off-policy correction of stale value targets by reanalysing with a fresh search, and in V2
 **Gumbel search** (sequential halving with Gumbel noise at the root, which acts well with few
-simulations) and search-based value estimation. Read against G2 and B1: whether it is the search or
+simulations) and search-based value estimation. Read against G2 and D1: whether it is the search or
 the sample-efficiency tricks that carry it at low step counts.
 
 | module | contents |
@@ -100,8 +100,8 @@ consistency loss is zero when g is the identity on a repeated observation; the v
 constant-reward sequence equals K × r. Mutants: the halving keeping the wrong half, the consistency
 target not stop-gradiented, the prefix reset not on episode boundary.
 
-**The budget question G3 is for.** G3 runs at B1's short cap (500k steps) and again at G2's cap. B1
-was chosen as the value-based probe of the same regime, so B1 against G3 at the short cap is the
+**The budget question G3 is for.** G3 runs at D1's short cap (500k steps) and again at G2's cap. D1
+was chosen as the value-based probe of the same regime, so D1 against G3 at the short cap is the
 "search or tricks" reading.
 
 ### G4 -- Muesli (Hessel et al. 2021)
@@ -145,14 +145,14 @@ the exp taken before the clip, the normaliser dropped, importance weights unclip
 | G1 | 4 seeds of `mcts` at **800** simulations (AlphaZero's, §2b: SGD, MSE value, α ≈ 3, TD ∞) + 4 seeds at **50** (MuZero Atari's search budget with the TD-10 target), measured **both ways** (§5) | the PPO reference's reward preset, `hist8`, `SNEK_FC_LAYERS=320`; all fresh, as the papers -- a `SNEK_INIT_FROM` PPO trunk is the local variant and runs only if the fresh cells do not learn a prior | PPO `hist8`, the fixed-path references | stage-B density and the depth passes **for the network alone**; the same for the search at eval simulations; steps per perfect game via `tools.fixed_path --policy` beside the references |
 | G1 simulations | the best G1 seed's checkpoint measured at 1, 10, 50, 200, 800 simulations | G1 | G1 | the perfect rate as a function of the search budget: where the network alone ends and the search begins to pay |
 | G2 | 4 seeds of `muzero` at G1's cap | G1's | G1 | as G1, network-alone and searched |
-| G3 | 4 seeds of `ezv2` at 100k moves (the paper's regime) + 4 at 500k; then 4 at G2's cap if either moved | G2's | B1 at 100k and 500k; G2 | as G1 |
+| G3 | 4 seeds of `ezv2` at 100k moves (the paper's regime) + 4 at 500k; then 4 at G2's cap if either moved | G2's | D1 at 100k and 500k; G2 | as G1 |
 | G4 | 4 seeds of `muesli` | G2's | PPO `hist8`, G2 network-alone | as PPO |
 
 **Registered prediction (the agent's, 2026-09-16).** The G1 search at 50 simulations plays perfect
 games at a rate above every HOF entry within a fraction of the reference cap, because the simulator
 refuses the fatal move the champions die of and the value prior only has to be right about which
 branch is *doomed*, not which is optimal. The G1 network alone is level with PPO or below it. G2 trails
-G1 searched and matches G1 network-alone; G3 at the short cap beats B1; G4 is level with PPO. The
+G1 searched and matches G1 network-alone; G3 at the short cap beats D1; G4 is level with PPO. The
 result that would matter: G1 network-alone *above* PPO, which would say search-generated targets are
 a better teacher than the policy gradient for this game even when no search runs at play time.
 

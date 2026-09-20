@@ -1,7 +1,7 @@
 # Group F: exploration -- NGU, Agent57
 
 **Status: planned 2026-09-16, nothing built.** Group F of [`algorithm-series.md`](algorithm-series.md);
-conventions in [`README.md`](README.md). Phase 6 of the running order; waits for E2, which both rows
+conventions in [`README.md`](README.md). Phase 7 of the running order; waits for E2, which both rows
 are built on.
 
 The question this group asks is one the game does not: whether exploration machinery matters when
