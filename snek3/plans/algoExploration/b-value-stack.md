@@ -1,7 +1,7 @@
 # Group B: the value stack -- Rainbow, Beyond the Rainbow
 
-**Status: planned 2026-09-16, nothing built.** Group B of [`algorithm-series.md`](algorithm-series.md);
-conventions in [`README.md`](README.md). Phase 4 of the running order; waits for Group A to close.
+**Status: planned 2026-09-16, nothing built** (no `algos/rainbow/`, no `NoisyLinear`, no tests; `DuelingTrunk` is F1's to build first). **Where each piece and each row stands is the `status` column of §1 and §3 and the gate table of §4** (added 2026-09-20, on the same rule as `a-return-tail.md`: a cell is filled in the pass that does the work, and an empty cell means *not done*, not *passed*). Group B of [`algorithm-series.md`](algorithm-series.md);
+conventions in [`README.md`](README.md). Phase 4 of the running order; waits for Group A to close -- as of 2026-09-20 A1-A4 are closed, A5 (b39) is live and A6 (b40) is queued.
 
 The question: does the strongest single-box stack of value-learning tricks beat the PPO incumbent on
 this game? B is read against A. If B2 beats B1 by about what IQN plus Munchausen beat C51 by in Group A,
@@ -13,15 +13,15 @@ work worth isolating afterwards.
 Both rows are compositions of pieces that exist by the time they run. The implementation work is the
 composition and the one ingredient nothing earlier builds: **noisy nets**. Dueling arrives with F1 in phase 1.
 
-| shared piece | decision |
-|---|---|
-| package | `algos/rainbow/`, one `algo.py` with two `NAME`s, `rainbow` and `btr`, over a `net.py` that assembles the trunk from flags. Not two packages: BTR is Rainbow with different flags and a different head, and the flags are the experiment |
-| the head | Group A's `algos/dist/heads.py` -- `Categorical` for Rainbow, `Implicit` for BTR. Nothing distributional is written here |
-| the loss | Group A's losses, with Munchausen's knobs from A6 available to both rows (on for BTR, off for Rainbow, as the papers have them). **BTR drops double-Q**: with Munchausen's soft target there is no separate argmax to decouple, and the paper's Table 1 lists it as removed; `SNEK_RAINBOW_DOUBLE` (1 for `rainbow`, 0 for `btr`) |
-| replay, collection, schedules | `algos/dqn/`'s, including n-step (already `SNEK_N_STEP_UPDATE`) and PER (already on). `algos/dqn/` does not change |
-| the sidecar | `head` from Group A plus `trunk`: `{"dueling": true, "noisy": true, "residual": false}` for Rainbow or `{"dueling": true, "noisy": true, "residual": true, "blocks": 3, "spectral": true, "layer_norm": false}` for BTR. In the signature |
-| restore | two entries; both greedy over the head's mean, noise off at act time |
-| the step | DQN's |
+| shared piece | status | decision |
+|---|---|---|
+| package | not built | `algos/rainbow/`, one `algo.py` with two `NAME`s, `rainbow` and `btr`, over a `net.py` that assembles the trunk from flags. Not two packages: BTR is Rainbow with different flags and a different head, and the flags are the experiment |
+| the head | **exists** (A, built 2026-09-17) | Group A's `algos/dist/heads.py` -- `Categorical` for Rainbow, `Implicit` for BTR. Nothing distributional is written here |
+| the loss | **exists** (A; Munchausen knobs built with A6, batch b40 queued 2026-09-19) | Group A's losses, with Munchausen's knobs from A6 available to both rows (on for BTR, off for Rainbow, as the papers have them). **BTR drops double-Q**: with Munchausen's soft target there is no separate argmax to decouple, and the paper's Table 1 lists it as removed; `SNEK_RAINBOW_DOUBLE` (1 for `rainbow`, 0 for `btr`) |
+| replay, collection, schedules | **exists** | `algos/dqn/`'s, including n-step (already `SNEK_N_STEP_UPDATE`) and PER (already on). `algos/dqn/` does not change |
+| the sidecar | `head` exists; `trunk` not built | `head` from Group A plus `trunk`: `{"dueling": true, "noisy": true, "residual": false}` for Rainbow or `{"dueling": true, "noisy": true, "residual": true, "blocks": 3, "spectral": true, "layer_norm": false}` for BTR. In the signature |
+| restore | not built | two entries; both greedy over the head's mean, noise off at act time |
+| the step | exists for B1; B2's `collect_envs`-per-step change not built | DQN's |
 
 ## 2. The rows
 
@@ -116,17 +116,27 @@ Group A); BTR has no local cell, because its collection *is* one of the things i
 
 ## 3. The batches
 
-| batch | arms | base | read against | judged on |
-|---|---|---|---|---|
-| B1 | 4 seeds `rainbow` **paper** (§2b) + 4 seeds `rainbow` **local** (A1's local plumbing under the Rainbow head and flags) | the reference's reward, history and trunk | A2's two cells and PPO's `hist8` table | stage-B density, `hof5000`, `hof30k`, drawdowns |
-| B1 ablation | 4 seeds paper with noisy off (ε 1 → 0.01 over the first **250k frames = 62.5k moves**, the paper's own non-noisy ablation) | B1 paper | B1 paper | whether noisy nets matter here |
-| B2 | 4 seeds `btr` (§2b, the paper's collection) + 4 seeds `btr` with `SNEK_BTR_LAYER_NORM=1` (the paper's post-submission variant) | the reference's reward and history | B1 paper and A4 + A6 | as B1 |
-| B2 ablation | 4 seeds with the plain `QNet` trunk in place of the residual one + 4 seeds with spectral norm off | B2 | B2 | is the trunk the difference, and is it the norm |
+| batch | status | arms | base | read against | judged on |
+|---|---|---|---|---|---|
+| B1 | **waiting**: on F1's `DuelingTrunk`, on `NoisyLinear` (not built), and on A6 closing (gate 4) | 4 seeds `rainbow` **paper** (§2b) + 4 seeds `rainbow` **local** (A1's local plumbing under the Rainbow head and flags) | the reference's reward, history and trunk | A2's two cells and PPO's `hist8` table | stage-B density, `hof5000`, `hof30k`, drawdowns |
+| B1 ablation | **waiting** on B1 | 4 seeds paper with noisy off (ε 1 → 0.01 over the first **250k frames = 62.5k moves**, the paper's own non-noisy ablation) | B1 paper | B1 paper | whether noisy nets matter here |
+| B2 | **waiting** on B1 closing; `ResidualTrunk` and the wide-collection step not built | 4 seeds `btr` (§2b, the paper's collection) + 4 seeds `btr` with `SNEK_BTR_LAYER_NORM=1` (the paper's post-submission variant) | the reference's reward and history | B1 paper and A4 + A6 | as B1 |
+| B2 ablation | **waiting** on B2 | 4 seeds with the plain `QNet` trunk in place of the residual one + 4 seeds with spectral norm off | B2 | B2 | is the trunk the difference, and is it the norm |
 
 The two ablations are what make the group readable: without them B2 minus B1 is one number with four
 changes behind it. They are cheap because they are flag flips on arms that have already been tuned.
 
 ## 4. Gates
+
+**Where each row stands** (2026-09-20; a cell is filled in the pass that runs the gate, and an empty cell means
+*not run*, not *passed*):
+
+| gate | B1 Rainbow | B1 ablation | B2 BTR | B2 ablation |
+|---|---|---|---|---|
+| 1 smoke, checkpoint, restore (both names) | not run (nothing to run) | -- | not run | -- |
+| 2 `btr` equals `rainbow` at Rainbow's flags | -- | -- | not run | -- |
+| 3 mutation spec kills every mutant | no spec yet | -- | no spec yet | -- |
+| 4 predecessor closed; tuning wave done | A2 closed 2026-09-18; **A6 open** (b40 queued 2026-09-19); tuning wave not run | B1 not closed | B1 not closed | B2 not closed |
 
 1. Smoke as in `a-return-tail.md` §4, for both names.
 2. The `btr`-equals-`rainbow` fixture at Rainbow's flags passes, so the ablations are exact.
