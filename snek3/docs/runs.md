@@ -17,9 +17,11 @@ are in git history before 2026-09-10.
   competence in 10M moves on this game for DQN or C51, so rows A2-A4 are queued on b35's local cell (b37: C51 and QR-DQN;
   b38: IQN neutral and CVaR-trained). b37 closed 2026-09-18: the heads buy the hold, not the ceiling. b38 closed
   2026-09-19: IQN at N = N′ 8 plateaus at 55-65%, no checkpoint reached stage B, the CVaR-trained cell lower and one seed
-  dead; the CVaR hand pass is moot. Still open: whether N 8 is the ceiling (b39, FQF at N 8, live, drawing the same band
-  at 0.8M) or the implicit head is; whether the paper cell arrives at its full 50M-move budget (~18 h an arm); and A6
-  (Munchausen), whose M-best arm now goes on QR-DQN or C51 rather than IQN.
+  dead; the CVaR hand pass is moot. b39 closed 2026-09-20: FQF at the same N 8 climbs where IQN flattened (three seeds
+  cross 90) but never holds and never reaches 97 -- the sampling was b38's ceiling, N 8 is still short of N 32. Still open:
+  FQF at N 16 or 32 in waves of 4 (a wave, if b40 says the target is not where the ceiling is); whether the paper cell
+  arrives at its full 50M-move budget (~18 h an arm); and b40 (Munchausen), live -- M-DQN closed with 100 stage-B rows and
+  a 97.8 best, M-QR-DQN at 2.4M is the steadiest value cell yet.
 - **`rp` annealed to zero after onset.** b34's per-reversal penalty gave the fastest onset and the best stability on the
   `hist8` base and cost 5 pp of plateau density; a penalty that decays to 0 by ~10M would say whether the two can be
   separated. The reversal-rate-by-fill measurement the b34 prediction named is still owed.
@@ -50,7 +52,7 @@ are in git history before 2026-09-10.
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
 | [b40](#b40--munchausen-on-the-local-plumbing-m-dqn-beside-m-qr-dqn) | the value target: Munchausen's log-policy reward term and soft target (`SNEK_MUNCHAUSEN_ALPHA` 0.9, `_TAU` 0.03, `_L0` -1) on DQN / on QR-DQN N 32 | b35's local cell / b37's QR-DQN cell | 2 × 4 | 3M steps | registered | — |
-| [b39](#b39--fqf-at-n-8-on-the-local-plumbing) | the head: FQF, 8 learned fractions (`SNEK_DIST_QUANTILES` 8) | b35's local cell, `SNEK_ALGO=fqf` | 1 × 4 | 2M steps | registered | — |
+| [b39](#b39--fqf-at-n-8-on-the-local-plumbing) | the head: FQF, 8 learned fractions (`SNEK_DIST_QUANTILES` 8) | b35's local cell, `SNEK_ALGO=fqf` | 1 × 4 | 2M steps | falsified on onset, held on the rest | not IQN's band: three of four seeds cross 90 at 1.25-1.65M (IQN at N 8 never did), best30 85 against 65, but none holds -- 71-82 after onset, 27-84% of evals below 80 -- and no checkpoint reached 97, so stage B is empty. Eight learned fractions beat eight sampled ones and still trail N 32 fixed |
 | [b38](#b38--iqn-risk-neutral-beside-trained-under-cvar-025-on-the-local-plumbing) | IQN (N = N′ 8) trained risk-neutral / under CVaR 0.25 (`SNEK_DIST_RISK_ALPHA` 0.25, `SNEK_DIST_RISK_TRAIN` 1) | b35's local cell, `SNEK_ALGO=iqn` | 2 × 4 | 2M steps | falsified | no checkpoint reached 97: the neutral cell climbs to 50% by 0.1-0.2M and sits at 55-65% to the cap (max eval 82); the CVaR-trained cell 40-54%, one seed dead from 0.9M. Zero stage-B rows, the first value batch with none. FQF at the same N 8 (b39) is drawing the same band |
 | [b37](#b37--c51-and-qr-dqn-on-the-local-plumbing) | the head: C51 (51 atoms) / QR-DQN (N 32) | b35's local cell | 2 × 4 | 3M steps | held on the plateau, split on onset | both heads hold 88-93 after onset where DQN oscillates at 72-87 (evals below 80: C51 1-6%, QR-DQN 0.3-7%, DQN 12-76%); C51 reaches 90% at 0.27-0.34M, QR-DQN not until 1.1-1.8M; best rows 96.8 / 98.0 against 96.6, no `hof5000` candidate. The head buys the hold, not the ceiling |
 | [b36](#b36--c51-stability-two-supports-on-the-paper-cells-plumbing) | C51's support: 51 atoms / 101 atoms on [-10, 110] | b35's paper cell, C51 head, Adam 2.5e-4 | 2 × 2 | 10M moves | registered | — |
@@ -144,7 +146,7 @@ the box ran each arm 3.4x slower than four; the laptop takes arms one at a time 
 | cells × seeds | 1 × 4, seeds 1-4 pinned to the letter |
 | cap | **2M** counted steps = 8M moves, b38's cap, so the two N 8 rungs read on one x-axis |
 | control | b38's neutral IQN cell (N = N′ 8, the reference row in the viewer); b37's C51 and QR-DQN; b35's local DQN. The CVaR *read* of every checkpoint (`tools.closeout --policy-variant cvar:0.25`) is a hand pass after the batch closes |
-| predicted | registered 2026-09-18 by the agent: onset with QR-DQN's (1-2M), not C51's; the plateau at or above QR-DQN's 88-93 with the fewest evals below 80 of the quantile rungs; the best row within 2 points of 98.0 and no `hof5000` candidate -- learned fractions sharpen a tail the loss already fits, and this game's ceiling is not in the loss |
+| predicted | registered 2026-09-18 by the agent: onset with QR-DQN's (1-2M), not C51's; the plateau at or above QR-DQN's 88-93 with the fewest evals below 80 of the quantile rungs; the best row within 2 points of 98.0 and no `hof5000` candidate -- learned fractions sharpen a tail the loss already fits, and this game's ceiling is not in the loss -- **falsified on onset, held on the rest** (closed 2026-09-20): onset 1.25-1.65M is QR-DQN's, not C51's, as predicted, but the plateau is *below* QR-DQN's (71-82 after 90, 27-84% below 80 against 0.3-7%), and the best row was never measured: no checkpoint reached 97, so there is no stage B and no `hof5000` candidate |
 
 **Why.** Row A5, the last head of the ladder: FQF learns *where* the quantiles sit, which should matter
 most when the return is bimodal, and a perfect game against a fatal move is that shape. N is 8, not the
@@ -154,6 +156,13 @@ solo rate, so N 32 is 250 h a wave and N 8 with four arms about 40 h. N 8 also m
 control. One cell: the paper cell is dropped by the plan's §6 rule after b35 and b37, and a CVaR-trained cell
 is b38's question. Gates: smoke and restore passed, 28 / 28 mutants killed; the 500k laptop arm was not run,
 so a cell still at zero perfect at 500k is stopped.
+
+**Learned.** The head matters after all at N 8: where IQN's eight sampled fractions flattened at 55-65% for
+1.8M steps, FQF's eight learned ones keep climbing and three seeds cross 90 by 1.65M -- so b38's ceiling
+was the sampling, not the quantile loss. But learned fractions do not buy the hold: after onset the seeds
+oscillate 60-95, no eval reaches 97, stage B is empty. N 8 is still short of N 32 fixed quantiles or 51
+atoms. The surprise was how wrong the 0.8M reading was -- "drawing b38's band" -- the band moved at 1.2M,
+which is the usual onset for the quantile heads on this plumbing.
 
 ## b38 — IQN, risk-neutral beside trained under CVaR 0.25, on the local plumbing
 

@@ -17,6 +17,17 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### Eight *learned* fractions learn what eight sampled ones do not: FQF at N 8 climbs where IQN at N 8 flattened, and still does not hold or reach 97
+
+b39 (2026-09-20, `docs/runs.md`, `docs/results.md`): four FQF arms on b35's local plumbing, N 8, K 32, 2M counted steps --
+b38's IQN with the eight fractions proposed by a trained layer instead of sampled. IQN sat at 55-65% from 0.2M to the cap;
+FQF rises from 38-46% in the first quarter to 70-81% in the last, three seeds cross 90 at 1.25-1.65M and the fourth peaks at
+89, best30 85.1 (79.1-89.5) against 65.3. After crossing 90 the seeds average 71-82 with 27-84% of evals below 80, no eval
+reaches 97, and stage B is empty. So b38's plateau was the *sampling* of the fractions, not the quantile Huber or N as such;
+and N 8 learned is still below N 32 fixed (b37's QR-DQN: 87-93 after onset, 0.3-7% below 80) or 51 atoms. Two rungs with an
+empty stage B in a row also say something about the protocol: the 97/100 stage-A gate that selects for stage B is calibrated
+to PPO's plateau, and for the value family the stage-A columns (best30, evals below 80, onset) are carrying the whole reading.
+
 ### IQN at N = N′ 8 does not learn this game past a 55-65% perfect rate, and training it under CVaR 0.25 makes it worse
 
 b38 (2026-09-19, `docs/runs.md`, `docs/results.md`): eight IQN arms on b35's local plumbing, N = N′ 8, K 32, 2M counted steps

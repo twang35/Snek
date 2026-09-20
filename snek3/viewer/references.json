@@ -394,18 +394,14 @@
  },
  "b40": {
   "arms": [
-   "b35e-dqnlocal-seed5",
-   "b35f-dqnlocal-seed6",
-   "b35g-dqnlocal-seed7",
-   "b35h-dqnlocal-seed8",
    "b37e-qrdqnlocal-seed5",
    "b37f-qrdqnlocal-seed6",
    "b37g-qrdqnlocal-seed7",
    "b37h-qrdqnlocal-seed8"
   ],
-  "label": "reference: b35's local DQN cell and b37's QR-DQN N 32 cell -- b40 is each of them with the Munchausen term (alpha 0.9, tau 0.03) on the same plumbing",
+  "label": "reference: b37's QR-DQN N 32 cell -- b40e-h is the same cell with the Munchausen term (alpha 0.9, tau 0.03). b40a-d's control, b35's local DQN cell, is the reference of b37/b38 (one reference cell per batch in this table)",
   "after": "mqrdqnlocal",
-  "value": "dqn",
+  "value": "qrdqn",
   "knob": "name"
  }
 }

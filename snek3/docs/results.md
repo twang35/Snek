@@ -22,6 +22,44 @@ whose published artifacts are history, and the daemon's ledger, whose keys are t
 waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
 
 
+<!-- progress_update: batch b39 -->
+## Batch b39 — the `knob` sweep, 1 values x 4 seeds, 2M, closed 2026-09-20
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b38a-iqnlocal-seed1, b38b-iqnlocal-seed2, b38c-iqnlocal-seed3, b38d-iqnlocal-seed4`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| knob | rows | ≥98%/500 | per-seed share | ≥99.2 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| fqflocal | 0 | – | – – – – | 0 | – | 85.05 (79.1-89.5) | 13.3 | 0.83% | 77.58% | 0.0% |
+| **iqn** (reference) | 0 | – | – – – – | 0 | – | 65.30 (60.1-67.5) | 0.1 | 4.07% | 99.81% | 0.0% |
+
+<!-- reading -->
+
+No table again -- **no b39 checkpoint reached stage A's 97**, so stage B and both passes closed with zero rows --
+but the stage-A traces say something b38's did not: the learned fractions matter. IQN at N 8 sat in a 55-65%
+band from 0.2M to the cap; FQF at the same N 8 keeps climbing, 38-46% in the first quarter to 70-81% in the
+last, three of four seeds cross 90 (at 1.25M, 1.57M and 1.65M; `b39d` peaks at 89), and the best30 is 85.1
+(79-89.5) against IQN's 65.3. What it does not do is hold: after crossing 90 the seeds average 71-82 with 27-84%
+of their evals below 80, the score line at 91-93.5 -- a C51-style onset that never settles, a million steps
+later than C51's. So against b38 the head is not the whole story (eight *learned* fractions learn what eight
+sampled ones do not), and against b37 N 8 is still short of what N 32 fixed quantiles or 51 atoms give. The
+charts.md reading written at 0.8M, "drawing b38's band", was wrong by 1.2M: the band moved. The row's open
+question is FQF at N 32 or 16 with waves of 4 (68 → 31 → 16 counted steps/s solo), now affordable at the
+desktop's 4-arm rate; whether it is worth a wave depends on b40, which is asking whether the ceiling is in the
+target rather than the head.
+
+<!-- /reading -->
+
+### Every arm
+
+| arm | knob | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b39a-fqflocal-seed1` | fqflocal | 0 | – | – | – | 85.9 @1.7M | 7.7 | 0.0% |
+| `b39b-fqflocal-seed2` | fqflocal | 0 | – | – | – | 89.5 @1.4M | 30.4 | 0.89% |
+| `b39c-fqflocal-seed3` | fqflocal | 0 | – | – | – | 85.7 @1.0M | 11.9 | 2.64% |
+| `b39d-fqflocal-seed4` | fqflocal | 0 | – | – | – | 79.1 @1.6M | 3.2 | 0.78% |
+
+<!-- /progress_update: batch b39 -->
+
 <!-- progress_update: batch b38 -->
 ## Batch b38 — the `knob` sweep, 2 values x 4 seeds, 2M, closed 2026-09-19
 
