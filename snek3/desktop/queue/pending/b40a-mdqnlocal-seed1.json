@@ -1,0 +1,29 @@
+{
+ "env": {
+  "SNEK_ALGO": "dqn",
+  "SNEK_CHASE_SAFE_GATE": "75",
+  "SNEK_CHASE_SAFE_SHAPING": "0.1",
+  "SNEK_DISCOUNT": "0.99",
+  "SNEK_EVAL_INTERVAL": "1000",
+  "SNEK_EVAL_QUEUE": "1",
+  "SNEK_EVAL_QUEUE_DEPTH": "16",
+  "SNEK_EVAL_WORKERS": "8",
+  "SNEK_FC_LAYERS": "320",
+  "SNEK_FOOD_DISTANCE_REWARD": "0",
+  "SNEK_MUNCHAUSEN_ALPHA": "0.9",
+  "SNEK_MUNCHAUSEN_L0": "-1",
+  "SNEK_MUNCHAUSEN_TAU": "0.03",
+  "SNEK_OBS_HISTORY": "8",
+  "SNEK_REWARD_PRESET": "b2",
+  "SNEK_SEED": "1",
+  "SNEK_STEP_PENALTY": "0.01"
+ },
+ "id": "b40a-mdqnlocal-seed1",
+ "label": "b40: Munchausen (alpha 0.9, tau 0.03, l0 -1) on the local DQN plumbing, hist8 at 3M steps, M-DQN beside M-QR-DQN N 32, M-DQN (row A6) on b35 local DQN, seed 1 of 8",
+ "max_steps": 3000000,
+ "notes": "Batch b40: row A6 of the algorithm series, Munchausen RL (Vieillard, Pietquin & Geist 2020) on the local plumbing (PER 0.6, fork 4, shield 0.8, target every 8 updates, lr 1e-5, batch 128, the eval-driven epsilon), two cells x 4 seeds. mdqnlocal (b40a-d): M-DQN -- b35's local DQN cell with the log-policy term added to the reward and the soft (log-sum-exp) target, alpha 0.9, tau 0.03, l0 -1, the paper's values; epsilon-greedy acting, 1-step. mqrdqnlocal (b40e-h): the same two knobs on b37's QR-DQN cell (N 32, kappa 1), the rung with the densest stage B of A2-A5 (346 rows, best 98.0; C51 239 / 96.8; IQN and FQF at N 8 none), which is the plan's criterion for the M-best arm. The term is alpha * clip(tau * log pi(a|s), l0, 0), so it lies in [-0.9, 0] a step: up to 90% of a food reward and under 1% of the +100 win -- tau is the paper's against a unit reward and food here is 1. Read against b35's local DQN (best 96.6, 72-87 after onset, 12-76% of evals below 80) and b37's QR-DQN (best 98.0, 87-93 after onset, 0.3-7% below 80, onset 1.1-1.8M). 3M counted steps = 12M moves, b37's cap, so M-QR-DQN reads on one x-axis with QR-DQN; eval every 1,000. Gates passed 2026-09-19: 5,000-step smokes of both cells checkpoint (458 and 124 counted steps/s alone on the laptop); tests/mut_dist.json 28 of 28 killed including the three Munchausen mutants. The 500k laptop arm was not run separately; a cell still at zero perfect at 500k is stopped. Prediction (agent, 2026-09-19): M-DQN holds a steadier plateau than DQN -- the entropy-regularised target is a hold mechanism, so fewer evals below 80 and best30 above 88 -- but does not raise the best row past 97; M-QR-DQN arrives no earlier than QR-DQN and its plateau and best row are within noise of b37e-h, because QR-DQN already holds and the ceiling on this game is not in the value target. Unpinned: the desktop runs waves of 4 (runtime.json max_trainers 4, set with this batch because 8 arms on the box run each arm 3.4x slower than 4) and the laptop takes arms one at a time while its scheduler is up.",
+ "policy": "b40a-mdqnlocal-seed1",
+ "priority": 410,
+ "project": "snek3",
+ "type": "train"
+}
