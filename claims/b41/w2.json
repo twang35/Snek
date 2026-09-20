@@ -1,0 +1,14 @@
+{
+ "arms": [
+  "b41e-saclocal-seed5",
+  "b41f-saclocal-seed6",
+  "b41g-saclocal-seed7",
+  "b41h-saclocal-seed8"
+ ],
+ "batch": "b41",
+ "box": "desktop",
+ "claimed_iso": "2026-09-20T12:48:26",
+ "claimed_ts": 1789933706.3966568,
+ "kind": "wave",
+ "wave": 2
+}
