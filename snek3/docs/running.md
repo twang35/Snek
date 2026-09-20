@@ -139,6 +139,38 @@ Throughput on the laptop, stage A off, paper-cell plumbing (1 lane, batch 32, 0.
 move), 2026-09-17: dqn ~1,870 st/s, c51 ~1,700, fqf ~760, iqn ~640, qrdqn ~520. The local cell's four
 gradient steps a counted step at batch 128 cost IQN 15 st/s, so the heavy heads have no local cell.
 
+### Discrete SAC — only under `SNEK_ALGO=sac` or `sac2`
+
+Group B of the algorithm series (`plans/algoExploration/b-entropy.md`; `algos/sac/`). A categorical actor
+(DQN's `QNet` read as logits, exactly PPO's, so the checkpoint is the actor alone and `arch.json` gains no
+field), two Q critics with target copies, and an automatically tuned or fixed temperature; off-policy from
+DQN's replay and collector with the fork and the shield **off** -- the agent samples from its own policy.
+`sac` is Christodoulou 2019 at its paper values; `sac2` is the same class with Zhou et al. 2022's fixes as
+its defaults (fixed α 0.05, entropy-penalty, double average Q with a Q-clip, Polyak 0.005). Every DQN, PPO
+and distributional knob is **refused by name**, as under PPO; `SNEK_COLLECT_ENVS` (default **16** here) and
+`SNEK_DISCOUNT` are shared.
+
+| knob | `sac` | `sac2` | notes |
+|---|---|---|---|
+| `SNEK_SAC_LEARNING_RATE`, `SNEK_SAC_CRITIC_LEARNING_RATE` | 3e-4 | 1e-5 | Adam, actor and critics |
+| `SNEK_SAC_ADAM_EPSILON` | 1e-8 | 1e-8 | torch's default, the papers' |
+| `SNEK_SAC_BATCH_SIZE` | 64 | 64 | 128 in the local cell |
+| `SNEK_SAC_TARGET_UPDATE_PERIOD`, `SNEK_SAC_TAU` | 2000, 1.0 | 1, 0.005 | gradient updates between target moves; τ 1.0 is a hard copy, below it Polyak |
+| `SNEK_SAC_ALPHA` | `auto` | 0.05 | the temperature: `auto` tunes log α by gradient, a number fixes it and builds no α optimiser |
+| `SNEK_SAC_TARGET_ENTROPY_RATIO`, `SNEK_SAC_INIT_ALPHA`, `SNEK_SAC_ALPHA_LEARNING_RATE` | 0.98, 1.0, 3e-4 | same | `auto` only: the target is `ratio · ln 3 = 1.0766` |
+| `SNEK_SAC_REPLAY_RATIO` | 0.25 | 0.1 | gradient updates per game move, carried as a fraction |
+| `SNEK_SAC_N_STEP` | 1 | 3 | |
+| `SNEK_SAC_ENTROPY_PENALTY` | 0 (off) | 0.5 | β · ½ (H_prev − H)², H_prev the previous update's mean entropy |
+| `SNEK_SAC_CRITIC_COMBINE` | `min` | `avg` | how the two critics' Q(s, ·) are read, in the target and the actor loss |
+| `SNEK_SAC_Q_CLIP` | 0 (off) | 0.5 | the critic loss becomes max((Q − y)², (Q′ + clip(Q − Q′, ±c) − y)²) on the squared error; off, it is Huber |
+| `SNEK_SAC_REPLAY_BUFFER_MAX_LENGTH` | 1,000,000 | 100,000 | 100,000 in the local cell |
+| `SNEK_SAC_PRIORITY_EXPONENT` | 0 (uniform) | 0 | 0.6 is the local plumbing's PER, with DQN's β anneal 0.4 → 1 over 300k |
+| `SNEK_SAC_PREFILL` | 20,000 | 20,000 | transitions from the untrained actor before the first update |
+
+Each eval row carries `alpha` and a `sac` block -- `entropy`, `target_entropy`, `critic_loss`, `actor_loss`,
+`alpha_loss`, `entropy_penalty`, `clip_fraction` (the share of critic samples the clipped branch won) and
+`episodes` -- so the gates in `b-entropy.md` §4 read off the history file.
+
 ### PPO — only under `SNEK_ALGO=ppo`
 
 Every knob above whose meaning is DQN-specific — `SNEK_FORK_*`, `SNEK_INITIAL_EPSILON`,

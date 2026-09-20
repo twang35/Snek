@@ -27,7 +27,7 @@ reason.
 |---|---|---|---|
 | `env/` | the scalar game: constants, drawing, `Game`, the reference observation builder | **yes, and only here** | no |
 | `vectorized/` | `VecSnake` (N games in lockstep, pure numpy) plus the measurement engine and wave | no | no |
-| `algos/dqn/`, `algos/ppo/`, `algos/dist/` | learning algorithms: the network, the replay, the agent, the collector; `dist/` is the four distributional heads (c51, qrdqn, iqn, fqf) on `dqn/`'s replay and schedules | no | yes |
+| `algos/dqn/`, `algos/ppo/`, `algos/dist/`, `algos/sac/` | learning algorithms: the network, the replay, the agent, the collector; `dist/` is the four distributional heads (c51, qrdqn, iqn, fqf) on `dqn/`'s replay and schedules; `sac/` is discrete SAC (`sac`, `sac2`) on `dqn/`'s replay and collector with PPO's actor as the checkpoint | no | yes |
 | `tools/` | the tools and the libraries behind them: `arch`, `checkpoints`, `restore`, `eval_plan`, `run_report`, charts | no | yes, for checkpoint I/O |
 | `desktop/` | the git-bus job queue. stdlib only, imports nothing from this project | no | no |
 | `skills/` | the procedures an agent runs often: launching, queueing, stopping, progress updates. Markdown only | | |
@@ -267,6 +267,8 @@ And the training side, which is the other direction — from a knob to an arm:
 | `algos/dist/net.py` | the distributional heads on `QNet`'s trunk -- C51's categorical, QR-DQN's fixed quantiles, IQN's implicit quantile function with the cosine embedding, FQF's fraction proposal -- and the module `tools/restore.py` loads any of the four through; `q_values` is the mean read, `cvar_values` the tail read a `--policy-variant` measures |
 | `algos/dist/losses.py` | the projection, the cross-entropy, the quantile Huber and FQF's fraction gradient, per sample |
 | `algos/dist/agent.py` | `DistAgent`: `DdqnAgent` with the distributional target (double-Q, or the Munchausen mixture) and loss per head; the priority is the loss |
+| `algos/sac/agent.py` | discrete SAC: the soft target over the categorical policy, twin critics (min or double-average, Huber or Q-clipped), the actor's KL loss with the optional entropy-penalty, and the temperature (auto-tuned to a target entropy, or fixed); the six loss functions are module-level so a fixture can hand them a two-action example |
+| `algos/sac/algo.py` + `sac2.py`, `net.py` | the seam for `sac` (Christodoulou 2019's values) and `sac2` (Zhou et al. 2022's fixes as defaults), on `dqn/`'s replay and collector with the fork and shield off and the agent sampling from pi; the actor is PPO's `QNet`-as-logits, so the checkpoint restores through `tools/restore.py` with no sidecar field; every DQN, PPO and dist knob refused by name, its own under `SAC_` |
 | `algos/dist/algo.py` + `c51.py`, `qrdqn.py`, `iqn.py`, `fqf.py` | one `DqnAlgo` subclass parameterised by the rung, the `SNEK_DIST_*` knobs, the `head` the sidecar records (`arch_fields`); four one-screen modules give each rung its `NAME` in `train.ALGOS` |
 
 **One `train.py` serves every algorithm, and that is a measurement rule rather than a tidiness one.**

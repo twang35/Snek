@@ -45,6 +45,8 @@ import torch
 
 from algos.dist import c51 as c51_algo
 from algos.dist import fqf as fqf_algo
+from algos.sac import algo as sac_algo
+from algos.sac import sac2 as sac2_algo
 from algos.dist import iqn as iqn_algo
 from algos.dist import qrdqn as qrdqn_algo
 from algos.dqn import algo as dqn_algo
@@ -69,7 +71,7 @@ from vectorized import engine
 # reason `tools/restore.py` gives for the same shape: adding PPO is one line, and an unrecognised
 # value names itself in the error instead of falling through to a default.
 ALGOS = {module.NAME: module for module in
-         (dqn_algo, ppo_algo, c51_algo, qrdqn_algo, iqn_algo, fqf_algo)}
+         (dqn_algo, ppo_algo, c51_algo, qrdqn_algo, iqn_algo, fqf_algo, sac_algo, sac2_algo)}
 
 # ---------------------------------------------------------------- config
 

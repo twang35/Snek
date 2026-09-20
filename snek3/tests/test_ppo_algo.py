@@ -322,7 +322,7 @@ def test_a_ppo_checkpoint_restores_into_a_playable_policy(tmp_path, monkeypatch)
 def test_an_algo_the_restore_path_does_not_know_names_itself(tmp_path):
     policy_dir = str(tmp_path / 'b6')
     arch = arch_tools.build_arch((16,), constants.NUM_ACTIONS, constants.OBS_LEN,
-                                constants.OBS_ERA, algo='sac')
+                                constants.OBS_ERA, algo='nobody')
     arch_tools.write_arch(policy_dir, arch)
     with pytest.raises(arch_tools.ArchMismatch, match='unknown algo'):
         restore.policy_fn_for(arch, None)

@@ -45,7 +45,15 @@ def _dist():
     return network
 
 
-ALGORITHMS = {'dqn': _dqn, 'ppo': _ppo, 'c51': _dist, 'qrdqn': _dist, 'iqn': _dist, 'fqf': _dist}
+def _sac():
+    # A SAC checkpoint is the actor alone -- DQN's `QNet` read as logits, as PPO's is -- so its module's
+    # `build` and `greedy_policy_fn` are PPO's, and `sac`/`sac2` need no sidecar field.
+    from algos.sac import net as network
+    return network
+
+
+ALGORITHMS = {'dqn': _dqn, 'ppo': _ppo, 'c51': _dist, 'qrdqn': _dist, 'iqn': _dist, 'fqf': _dist,
+              'sac': _sac, 'sac2': _sac}
 
 
 def _module_for(arch):

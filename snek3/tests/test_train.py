@@ -310,7 +310,7 @@ def test_an_unknown_algorithm_names_itself_rather_than_defaulting(monkeypatch):
     is the general shape of the trap: a fixture whose subject is "a name the registry lacks" must use
     a name nothing intends to add.
     """
-    monkeypatch.setenv('SNEK_ALGO', 'sac')
+    monkeypatch.setenv('SNEK_ALGO', 'nobody')
     with pytest.raises(ValueError, match='not an algorithm this build knows'):
         train.build_config()
     # And the lookup is exact rather than case-folded, so a near-miss is refused too.
