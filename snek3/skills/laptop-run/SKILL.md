@@ -74,6 +74,17 @@ part exactly while its scheduler is up**: it is not a daemon, nothing runs while
 batch pushed to `ops` while it is down waits for the desktop or for the next start of this command.
 `--no-hof` stops after stage B; `--no-stage-b` trains only.
 
+**To stop after the current batch** -- its passes included, nothing new claimed -- `touch runs/.live/.drain`
+(or start with `--drain`, which writes it): the scheduler finishes what the laptop holds and exits where it
+would have claimed the next wave. `runs/.live/.paused` is the other thing: it holds the *passes* too, so it
+is "stop now", not "stop after". **The marker outlives the scheduler**: `rm runs/.live/.drain` before the
+next start, or that scheduler exits at once with `.drain exists` in the log. The running scheduler is old
+code: to drain one started before 2026-09-20, touch the marker, `kill -9` the scheduler pid (its arms and
+pass keep running and the next scheduler adopts them), and rerun the command above -- then check the
+log for a `published to laptop-results` line for the last pass, because a scheduler killed between a
+pass ending and its publish leaves those files off the feed (`python -m tools.results_feed <pass-id>
+<files>` publishes them by hand).
+
 Rerunning the same command after a kill or a reboot is the recovery procedure: the mirror is rewritten
 from the claims, finished arms are skipped, and so is any pass whose merged file every arm of the wave
 already has -- a shard resumes only from its own shard files and the merge deletes them, so without that

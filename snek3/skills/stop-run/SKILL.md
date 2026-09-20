@@ -84,6 +84,10 @@ ssh the-claw-den "ps -Ao pid=,etime=,command= | grep '[t]rain.py'"
 ssh the-claw-den 'kill -9 <pids>'
 ```
 
+To let the box **finish its current wave and passes and then stop** rather than stopping now, use the
+drain marker instead of a pause: `runs/.live/.drain` (`tools.scheduler --drain`, `laptop-run` skill), which
+the shared-queue scheduler reads where it would claim the next wave. A pause holds the passes too.
+
 Unpause when the box should take work again. Do not restart the daemon to stop a job: jobs are
 launched detached with `setsid` and `KillMode=process`, so a restart leaves them running and the
 daemon re-adopts them by pid.
