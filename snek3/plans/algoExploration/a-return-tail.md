@@ -217,7 +217,7 @@ cell means *not run*, not *passed*):
 
 | gate | A1 DQN | A2 C51 | A3 QR-DQN | A4 IQN | A5 FQF | A6 Munchausen |
 |---|---|---|---|---|---|---|
-| 1 smoke, checkpoint, restore | ran (b35 trained and measured) | ran (b36, b37) | ran (b37) | ran (b38 is training and its stage A measures every checkpoint) | **passed 2026-09-18**: 5,000 steps, `ckpt-5000.pt`, restored through `evaluate.py fqf-smoke one` under the neutral and the `cvar:0.25` read; `watch.py` not run (no window while the laptop is in use) | not run |
+| 1 smoke, checkpoint, restore | ran (b35 trained and measured) | ran (b36, b37) | ran (b37) | ran (b38 is training and its stage A measures every checkpoint) | **passed 2026-09-18**: 5,000 steps, `ckpt-5000.pt`, restored through `evaluate.py fqf-smoke one` under the neutral and the `cvar:0.25` read; `watch.py` not run (no window while the laptop is in use) | **passed 2026-09-19**: M-DQN (α 0.9, τ 0.03, l₀ −1 on b35's local cell) and M-QR-DQN (the same on b37's N 32 cell) each ran 5,000 steps and checkpointed, at 458 and 124 counted steps/s alone on the laptop. Not logged: the log-policy term's size beside the reward -- by construction it is α·clip(τ log π, l₀, 0) ∈ [−0.9, 0] a step, up to 90% of a food reward and under 1% of the +100 win |
 | 2 C51 support brackets the return, no end-atom mass | -- | ran with b36 (no clipping reported) | -- | -- | -- | -- |
 | 3 mutation spec kills every mutant | `mut_seam.json` | **passed 2026-09-18**: `mut_dist.json` 28 / 28 killed, covering every rung's head | same run | same run | same run | same run (the three Munchausen mutants are in the spec) |
 | 4 paper cell's ε ramp, shield 0, fork 1 read off the log | ran for b35's paper cell | b36 | -- (no paper cell ran) | -- | -- (no paper cell) | not run |
