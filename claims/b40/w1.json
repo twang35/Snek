@@ -1,0 +1,11 @@
+{
+ "arms": [
+  "b40a-mdqnlocal-seed1"
+ ],
+ "batch": "b40",
+ "box": "laptop",
+ "claimed_iso": "2026-09-19T23:18:23",
+ "claimed_ts": 1789885103.3049679,
+ "kind": "wave",
+ "wave": 1
+}
