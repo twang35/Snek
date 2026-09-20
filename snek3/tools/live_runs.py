@@ -47,6 +47,11 @@ REPUBLISH_NAME = '.republish'
 # While this exists the scheduler launches nothing new: the desktop daemon writes it for
 # `runtime.json`'s `paused`/`drain`, a human touches it on the laptop. What is running finishes.
 HOLD_NAME = '.paused'
+# While this exists the shared-queue scheduler claims nothing new: what this box holds -- its live
+# wave and that wave's passes -- finishes, and then it exits instead of taking the next free wave.
+# "Stop after the current batch", where `.paused` is "stop now, hold the passes too". `touch` it on
+# the laptop; `tools.scheduler --drain` writes it at start.
+DRAIN_NAME = '.drain'
 # A pass the scheduler is running: `.pass-<label>` holding the close-out's pid, written by the scheduler
 # (it holds the Popen; the close-out never learns its pass id). A dot-file, so `live()` never counts it
 # as a trainer. What lets a restarted scheduler wait for a pass instead of launching it twice.
@@ -114,6 +119,15 @@ def pass_entry(label):
 def held(runs_dir=None):
     """Whether the box is paused: the hold marker exists."""
     return os.path.exists(hold_path(runs_dir))
+
+
+def drain_path(runs_dir=None):
+    return os.path.join(directory(runs_dir), DRAIN_NAME)
+
+
+def draining(runs_dir=None):
+    """Whether the box is draining: held work finishes, nothing new is claimed."""
+    return os.path.exists(drain_path(runs_dir))
 
 
 def durations_path(runs_dir=None):

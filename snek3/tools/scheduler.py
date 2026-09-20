@@ -57,7 +57,9 @@ waves as the `tools.closeout` command it spells, once, marked `.done-<id>` besid
 
 **A `runs/.live/.paused` file pauses it**: what is running finishes, and the next wave, pass or eval
 waits until the file is gone. The desktop daemon writes it for `runtime.json`'s `paused`/`drain`; on
-the laptop, `touch` and `rm` it.
+the laptop, `touch` and `rm` it. **A `runs/.live/.drain` file drains it** (`--shared` only): what this
+box holds -- the live wave and its passes -- finishes, and the scheduler exits where it would have
+claimed the next free wave. `--drain` writes the file at start; `rm` it and the next scheduler claims again.
 
 **Never more than `--max-trainers` (8) trainers on the box, counting anything else running here.**
 Before each launch the scheduler waits until the box's live trainer count is below the cap.
@@ -524,6 +526,9 @@ class Driver(object):
         if live_runs.held(self.runs_dir):
             lines.append('** paused: {0} exists; nothing new starts until it is removed'.format(
                 live_runs.hold_path(self.runs_dir)))
+        if live_runs.draining(self.runs_dir):
+            lines.append('** draining: {0} exists; what is held finishes, nothing new is claimed'.format(
+                live_runs.drain_path(self.runs_dir)))
         for number, arms in waves(self.specs, self.wave):
             for pass_name in self.passes if self.stage_b else ():
                 if self._pass_failed(arms, pass_name, number):
@@ -1128,6 +1133,8 @@ def run_shared(queue_dir, make_driver, shared, wave_size, after=None, reporter=N
     (the existing `Driver`, its waves numbered by the claims), and when nothing held is left to run --
     or what is left has already run once and is stuck on a failed pass -- claims the next wave or eval
     spec for this box. A claim won is a spec in the mirror at the next sync; none to claim is the exit.
+    So is `runs/.live/.drain` (`live_runs.draining`), read at the moment a claim would be made: what was
+    held has finished and the box stops there.
     """
     worst = 0
     ran = {}
@@ -1150,6 +1157,10 @@ def run_shared(queue_dir, make_driver, shared, wave_size, after=None, reporter=N
         if picked[0] == 'stale':
             _log('shared queue: {0} still owe work that already ran once here (a failed pass); left as is'.format(
                 ', '.join(picked[1])))
+        if live_runs.draining(runs_dir):
+            _log('shared queue: {0} exists; nothing held is left and nothing new is claimed; exiting'.format(
+                live_runs.drain_path(runs_dir)))
+            return exit_with(worst or (1 if picked[0] == 'stale' else 0))
         record = shared.claim_next(wave_size)
         if record is None:
             _log('shared queue: nothing in the pool for {0}; exiting'.format(shared.box))
@@ -1192,6 +1203,9 @@ def build_parser():
                         help='do not publish finished arms and passes to this box\'s results branch '
                              '(SNEK_RESULTS_BRANCH, default laptop-results), nor the live arms\' pictures '
                              'every ten minutes')
+    parser.add_argument('--drain', action='store_true',
+                        help='with --shared: finish what this box holds, then exit instead of claiming the next wave '
+                             '(writes runs/.live/.drain; rm it to claim again)')
     parser.add_argument('--reopen-window', action='store_true',
                         help='ask the running scheduler for a fresh chart window, then exit')
     parser.add_argument('--republish', action='store_true',
@@ -1248,6 +1262,11 @@ def main(argv=None):
     if args.shared:
         box = args.box or claims.box_name()
         shared = SharedQueue(claims.Store(log=_log), box, args.queue)
+        if args.drain:
+            os.makedirs(live_runs.directory(), exist_ok=True)
+            with open(live_runs.drain_path(), 'a'):
+                pass
+            _log('draining: {0} written; what this box holds finishes, then exit'.format(live_runs.drain_path()))
     reporter = Reporter(publisher, queue_dir=args.queue, make_driver=make_driver, window=window,
                         pool=shared.lines if shared else None, extra=shared.unheld if shared else None)
 

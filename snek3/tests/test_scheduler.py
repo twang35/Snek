@@ -1372,6 +1372,29 @@ def test_run_shared_leaves_a_failed_pass_alone_and_still_claims_the_next_wave(tm
     assert os.path.exists(os.path.join(queue, 'b21', '.failed-b21-hof5000')), 'marked, and the loop went on to b18'
 
 
+def test_run_shared_with_the_drain_marker_finishes_what_it_holds_and_exits_without_claiming(tmp_path, box):
+    """`runs/.live/.drain`: "stop after the current batch". The held wave and its passes run to the end,
+    then the loop exits where it would have claimed -- `.paused` would have held the passes too."""
+    from tools import claims
+    queue = str(tmp_path / 'mirror')
+    specs = {p: spec(p) for p in ('b40e-x-seed5', 'b40f-x-seed6', 'b41a-y-seed1')}
+    shared = FakeShared(queue, specs, [claims.wave_record('b41', 2, 'laptop', ['b41a-y-seed1'])])
+    shared.held.append(claims.wave_record('b40', 3, 'laptop', ['b40e-x-seed5', 'b40f-x-seed6']))
+    os.makedirs(live_runs.directory(box['runs']), exist_ok=True)
+    with open(live_runs.drain_path(box['runs']), 'w'):
+        pass
+    calls = FinishingCalls(box['runs'])
+    make = lambda specs: driver(specs, box, calls, wave=2)
+    code = scheduler.run_shared(queue, make, shared, 2, runs_dir=box['runs'])
+    assert code == 0
+    assert [e[1] for e in calls.events if e[0] == 'train'] == ['b40e-x-seed5', 'b40f-x-seed6'], 'the held wave ran, b41 did not'
+    assert [entry['label'] for entry in live_runs.durations(box['runs'])['stageb']] == ['b40-stageb-w3'], 'its passes ran too'
+    assert shared.asked == [], 'no claim was made'
+    assert shared.upcoming, 'b41 is still in the pool for the other box'
+    d = driver(list(specs.values()), box, calls, wave=2)
+    assert any(line.startswith('** draining') for line in d.attention())
+
+
 def test_an_arm_training_here_that_no_claim_covers_is_named_and_left_alone(tmp_path, box, monkeypatch):
     from tools import claims
     queue = str(tmp_path / 'mirror')
