@@ -1,0 +1,27 @@
+{
+ "env": {
+  "SNEK_ALGO": "sac",
+  "SNEK_CHASE_SAFE_GATE": "75",
+  "SNEK_CHASE_SAFE_SHAPING": "0.1",
+  "SNEK_COLLECT_ENVS": "16",
+  "SNEK_DISCOUNT": "0.99",
+  "SNEK_EVAL_INTERVAL": "1000",
+  "SNEK_EVAL_QUEUE": "1",
+  "SNEK_EVAL_QUEUE_DEPTH": "16",
+  "SNEK_EVAL_WORKERS": "8",
+  "SNEK_FC_LAYERS": "320",
+  "SNEK_FOOD_DISTANCE_REWARD": "0",
+  "SNEK_OBS_HISTORY": "8",
+  "SNEK_REWARD_PRESET": "b2",
+  "SNEK_SEED": "1",
+  "SNEK_STEP_PENALTY": "0.01"
+ },
+ "id": "b41a-sacpaper-seed1",
+ "label": "b41: discrete SAC (row B1), 16 lanes, hist8 at 50M moves (3.125M counted steps), paper replay beside local replay, paper cell as written: target entropy 0.98 ln|A|, batch 64, 1M uniform, 0.25 updates a move, target every 2000, seed 1 of 8",
+ "max_steps": 3125000,
+ "notes": "Batch b41: row B1 of the algorithm series, discrete SAC (Christodoulou 2019) on the PPO reference's reward preset, hist8 and fc 320, two cells x 4 seeds, 16 lanes. The series' rule (algorithm-series.md section 0, 2026-09-20): four arms as close to the paper as possible, even where that is known to be worse, beside four arms with local tweaks that could improve it. sacpaper (b41a-d): the 2019 paper's settings as written -- Adam 3e-4 actor and critics, batch 64, 1M uniform replay, 0.25 gradient updates a move, hard target copy every 2,000 updates, 1-step, temperature tuned by gradient from 1.0 toward 0.98 * ln|A|, prefill 20k moves. saclocal (b41e-h): the same agent with two local tweaks: the target entropy at 0.1 * ln|A| = 0.11 nats, and snek3's replay settings -- batch 128, PER 0.6 with DQN's beta anneal, 100k replay, 0.5 gradient updates a move (1.0 is DQN's; halved to land the four arms near 8 h), hard target copy every 8 updates. Why the target is the local tweak (gate 2, 2026-09-20, 500k-move laptop arms): at the paper's 0.98 on three actions the target is 1.077 nats against a maximum of 1.099, a near-uniform policy, so alpha rose at Adam's full rate from 1.0 to 66,000 while the entropy sat pinned at the target and the score fell from 46 to 3 -- the 2019 agent's known failure, here from the target rather than a stuck temperature; the paper cell runs it anyway, as the paper. At 0.1 the same arm's alpha fell from 1.0 to 0.03-0.04, its entropy settled at 0.08-0.13, and it read 50-64% perfect at 500k moves (31k counted steps), faster than any DQN cell (b35's local DQN: 90% at 0.6-1.6M counted steps). PPO's converged policies here run at 0.001-0.009 nats. Cost, laptop alone, stage A off: paper 259 counted steps/s (about 5 h for four arms on the desktop), local at 1.0 updates a move 65 (about 19 h), so the local cell runs 0.5 (about 10 h). 50M moves = 3,125,000 counted steps at 16 lanes, the plan's budget; eval every 1,000. Read against b35's local DQN cell (best 96.6, 72-87 after onset), PPO's hist8 cell (b27q-x, 95% stage-B density) and b40's M-DQN (entropy-regularised value target, 100 stage-B rows, best 97.8): the group asks whether PPO's advantage is the entropy bonus rather than the policy gradient. Judged on stage-B density, hof5000/hof30k, drawdowns, and the policy entropy trace beside PPO's. Gates passed 2026-09-20: smokes of sac and sac2 checkpoint and restore through evaluate.py; tests/mut_sac.json 10 of 10 killed; the 500k-move arm at 0.1 shows alpha falling and entropy at target (the paper's 0.98 does not, above); sac2's 500k arm logs a non-zero entropy-penalty and a Q-clip fraction of 0.0 -- at lr 1e-5 the clip never binds, recorded for B2. Prediction (agent, 2026-09-20): the paper cell's alpha runs away within the first 100k moves and the cell never reads a non-zero perfect rate -- the paper's own failure mode on three actions; the local cell reaches 90% before 0.3M counted steps, the fastest onset of any value agent yet, holds steadier than DQN because the entropy term is a hold mechanism, does not reach PPO's 95% stage-B density, and its entropy trace settles at 0.05-0.12 nats, an order above PPO's. Unpinned: the desktop runs waves of 4, the laptop waves of 4.",
+ "policy": "b41a-sacpaper-seed1",
+ "priority": 420,
+ "project": "snek3",
+ "type": "train"
+}
