@@ -213,6 +213,10 @@ keep it, and `grep -rn <name> --include='*.md' .` first — the docs link files 
 
 **Throwaway output is fine to delete**: smoke tests, speed benchmarks, `snek3/gifs/`, and
 verification evals. Judge by what produced it, not by where it lives.
+**Smoke and benchmark files need no approval to delete** (standing authorization, 2026-09-20): a gate run's
+`savedPolicies/<name>/` and its `runs/<name>*` files, where the name ends in `-smoke` or `-bench-*`, are
+cleared as soon as the gate's result is written into the plan or the docs. The one check is the grep above:
+a smoke a doc names by that name (`ppo-smoke`, the PPO gate arm in `runs.md`) stays.
 
 ## There are two compute hosts — say which one you mean
 
