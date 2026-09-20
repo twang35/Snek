@@ -1,0 +1,14 @@
+{
+ "arms": [
+  "b39a-fqflocal-seed1",
+  "b39b-fqflocal-seed2",
+  "b39c-fqflocal-seed3",
+  "b39d-fqflocal-seed4"
+ ],
+ "batch": "b39",
+ "box": "desktop",
+ "claimed_iso": "2026-09-19T18:11:47",
+ "claimed_ts": 1789866707.8718042,
+ "kind": "wave",
+ "wave": 1
+}
