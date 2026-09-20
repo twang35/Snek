@@ -17,6 +17,21 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### The value target is not where the ceiling is either: Munchausen tightens the hold on both critics and moves no best row, and Group A closes with every rung at 96.6-98.0
+
+b40 (2026-09-20, `docs/runs.md`, `docs/results.md`): Munchausen's two changes to the value target -- the clipped, τ-scaled
+log-policy of the taken action added to the reward (α 0.9, τ 0.03, l₀ −1) and a soft bootstrap in place of the argmax -- on
+b35's local DQN and on b37's QR-DQN N 32, four seeds each, 3M counted steps. On QR-DQN the term is invisible at the seed
+level: onset 1.13-1.54M against 1.12-1.76M, 89-93 after crossing 90 with 0-3% of evals below 80 against 87-93 and 0-7%,
+436 stage-B rows against 346, the same 98.0 best row, no checkpoint at 99.2 on either. On DQN it damps the drawdowns without
+removing them (13-59% of evals below 80 after onset against 12-76%; `b40a` still spends 63% of its last 600k below 80), and one
+seed's 1.7-2.1M stretch at 91-98 gives 93 of the cell's 100 rows and a 97.8 best against DQN's 96.6. So the paper's mechanism
+-- an entropy-regularised, KL-damped target -- buys the same thing the distributional heads bought (b37): the hold, by a few
+points, and not the ceiling. That closes Group A with one result across seven rungs (DQN, C51, QR-DQN, IQN, FQF, M-DQN,
+M-QR-DQN): a stage-B best of 96.6-98.0 and zero `hof5000` candidates, against PPO's 95% of rows at 98 and 12,479 candidates
+on the same observation. Whatever separates the value family from PPO on this game is not in what the critic represents
+(b37-b39) or what it is trained toward (b40); the next place to look is the actor, which is Group B's question (b41).
+
 ### Eight *learned* fractions learn what eight sampled ones do not: FQF at N 8 climbs where IQN at N 8 flattened, and still does not hold or reach 97
 
 b39 (2026-09-20, `docs/runs.md`, `docs/results.md`): four FQF arms on b35's local plumbing, N 8, K 32, 2M counted steps --

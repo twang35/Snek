@@ -19,9 +19,11 @@ are in git history before 2026-09-10.
   2026-09-19: IQN at N = N′ 8 plateaus at 55-65%, no checkpoint reached stage B, the CVaR-trained cell lower and one seed
   dead; the CVaR hand pass is moot. b39 closed 2026-09-20: FQF at the same N 8 climbs where IQN flattened (three seeds
   cross 90) but never holds and never reaches 97 -- the sampling was b38's ceiling, N 8 is still short of N 32. Still open:
-  FQF at N 16 or 32 in waves of 4 (a wave, if b40 says the target is not where the ceiling is); whether the paper cell
-  arrives at its full 50M-move budget (~18 h an arm); and b40 (Munchausen), live -- M-DQN closed with 100 stage-B rows and
-  a 97.8 best, M-QR-DQN at 2.4M is the steadiest value cell yet.
+  b40 closed 2026-09-20: Munchausen's target is QR-DQN's hold made slightly tighter and DQN's drawdowns made slightly
+  shallower, the same 98.0 / 97.8 best rows, no `hof5000` candidate -- the target is not where the ceiling is either, so
+  Group A closes with seven rungs at 96.6-98.0 against PPO's 99.8 best30. Still open, and both now second-order: FQF at N 16
+  or 32 in waves of 4 (a steadier plateau at best, not the ceiling), and whether the paper cell arrives at its full 50M-move
+  budget (~18 h an arm).
 - **Group B's temperature target** (queued 2026-09-20 as b41): the 2019 paper's 0.98 · ln|A| forces a near-uniform policy on
   three actions and α runs away; b41's paper cell runs it as written and its local cell runs 0.1. Whether the target should track PPO's 0.001-0.009 nats instead, and whether
   B2's Q-clip ever binds at lr 1e-5 (0.0 of samples in the gate arm), are the questions B2 and its tuning wave carry.
@@ -55,7 +57,7 @@ are in git history before 2026-09-10.
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
 | [b41](#b41--discrete-sac-paper-cell-beside-local-cell) | the algorithm: discrete SAC (`SNEK_ALGO=sac`). Paper cell as written (target entropy 0.98 ln 3, batch 64, 1M uniform, 0.25 updates a move) / local cell (target 0.1 ln 3, batch 128, PER 0.6, 100k, 0.5 updates a move, target every 8) | PPO's reward, hist8, `fc 320`; 16 lanes | 2 × 4 | 3.125M steps = 50M moves | registered | — |
-| [b40](#b40--munchausen-on-the-local-plumbing-m-dqn-beside-m-qr-dqn) | the value target: Munchausen's log-policy reward term and soft target (`SNEK_MUNCHAUSEN_ALPHA` 0.9, `_TAU` 0.03, `_L0` -1) on DQN / on QR-DQN N 32 | b35's local cell / b37's QR-DQN cell | 2 × 4 | 3M steps | registered | — |
+| [b40](#b40--munchausen-on-the-local-plumbing-m-dqn-beside-m-qr-dqn) | the value target: Munchausen's log-policy reward term and soft target (`SNEK_MUNCHAUSEN_ALPHA` 0.9, `_TAU` 0.03, `_L0` -1) on DQN / on QR-DQN N 32 | b35's local cell / b37's QR-DQN cell | 2 × 4 | 3M steps | held (the M-DQN best row 97.8, 0.8 over the line) | the target is not where the ceiling is: M-QR-DQN is QR-DQN with a slightly tighter hold (onset 1.13-1.54M, 89-93 after onset with 0-3% below 80, 436 rows, best 98.0 against 346 / 98.0), M-DQN is DQN with shallower drawdowns (73-87 after onset, 13-59% below 80 against 12-76%; 100 rows, 93 of them one seed's, best 97.8 against 96.6). No arm reached 99.2; both passes empty. Group A closes with every rung at 96.6-98.0 |
 | [b39](#b39--fqf-at-n-8-on-the-local-plumbing) | the head: FQF, 8 learned fractions (`SNEK_DIST_QUANTILES` 8) | b35's local cell, `SNEK_ALGO=fqf` | 1 × 4 | 2M steps | falsified on onset, held on the rest | not IQN's band: three of four seeds cross 90 at 1.25-1.65M (IQN at N 8 never did), best30 85 against 65, but none holds -- 71-82 after onset, 27-84% of evals below 80 -- and no checkpoint reached 97, so stage B is empty. Eight learned fractions beat eight sampled ones and still trail N 32 fixed |
 | [b38](#b38--iqn-risk-neutral-beside-trained-under-cvar-025-on-the-local-plumbing) | IQN (N = N′ 8) trained risk-neutral / under CVaR 0.25 (`SNEK_DIST_RISK_ALPHA` 0.25, `SNEK_DIST_RISK_TRAIN` 1) | b35's local cell, `SNEK_ALGO=iqn` | 2 × 4 | 2M steps | falsified | no checkpoint reached 97: the neutral cell climbs to 50% by 0.1-0.2M and sits at 55-65% to the cap (max eval 82); the CVaR-trained cell 40-54%, one seed dead from 0.9M. Zero stage-B rows, the first value batch with none. FQF at the same N 8 (b39) is drawing the same band |
 | [b37](#b37--c51-and-qr-dqn-on-the-local-plumbing) | the head: C51 (51 atoms) / QR-DQN (N 32) | b35's local cell | 2 × 4 | 3M steps | held on the plateau, split on onset | both heads hold 88-93 after onset where DQN oscillates at 72-87 (evals below 80: C51 1-6%, QR-DQN 0.3-7%, DQN 12-76%); C51 reaches 90% at 0.27-0.34M, QR-DQN not until 1.1-1.8M; best rows 96.8 / 98.0 against 96.6, no `hof5000` candidate. The head buys the hold, not the ceiling |
@@ -152,7 +154,7 @@ near the 8-hour budget.
 | cells × seeds | 2 × 4, seeds 1-8 pinned to the letter |
 | cap | 3M counted steps = 12M moves, b37's cap, so M-QR-DQN and QR-DQN read on one x-axis (QR-DQN's onset was 1.1-1.8M) |
 | control | b35's local DQN cell and b37's QR-DQN cell, each against its Munchausen twin; the two twins against each other. The term is α·clip(τ log π, l₀, 0) ∈ [−0.9, 0] a step -- up to 90% of a food reward, under 1% of the +100 win |
-| predicted | registered 2026-09-19 by the agent: M-DQN holds a steadier plateau than DQN -- the entropy-regularised target is a hold mechanism, so fewer evals below 80 and best30 above 88 -- but does not raise the best row past 97; M-QR-DQN arrives no earlier than QR-DQN and its plateau and best row are within noise of `b37e`-`h`, because QR-DQN already holds and the ceiling on this game is not in the value target |
+| predicted | registered 2026-09-19 by the agent: M-DQN holds a steadier plateau than DQN -- the entropy-regularised target is a hold mechanism, so fewer evals below 80 and best30 above 88 -- but does not raise the best row past 97; M-QR-DQN arrives no earlier than QR-DQN and its plateau and best row are within noise of `b37e`-`h`, because QR-DQN already holds and the ceiling on this game is not in the value target -- **held** (closed 2026-09-20): M-QR-DQN's onset 1.13-1.54M against QR-DQN's 1.12-1.76M, 89-93 after onset with 0-3% below 80 against 87-93 and 0-7%, the same 98.0 best row, no `hof5000` candidate on either; M-DQN steadier than DQN by a few points (13-59% below 80 against 12-76%, best30 92.1), best row 97.8 -- 0.8 over the "not past 97", one seed's 1.7-2.1M stretch, still under 98 |
 
 **Why.** Row A6 closes Group A: every rung so far changed what the critic *represents*, and Munchausen
 changes what it is *trained toward* -- an entropy-regularised, KL-damped target that the paper shows lifting
@@ -161,6 +163,15 @@ and b39 said eight sampled fractions buy neither. If the ceiling is in the targe
 this is the row that moves it. Two cells so the term is read on a scalar critic and on the best quantile
 one. Unpinned, and the desktop now runs waves of 4 (`max_trainers` 4 with this batch) because eight arms on
 the box ran each arm 3.4x slower than four; the laptop takes arms one at a time while its scheduler is up.
+
+**Learned.** The target is not where the ceiling is. Munchausen's entropy-regularised target does on this game
+exactly what it did to the hold in b37's reading of the heads: a few points fewer evals below 80 on both critics,
+a slightly denser stage B (436 rows against 346 on QR-DQN, 100 against 45 on DQN), and the same best row -- 98.0
+on the quantile critic, 97.8 on the scalar one, no checkpoint at 99.2. With A6 closed, seven rungs of Group A
+share one result: stage-B best 96.6-98.0, zero `hof5000` candidates, against PPO's 12,479 on the same observation.
+What surprised: how little the term moved *anything* on QR-DQN -- onset, plateau, best row and drawdowns all within
+a seed's spread. What it changed: FQF at N 32 is not worth a Group-A wave for the ceiling, and the question moves to
+the actor (Group B, b41).
 
 ## b39 — FQF at N 8 on the local plumbing
 

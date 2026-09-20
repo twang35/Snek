@@ -22,6 +22,52 @@ whose published artifacts are history, and the daemon's ledger, whose keys are t
 waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
 
 
+<!-- progress_update: batch b40 -->
+## Batch b40 — the `knob` sweep, 2 values x 4 seeds, 3M, closed 2026-09-20
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b37e-qrdqnlocal-seed5, b37f-qrdqnlocal-seed6, b37g-qrdqnlocal-seed7, b37h-qrdqnlocal-seed8`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| knob | rows | ≥98%/500 | per-seed share | ≥99.2 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| mdqnlocal | 100 | 0.0% | 0.0 0.0 0.0 – | 0 | 97.8 | 92.05 (88.7-96.5) | 40.0 | 0.15% | 46.17% | 0.3% |
+| mqrdqnlocal | 436 | 0.2% | 0.0 0.0 0.0 0.5 | 0 | 98.0 | 95.40 (93.6-96.5) | 53.8 | 0.0% | 11.61% | 1.6% |
+| **qrdqn** (reference) | 346 | 0.3% | 0.0 0.4 0.0 0.0 | 0 | 98.0 | 94.47 (92.4-96.9) | 56.2 | 0.0% | 13.41% | 1.3% |
+
+<!-- reading -->
+
+**Held on both cells, with one number over the line.** Read the M-QR-DQN cell first, against `b37e`-`h`: the
+Munchausen term changes almost nothing that the table can see. Onset 1.13-1.54M against QR-DQN's 1.12-1.76M; after
+crossing 90 the four seeds average 89-93 with 0-3% of evals below 80 against 87-93 and 0-7%; 436 stage-B rows
+against 346, best30 95.4 against 94.5, the same 98.0 best row, and -- the number that matters for Group A -- no
+checkpoint at 99.2, so `hof5000` and `hof30k` closed with zero rows on every arm, as every value rung has. The
+prediction ("no earlier, within noise") held. The M-DQN cell against `b35e`-`h` is the same story on a scalar
+critic: after onset 73-87 against 72-87, 13-59% of evals below 80 against 12-76%, best30 92.1 against DQN's, and
+the 100 rows against 45 are `b40b` alone (93 of them; `b40a`/`c` have 3 and 4, `b40d` none). Its 97.8 best row is
+0.8 over the "not past 97" the prediction drew, one seed's 1.7-2.1M stretch, and still under 98. What the stage-A
+traces add is the *shape* of the hold: the term does not remove the drawdowns on DQN (`b40a` spends 63% of its last
+600k below 80, `b40c` 44%), it damps them -- the same drawdowns, a few points shallower. So the target is not where
+the ceiling is either: with A6 closed, every rung of Group A -- DQN, C51, QR-DQN, IQN, FQF, M-DQN, M-QR-DQN -- has
+ended with the same stage-B best of 96.6-98.0 and no `hof5000` candidate, against PPO's 95% of rows at 98 and
+12,479 candidates on the same observation. That settles what a Group-A wave of FQF at N 32 could buy (a steadier
+plateau, not the ceiling) and hands the question to Group B's SAC (b41), which changes the *actor*.
+
+<!-- /reading -->
+
+### Every arm
+
+| arm | knob | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b40a-mdqnlocal-seed1` | mdqnlocal | 3 | 0.0% | 0 | 92.4 | 91.5 @1.4M | 28.4 | 7.89% |
+| `b40b-mdqnlocal-seed2` | mdqnlocal | 93 | 0.0% | 0 | 97.8 | 96.5 @2.1M | 44.9 | 0.0% |
+| `b40c-mdqnlocal-seed3` | mdqnlocal | 4 | 0.0% | 0 | 92.8 | 91.5 @1.6M | 44.4 | 0.17% |
+| `b40d-mdqnlocal-seed4` | mdqnlocal | 0 | – | – | – | 88.7 @2.2M | 42.2 | 0.12% |
+| `b40e-mqrdqnlocal-seed5` | mqrdqnlocal | 32 | 0.0% | 0 | 94.6 | 93.6 @2.5M | 49.3 | 0.0% |
+| `b40f-mqrdqnlocal-seed6` | mqrdqnlocal | 73 | 0.0% | 0 | 96.2 | 95.6 @1.7M | 50.6 | 0.0% |
+| `b40g-mqrdqnlocal-seed7` | mqrdqnlocal | 132 | 0.0% | 0 | 97.6 | 95.9 @1.8M | 64.2 | 0.0% |
+| `b40h-mqrdqnlocal-seed8` | mqrdqnlocal | 199 | 0.5% | 0 | 98.0 | 96.5 @2.1M | 51.2 | 0.0% |
+
+<!-- /progress_update: batch b40 -->
+
 <!-- progress_update: batch b39 -->
 ## Batch b39 — the `knob` sweep, 1 values x 4 seeds, 2M, closed 2026-09-20
 
