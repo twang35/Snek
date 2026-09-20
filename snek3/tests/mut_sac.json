@@ -93,6 +93,12 @@
    "file": "algos/sac/agent.py",
    "from": "            loss_1 = (q1_a - y) ** 2\n            loss_2 = (q2_a - y) ** 2",
    "to": "            loss_1 = F.huber_loss(q1_a, y, reduction='none', delta=1.0)\n            loss_2 = F.huber_loss(q2_a, y, reduction='none', delta=1.0)"
+  },
+  {
+   "desc": "the actor reads the critics from before their step",
+   "file": "algos/sac/agent.py",
+   "from": "        with torch.no_grad():\n            q_pi = combine(self.q1(obs), self.q2(obs), self.combine)",
+   "to": "        q_pi = combine(q1_all.detach(), q2_all.detach(), self.combine)"
   }
  ]
 }

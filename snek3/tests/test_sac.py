@@ -200,6 +200,37 @@ def test_collection_stores_each_states_entropy_and_the_replay_returns_it_with_th
     assert metrics2['entropy_penalty'] > 0.0
 
 
+def test_the_actor_is_trained_against_the_critics_as_just_updated(monkeypatch):
+    """Both papers' code steps the critics, then evaluates the actor objective on a fresh critic pass. So
+    within one update each online critic is run on `obs` twice -- once with a graph for its own loss, once
+    after its step for the actor -- and the actor's Q is the post-step value, not the pre-step one."""
+    algo, _, _ = build(monkeypatch, 'sac', SAC_CRITIC_LEARNING_RATE='0.05')   # a big critic step, so pre and post differ
+    algo.prefill()
+    batch, _, _ = algo.buffer.sample(8, 0)
+    agent = algo.agent
+    obs = torch.as_tensor(batch['obs'])
+    with torch.no_grad():
+        before = sac_agent.combine(agent.q1(obs), agent.q2(obs), agent.combine)
+    seen = []
+    def counting(module, inputs):
+        seen.append(inputs[0])
+    handles = [agent.q1.register_forward_pre_hook(counting), agent.q2.register_forward_pre_hook(counting)]
+    combined = []
+    original = sac_agent.combine
+    monkeypatch.setattr(sac_agent, 'combine', lambda a, b, how: combined.append(original(a, b, how)) or combined[-1])
+    agent.update(batch, None)
+    for handle in handles:
+        handle.remove()
+    on_obs = [t for t in seen if t.shape == obs.shape and torch.equal(t, obs)]
+    assert len(on_obs) == 4, 'each online critic ran on obs twice: its loss, then the actor'
+    with torch.no_grad():
+        after = original(agent.q1(obs), agent.q2(obs), agent.combine)
+    # combine() was called for the target (next_obs) and for the actor (obs): the actor's is the last one
+    actor_q = combined[-1]
+    assert torch.allclose(actor_q, after, atol=1e-5), 'the actor saw the critics after their step'
+    assert not torch.allclose(actor_q, before, atol=1e-5), 'and not before it (the step was large on purpose)'
+
+
 def test_the_critic_loss_is_mse_by_default_huber_by_knob_and_refuses_anything_else(monkeypatch):
     assert small_config(monkeypatch, 'sac')['sac_critic_loss'] == 'mse'
     assert small_config(monkeypatch, 'sac2')['sac_critic_loss'] == 'mse'

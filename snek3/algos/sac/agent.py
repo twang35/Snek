@@ -216,9 +216,13 @@ class SacAgent(object):
         critic_loss.backward()
         self.critic_optimizer.step()
 
-        # -- the actor, against the online critics as they stood before this step
+        # -- the actor, against the critics *as just updated*: both papers' code steps the critics and
+        # then evaluates the actor objective on a fresh critic pass (Christodoulou's SAC_Discrete,
+        # Zhou et al.'s Tianshou policy). Haarnoja's original computed both gradients from the same
+        # parameters, which is what reusing `q1_all`/`q2_all` here did until 2026-09-20 (review).
         log_pi = network.log_softmax(self.actor(obs))
-        q_pi = combine(q1_all.detach(), q2_all.detach(), self.combine)
+        with torch.no_grad():
+            q_pi = combine(self.q1(obs), self.q2(obs), self.combine)
         entropy = -(log_pi.exp() * log_pi).sum(dim=1)
         mean_entropy = entropy.mean()
         penalty = entropy_penalty(old_entropy, entropy, self.entropy_penalty).mean()

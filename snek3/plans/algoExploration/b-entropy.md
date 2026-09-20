@@ -1,10 +1,12 @@
 # Group B: entropy -- Discrete SAC, Revisiting Discrete SAC
 
 **Status: built 2026-09-20; entropy-penalty rewritten the same day** (`algos/sac/`, `sac` and `sac2` in `train.ALGOS` and `tools/restore.py`; tests `tests/test_sac.py`,
-mutants `tests/mut_sac.json` 15/15). A review (2026-09-20, another agent) found the first build's entropy-penalty was not the paper's term -- it compared
+mutants `tests/mut_sac.json` 16/16). A review (2026-09-20, another agent) found the first build's entropy-penalty was not the paper's term -- it compared
 consecutive minibatches' *mean* entropies, where the paper penalises the per-state difference between the collecting policy's entropy and the
 current one -- so B2 had not implemented Stable Discrete SAC; the replay now carries each transition's collection-time entropy and the penalty is
-per row (§B2). The same review asked for MSE in the paper cell: `SNEK_SAC_CRITIC_LOSS` (default `mse`, both papers') was added, and **b41's paper
+per row (§B2), and a second finding from the same review was taken the same day: the actor objective was evaluated on the critics *before*
+their step (Haarnoja's simultaneous form), where both papers' code steps the critics first and evaluates the actor on a fresh critic pass --
+now it does; one gradient step of staleness at these learning rates, so no reading changes. The same review asked for MSE in the paper cell: `SNEK_SAC_CRITIC_LOSS` (default `mse`, both papers') was added, and **b41's paper
 cell ran Huber** -- a stated departure, and not what killed it (α ran to 2.5 × 10⁸ with the entropy pinned at the target, a temperature failure the
 critic loss cannot produce). The local cell keeps Huber by knob. **B1 queued 2026-09-20 as b41** (`docs/runs.md`), 4 paper seeds as written + 4 local seeds
 (target entropy **0.1 · ln|A|** and snek3's replay at 0.5 updates a move), unpinned -- gate 2 found the paper's 0.98 target
