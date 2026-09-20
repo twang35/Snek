@@ -39,6 +39,11 @@ on why the arms stopped opening it, and [`findings.md`](findings.md) on the thre
 
 <!-- reading -->
 
+Live on the desktop, four arms at 0.8M of 2M. So far FQF at N 8 draws b38's picture, not b37's: 50% by
+0.1M, then a 54-63% band with no eval above 79, scores 93-93.5. The reference strip is b38's neutral IQN at
+the same N. If the band has not moved by 1.2M, the N 8 quantile rungs share one ceiling and the question is
+N, not the head.
+
 <!-- /reading -->
 
 **knob fqflocal** — `b39a`-`b39d`:
@@ -69,6 +74,13 @@ on why the arms stopped opening it, and [`findings.md`](findings.md) on the thre
 | **dqn** (reference) | 45 | 0.0% | 0.0 0.0 – – | 0 | 96.6 | 88.30 (83.1-95.6) | 27.2 | 1.46% | 74.52% | 0.1% |
 
 <!-- reading -->
+
+Every b38 trace has the same shape: a fast climb to 50% by 0.1-0.2M, then a flat, noisy band at 55-65% to
+the 2M cap with no eval above 82, while the score line sits at 93-94 with DQN's. The CVaR-trained arms
+(`b38e`-`h`) run 10-15 points lower, and `b38f` dies at 0.9M -- zero perfect games and a trailing score of
+49 from there to the cap, the only value-family arm to collapse after onset. Compare with `b37a`-`d` at
+the strip's end, which pass 90 by 0.34M on the same plumbing. No checkpoint reached 97, so there is no
+stage-B chart for this batch.
 
 <!-- /reading -->
 

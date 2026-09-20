@@ -17,6 +17,20 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### IQN at N = N′ 8 does not learn this game past a 55-65% perfect rate, and training it under CVaR 0.25 makes it worse
+
+b38 (2026-09-19, `docs/runs.md`, `docs/results.md`): eight IQN arms on b35's local plumbing, N = N′ 8, K 32, 2M counted steps
+-- four risk-neutral, four trained as Dabney et al.'s risk-sensitive agent (τ ← 0.25τ on the acting policy and the target's
+argmax). Every arm reaches 50% perfect by 0.1-0.2M, the fastest onset of any rung, then holds a flat band: 55-65% for the
+neutral cell (no eval above 82), 40-54% for the CVaR cell, with `b38f` collapsing at 0.9M to zero perfect games and a
+trailing score of 49 for its last million steps. The trailing score sits at 93.5-94.0 throughout, DQN's level, so the policy
+is competent at the game and does not finish it. No checkpoint reached stage A's 97, so stage B has zero rows -- the first
+value batch with none -- and the planned CVaR *read* of the neutral checkpoints has nothing to read. On the same plumbing C51
+passes 90 by 0.34M and QR-DQN (N 32) by 1.1-1.8M (b37), so the quantile Huber is not the problem; what differs is eight
+sampled fractions against a return with a +100 point mass. The prediction registered for the batch (neutral with b37's heads;
+CVaR later but steadier) is falsified on both halves. b39, FQF at the same N 8, is the check on N versus head and at 0.8M
+is drawing the same 54-63% band.
+
 ### A distributional head buys DQN's hold, not its ceiling: C51 and QR-DQN on snek3's plumbing keep the 90% plateau the scalar DQN loses, and neither raises the best row
 
 b37 (2026-09-18, `docs/runs.md`, `docs/results.md`): C51 (51 atoms on [−10, 110]) and QR-DQN (N 32, κ 1) on b35's local DQN

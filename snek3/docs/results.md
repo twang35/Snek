@@ -22,6 +22,52 @@ whose published artifacts are history, and the daemon's ledger, whose keys are t
 waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
 
 
+<!-- progress_update: batch b38 -->
+## Batch b38 — the `knob` sweep, 2 values x 4 seeds, 2M, closed 2026-09-19
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b35e-dqnlocal-seed5, b35f-dqnlocal-seed6, b35g-dqnlocal-seed7, b35h-dqnlocal-seed8`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| knob | rows | ≥98%/500 | per-seed share | ≥99.2 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| iqnlocal | 0 | – | – – – – | 0 | – | 65.30 (60.1-67.5) | 0.1 | 4.07% | 99.81% | 0.0% |
+| iqncvar25 | 0 | – | – – – – | 0 | – | 61.03 (55.4-66.4) | 0.0 | – | – | 0.0% |
+| **dqn** (reference) | 45 | 0.0% | 0.0 0.0 – – | 0 | 96.6 | 88.30 (83.1-95.6) | 27.2 | 1.46% | 74.52% | 0.1% |
+
+<!-- reading -->
+
+There is no table to read: **no b38 checkpoint reached stage A's 97/100**, so stage B, `hof5000` and `hof30k`
+all closed with zero rows, and the CVaR hand pass of the neutral checkpoints is moot -- there is nothing at
+the level a tail read would sharpen. Read the stage-A traces instead, against b35's local DQN and b37 at the
+same steps. IQN at N = N′ 8 rises to 50% by 0.1-0.2M, faster than any rung so far, and then stops: the
+neutral cell's quarter-means are 42 / 61 / 60 / 55 to 37 / 43 / 54 / 54 across the four seeds, no eval above
+82, trailing score 93.5-94.0 (DQN's 93.3-93.9 at the same point, so the snake is as competent at the game
+and simply does not finish it). The CVaR-trained cell is worse, as the prediction said it would be *early*
+but never recovering: 28-40% in the first quarter, 40-54% in the last for three seeds, and `b38f` collapsed
+at 0.9M to zero perfect games and a trailing score of 49 for the last million steps -- the first arm in the
+value family to die after onset. So the prediction's second half -- "a steadier plateau, fewer evals below
+80" -- is falsified, and its first half never engaged because the neutral cell did not sit with b37's heads.
+What this does not settle is *why* IQN plateaus where C51 and QR-DQN climb: N = N′ 8 is the paper's
+"appears to be sufficient", but that was on Atari returns, and an 8-sample quantile Huber against a return
+with a +100 point mass may be the whole story. b39 (FQF at the same N 8) is the check: at 0.8M its four seeds
+sit at 54-63%, the same band, the same shape.
+
+<!-- /reading -->
+
+### Every arm
+
+| arm | knob | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b38a-iqnlocal-seed1` | iqnlocal | 0 | – | – | – | 67.5 @1.2M | 0.1 | 7.82% |
+| `b38b-iqnlocal-seed2` | iqnlocal | 0 | – | – | – | 67.3 @1.8M | 0.1 | 0.31% |
+| `b38c-iqnlocal-seed3` | iqnlocal | 0 | – | – | – | 66.3 @0.3M | 0.0 | – |
+| `b38d-iqnlocal-seed4` | iqnlocal | 0 | – | – | – | 60.1 @1.2M | 0.0 | – |
+| `b38e-iqncvar25-seed5` | iqncvar25 | 0 | – | – | – | 62.7 @1.4M | 0.0 | – |
+| `b38f-iqncvar25-seed6` | iqncvar25 | 0 | – | – | – | 59.6 @0.6M | 0.0 | – |
+| `b38g-iqncvar25-seed7` | iqncvar25 | 0 | – | – | – | 55.4 @1.4M | 0.0 | – |
+| `b38h-iqncvar25-seed8` | iqncvar25 | 0 | – | – | – | 66.4 @1.0M | 0.0 | – |
+
+<!-- /progress_update: batch b38 -->
+
 <!-- progress_update: batch b37 -->
 ## Batch b37 — the `knob` sweep, 2 values x 4 seeds, 3M, closed 2026-09-18
 

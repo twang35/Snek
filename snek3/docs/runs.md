@@ -15,10 +15,11 @@ are in git history before 2026-09-10.
 
 - **Group A runs on the local plumbing** (decided 2026-09-17): b35 and b36 showed the papers' recipe does not reach
   competence in 10M moves on this game for DQN or C51, so rows A2-A4 are queued on b35's local cell (b37: C51 and QR-DQN;
-  b38: IQN neutral and CVaR-trained). b37 closed 2026-09-18: the heads buy the hold, not the ceiling. Still open: whether
-  the paper cell arrives at its full 50M-move budget (~18 h an arm); A5 (FQF, b39, queued 2026-09-18) and A6 (Munchausen),
-  which wants b38's reading for its M-best arm. The CVaR read of b38's neutral checkpoints is a hand pass
-  (`--policy-variant cvar:0.25`) once the batch closes.
+  b38: IQN neutral and CVaR-trained). b37 closed 2026-09-18: the heads buy the hold, not the ceiling. b38 closed
+  2026-09-19: IQN at N = N′ 8 plateaus at 55-65%, no checkpoint reached stage B, the CVaR-trained cell lower and one seed
+  dead; the CVaR hand pass is moot. Still open: whether N 8 is the ceiling (b39, FQF at N 8, live, drawing the same band
+  at 0.8M) or the implicit head is; whether the paper cell arrives at its full 50M-move budget (~18 h an arm); and A6
+  (Munchausen), whose M-best arm now goes on QR-DQN or C51 rather than IQN.
 - **`rp` annealed to zero after onset.** b34's per-reversal penalty gave the fastest onset and the best stability on the
   `hist8` base and cost 5 pp of plateau density; a penalty that decays to 0 by ~10M would say whether the two can be
   separated. The reversal-rate-by-fill measurement the b34 prediction named is still owed.
@@ -49,7 +50,7 @@ are in git history before 2026-09-10.
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
 | [b39](#b39--fqf-at-n-8-on-the-local-plumbing) | the head: FQF, 8 learned fractions (`SNEK_DIST_QUANTILES` 8) | b35's local cell, `SNEK_ALGO=fqf` | 1 × 4 | 2M steps | registered | — |
-| [b38](#b38--iqn-risk-neutral-beside-trained-under-cvar-025-on-the-local-plumbing) | IQN (N = N′ 8) trained risk-neutral / under CVaR 0.25 (`SNEK_DIST_RISK_ALPHA` 0.25, `SNEK_DIST_RISK_TRAIN` 1) | b35's local cell, `SNEK_ALGO=iqn` | 2 × 4 | 2M steps | registered | — |
+| [b38](#b38--iqn-risk-neutral-beside-trained-under-cvar-025-on-the-local-plumbing) | IQN (N = N′ 8) trained risk-neutral / under CVaR 0.25 (`SNEK_DIST_RISK_ALPHA` 0.25, `SNEK_DIST_RISK_TRAIN` 1) | b35's local cell, `SNEK_ALGO=iqn` | 2 × 4 | 2M steps | falsified | no checkpoint reached 97: the neutral cell climbs to 50% by 0.1-0.2M and sits at 55-65% to the cap (max eval 82); the CVaR-trained cell 40-54%, one seed dead from 0.9M. Zero stage-B rows, the first value batch with none. FQF at the same N 8 (b39) is drawing the same band |
 | [b37](#b37--c51-and-qr-dqn-on-the-local-plumbing) | the head: C51 (51 atoms) / QR-DQN (N 32) | b35's local cell | 2 × 4 | 3M steps | held on the plateau, split on onset | both heads hold 88-93 after onset where DQN oscillates at 72-87 (evals below 80: C51 1-6%, QR-DQN 0.3-7%, DQN 12-76%); C51 reaches 90% at 0.27-0.34M, QR-DQN not until 1.1-1.8M; best rows 96.8 / 98.0 against 96.6, no `hof5000` candidate. The head buys the hold, not the ceiling |
 | [b36](#b36--c51-stability-two-supports-on-the-paper-cells-plumbing) | C51's support: 51 atoms / 101 atoms on [-10, 110] | b35's paper cell, C51 head, Adam 2.5e-4 | 2 × 2 | 10M moves | registered | — |
 | [b35](#b35--dqn-the-value-familys-control-paper-cell-beside-local-cell) | the plumbing: the DQN-Adam paper cell (batch 32, 1M uniform replay, target 2,000 updates, ε linear 1 → 0.01, no shield, no fork) beside snek3's DQN defaults (PER, fork 4, shield, eval-driven ε) | hist8 observation and b27's reward, `fc 320` | 2 × 4 | 10M moves / 3M steps | falsified on local, held on paper | paper: 7-16% perfect at 10M moves, still rising, no stage B; local: 90% by 0.6-1.6M then a 71-88% oscillation, 45 stage-B rows, best 96.6, none at 98. The plumbing is the whole gap; neither is near PPO's 95% |
@@ -143,11 +144,18 @@ so a cell still at zero perfect at 500k is stopped.
 | cells × seeds | 2 × 4, seeds 1-8 pinned to the letter |
 | cap | **2M** counted steps = 8M moves: b35's local cell reached 90% by 0.6-1.6M and its plateau is what is read, and 3M at IQN's rate is a day an arm |
 | control | b35's local DQN cell; b37's two heads; the two cells against each other. The CVaR *read* of the neutral checkpoints (`tools.closeout --policy-variant cvar:0.25`) is a hand pass after the batch closes |
-| predicted | registered 2026-09-17 by the agent: the neutral cell sits with b37's heads; the CVaR-trained cell arrives later (it under-explores the food-seeking moves a neutral policy takes) but holds a steadier plateau -- fewer evals below 80, a higher stage-A share at ≥98 -- which is the tail-risk diagnosis showing through |
+| predicted | registered 2026-09-17 by the agent: the neutral cell sits with b37's heads; the CVaR-trained cell arrives later (it under-explores the food-seeking moves a neutral policy takes) but holds a steadier plateau -- fewer evals below 80, a higher stage-A share at ≥98 -- which is the tail-risk diagnosis showing through -- **falsified** (closed 2026-09-19): the neutral cell never sat with b37's heads (55-65% at the cap against C51's 88-91), and the CVaR-trained cell was lower throughout, 40-54% for three seeds with `b38f` collapsing to zero at 0.9M; no checkpoint reached stage A's 97 in either cell |
 
 **Why.** Row A4 is the row Group A exists for: acting on the low quantiles is the one thing a scalar
 critic cannot do, and it is the most direct test of the diagnosis that the failures are rare fatal
 moves rather than noisy returns. It runs on the local plumbing for the reason b37 does.
+
+**Learned.** IQN at N = N′ 8 does not learn this game past 65%: every arm climbs to 50% within 0.2M --
+faster than any rung yet -- and then holds a flat 55-65% band to 2M with the score line at DQN's 93-94, so
+the snake plays but does not finish. Training under CVaR 0.25 made it worse, not steadier, and killed one
+seed. No checkpoint reached 97, so stage B is empty and the CVaR hand pass is moot. The open question is
+whether the ceiling is N 8 -- eight samples against a +100 point mass -- or the implicit head itself; b39
+(FQF, N 8) is the first half of that answer and is drawing the same band.
 
 ## b37 — C51 and QR-DQN on the local plumbing
 
