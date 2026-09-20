@@ -27,11 +27,12 @@ ARCH_FILENAME = 'arch.json'
 FIELDS = ('algo', 'fc_layer_params', 'num_actions', 'obs_len', 'obs_era')
 
 # Fields an algorithm may add when its network has more shape than the five above describe -- a
-# distributional head's atoms and support, its quantile count, its embedding width. Written only when
+# distributional head's atoms and support, its quantile count, its embedding width; `trunk` (group C,
+# 2026-09-20) the flags that shape the body -- dueling streams, noisy layers, the residual stack. Written only when
 # present, so every sidecar that predates them reads unchanged, and **part of the signature**, so a
 # checkpoint cannot load into a differently shaped head silently (2026-09-17, group A of
 # `plans/algoExploration/`). Absence means the scalar head every `dqn` and `ppo` checkpoint has.
-OPTIONAL_FIELDS = ('head',)
+OPTIONAL_FIELDS = ('head', 'trunk')
 
 
 class ArchMismatch(Exception):
@@ -45,7 +46,7 @@ def arch_path(policy_dir):
     return os.path.join(policy_dir, ARCH_FILENAME)
 
 
-def build_arch(fc_layer_params, num_actions, obs_len, obs_era, algo='dqn', head=None):
+def build_arch(fc_layer_params, num_actions, obs_len, obs_era, algo='dqn', head=None, trunk=None):
     """The canonical dict.
 
     `fc_layer_params` is stored as a list of ints, because JSON has no tuples and every reader
@@ -60,6 +61,8 @@ def build_arch(fc_layer_params, num_actions, obs_len, obs_era, algo='dqn', head=
             'obs_era': str(obs_era)}
     if head is not None:
         arch['head'] = dict(head)
+    if trunk is not None:
+        arch['trunk'] = dict(trunk)
     return arch
 
 

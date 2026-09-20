@@ -51,6 +51,8 @@ from algos.dist import iqn as iqn_algo
 from algos.dist import qrdqn as qrdqn_algo
 from algos.dqn import algo as dqn_algo
 from algos.ppo import algo as ppo_algo
+from algos.rainbow import btr as btr_algo
+from algos.rainbow import rainbow as rainbow_algo
 # For `trailing_mean` only, which is a plain windowed average over the eval rows and is not about
 # epsilon. It lives beside the epsilon schedule because that is its other caller; when `algos/ppo/` lands
 # and needs the same trailing score, it moves somewhere both algorithms can reach without one
@@ -71,7 +73,8 @@ from vectorized import engine
 # reason `tools/restore.py` gives for the same shape: adding PPO is one line, and an unrecognised
 # value names itself in the error instead of falling through to a default.
 ALGOS = {module.NAME: module for module in
-         (dqn_algo, ppo_algo, c51_algo, qrdqn_algo, iqn_algo, fqf_algo, sac_algo, sac2_algo)}
+         (dqn_algo, ppo_algo, c51_algo, qrdqn_algo, iqn_algo, fqf_algo, sac_algo, sac2_algo,
+          rainbow_algo, btr_algo)}
 
 # ---------------------------------------------------------------- config
 

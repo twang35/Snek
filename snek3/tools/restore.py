@@ -45,6 +45,13 @@ def _dist():
     return network
 
 
+def _rainbow():
+    # Rainbow and Beyond the Rainbow: one module, `arch['head']` and `arch['trunk']` say what it builds;
+    # its greedy read has the noise off.
+    from algos.rainbow import net as network
+    return network
+
+
 def _sac():
     # A SAC checkpoint is the actor alone -- DQN's `QNet` read as logits, as PPO's is -- so its module's
     # `build` and `greedy_policy_fn` are PPO's, and `sac`/`sac2` need no sidecar field.
@@ -53,7 +60,7 @@ def _sac():
 
 
 ALGORITHMS = {'dqn': _dqn, 'ppo': _ppo, 'c51': _dist, 'qrdqn': _dist, 'iqn': _dist, 'fqf': _dist,
-              'sac': _sac, 'sac2': _sac}
+              'sac': _sac, 'sac2': _sac, 'rainbow': _rainbow, 'btr': _rainbow}
 
 
 def _module_for(arch):

@@ -1,6 +1,8 @@
 # Group C: the value stack -- Rainbow, Beyond the Rainbow
 
-**Status: planned 2026-09-16, nothing built** (no `algos/rainbow/`, no `DuelingTrunk`, no `NoisyLinear`, no tests). **Where each piece and each row stands is the `status` column of §1 and §3 and the gate table of §4** (added 2026-09-20, on the same rule as `a-return-tail.md`: a cell is filled in the pass that does the work, and an empty cell means *not done*, not *passed*). Group C of [`algorithm-series.md`](algorithm-series.md);
+**Status: built 2026-09-20, nothing queued** (`algos/rainbow/`: `noisy.py`, `net.py`, `agent.py`, `algo.py`, the names `rainbow` and `btr` in
+`train.ALGOS` and `tools/restore.py`; `tests/test_rainbow.py`, mutants `tests/mut_rainbow.json`, 14 of 14 killed). Gates 1, 2, 3 and 5 passed the same day
+(§4); **C1 is not queued until B2 has been queued** (decided 2026-09-20) and its tuning wave has run. Originally: planned 2026-09-16, nothing built. **Where each piece and each row stands is the `status` column of §1 and §3 and the gate table of §4** (added 2026-09-20, on the same rule as `a-return-tail.md`: a cell is filled in the pass that does the work, and an empty cell means *not done*, not *passed*). Group C of [`algorithm-series.md`](algorithm-series.md);
 conventions in [`README.md`](README.md). Phase 4 of the running order, after Group B (SAC); waits for Group A to close -- as of 2026-09-20 A1-A5 are closed (b39 closed today: FQF climbs where IQN flattened but never holds, stage B empty) and A6 (b40) is live on the laptop.
 
 **Decided 2026-09-20, before implementation** (the questions raised when the plan was re-read against the code):
@@ -11,6 +13,17 @@ conventions in [`README.md`](README.md). Phase 4 of the running order, after Gro
 | **C2 runs a paper cell and a local cell** | the paper's IQN 8 head plateaued at 55-65% in A4 with no stage-B checkpoint, so C2 as the paper alone might only repeat A4. The second cell of the wave is BTR's stack on the settings Group A's local cells found better, with A3's QR-DQN N 32 head (§2b, last paragraph); the layer-norm variant moves to the C2 ablation |
 | **C1's paper cell is kept** | Group A's rule drops the paper cell after two rows show the same sign, and every A paper cell trailed. C1's is kept for 4 seeds because it is the only cell where noisy nets replace the shield and the fork, which is the row's question; revisited if it reads like A1 paper |
 | **C builds `DuelingTrunk`** | it was D1's (BBF, then phase 1, unbuilt; now phase 5, after this group). C owns it in `algos/rainbow/net.py`; D1 imports the scalar form if its second wave wants dueling |
+
+**Decided 2026-09-20, at implementation** (the questions the code raised):
+
+| decision | what it changes |
+|---|---|
+| **the noise is on while collecting** | the plan said "zeroed for the greedy `policy_fn`", but the collector acts through the agent's greedy read, so with epsilon 0 that would have left the paper cell with no exploration at all. `RainbowAgent.greedy_actions` is a noisy forward, a fresh draw per act, as Rainbow and Dopamine act; stage A, restore, `watch.py` and every pass read the `mu` weights (`net.greedy_policy_fn`, noise off inside every call) |
+| **a separate package, and `algos/dqn/`, `algos/dist/` are imported, not edited** | Group A's heads build their own `QNet` and read features by walking it, so dueling and a residual trunk could not be composed onto them from outside. `algos/rainbow/net.py` is its own network offering the reads `DistAgent` calls, so the losses are still A's to the line; `build_config` is this module's because the defaults are the papers' and the epsilon floor is conditional on the noisy flag |
+| **the paper cell is as close to the paper as the game allows** | every `rainbow` and `btr` default is the paper's value from §2b; a spec states only what departs. Two names, one module, so `btr` at Rainbow's flags is `rainbow` weight for weight (gate 2) |
+| **the target net stays in eval mode** | a spectral-normed linear runs a power iteration on every training-mode forward, so a target in train mode drifted between copies; its `_u`/`_v` arrive with each hard copy and its normalised weight is the online net's at the copy. The power-iteration vectors are drawn from the arm's seeded generator, so a seed pins the whole state dict |
+| **`SNEK_RAINBOW_EPSILON_ZERO_AT` is a fraction of the run's moves** | `max_steps` x lanes; 0.5 for `btr`, 0 (never) for `rainbow`. With the eval-driven schedule it does nothing |
+| **the knob-naming test covers every registered algorithm** | it read `train.py` and `algos/dqn/algo.py` only, so the dist and SAC knobs were never checked; now parametrised over `train.ALGOS` and reading every module under `algos/` |
 
 The question: does the strongest single-box stack of value-learning tricks beat the PPO incumbent on
 this game? C is read against A. If C2 beats C1 by about what IQN plus Munchausen beat C51 by in Group A,
@@ -24,14 +37,14 @@ composition and the one ingredient nothing earlier builds: **noisy nets**. Dueli
 
 | shared piece | status | decision |
 |---|---|---|
-| package | not built | `algos/rainbow/`, one `algo.py` with two `NAME`s, `rainbow` and `btr`, over a `net.py` that assembles the trunk from flags. Not two packages: BTR is Rainbow with different flags and a different head, and the flags are the experiment |
+| package | **built 2026-09-20** | `algos/rainbow/`, one `algo.py` with two names, `rainbow` and `btr` (each a thin module, as the registry maps `module.NAME`), over a `net.py` that assembles the trunk from flags. Not two packages: BTR is Rainbow with different flags and a different head, and the flags are the experiment |
 | the head | **exists** (A, built 2026-09-17) | Group A's `algos/dist/heads.py` -- `Categorical` for Rainbow, `Implicit` for BTR. Nothing distributional is written here |
 | the loss | **exists** (A; Munchausen knobs built with A6, batch b40 queued 2026-09-19) | Group A's losses, with Munchausen's knobs from A6 available to both rows (on for BTR, off for Rainbow, as the papers have them). **BTR drops double-Q**: with Munchausen's soft target there is no separate argmax to decouple, and the paper's Table 1 lists it as removed; `SNEK_RAINBOW_DOUBLE` (1 for `rainbow`, 0 for `btr`) |
 | replay, collection, schedules | **exists** | `algos/dqn/`'s, including n-step (already `SNEK_N_STEP_UPDATE`) and PER (already on). `algos/dqn/` does not change |
-| the sidecar | `head` exists; `trunk` not built | `head` from Group A plus `trunk`: `{"dueling": true, "noisy": true, "residual": false}` for Rainbow or `{"dueling": true, "noisy": true, "residual": true, "blocks": 3, "spectral": true, "layer_norm": false}` for BTR. In the signature |
-| restore | not built | two entries; both greedy over the head's mean, noise off at act time |
-| the step | exists for C1; C2's `collect_envs`-per-step change not built | DQN's |
-| the ε floor | not built | `SNEK_RAINBOW_NOISY=1` lifts `EPSILON_HARD_FLOOR` so `min_epsilon` 0 is legal; refused as before with noisy off (decided 2026-09-20, above) |
+| the sidecar | **built** (`tools/arch.py` `OPTIONAL_FIELDS`, in the signature) | `head` from Group A plus `trunk`: `{"dueling": true, "noisy": true, "residual": false}` for Rainbow or `{"dueling": true, "noisy": true, "residual": true, "blocks": 3, "spectral": true, "layer_norm": false}` for BTR. In the signature |
+| restore | **built** | two entries; both greedy over the head's mean, noise off |
+| the step | **exists for both** | DQN's: one counted step is one `collector.step()`, which at `collect_envs` 64 is 64 moves, and `advance()` already reports both |
+| the ε floor | **built** | `SNEK_RAINBOW_NOISY=1` lifts `EPSILON_HARD_FLOOR` so `min_epsilon` 0 is legal; refused as before with noisy off (decided 2026-09-20, above). In `algos/rainbow/algo.py`'s own `build_config`, since DQN's validation cannot see the flag |
 
 ## 2. The rows
 
@@ -132,9 +145,9 @@ collection is therefore one of the things the two cells differ in, and the C2 ab
 
 | batch | status | arms | base | read against | judged on |
 |---|---|---|---|---|---|
-| C1 | **waiting**: on `DuelingTrunk` and `NoisyLinear` (both C's, not built) and on A6 closing (gate 4); **the paper cell is kept** (decided 2026-09-20, above) | 4 seeds `rainbow` **paper** (§2b) + 4 seeds `rainbow` **local** (A1's local plumbing under the Rainbow head and flags) | the reference's reward, history and trunk | A2's two cells and PPO's `hist8` table | stage-B density, `hof5000`, `hof30k`, drawdowns |
+| C1 | **built, waiting to queue**: A6 (b40) closed 2026-09-20; **C1 waits for B2 to be queued** (decided 2026-09-20), then its tuning wave; **the paper cell is kept** (decided 2026-09-20, above) | 4 seeds `rainbow` **paper** (§2b) + 4 seeds `rainbow` **local** (A1's local plumbing under the Rainbow head and flags) | the reference's reward, history and trunk | A2's two cells and PPO's `hist8` table | stage-B density, `hof5000`, `hof30k`, drawdowns |
 | C1 ablation | **waiting** on C1 | 4 seeds paper with noisy off (ε 1 → 0.01 over the first **250k frames = 62.5k moves**, the paper's own non-noisy ablation) | C1 paper | C1 paper | whether noisy nets matter here |
-| C2 | **waiting** on C1 closing; `ResidualTrunk` and the wide-collection step not built | 4 seeds `btr` **paper** (§2b, the paper's collection, IQN 8) + 4 seeds `btr` **local** (§2b's last paragraph: A's local plumbing and the QR-DQN N 32 head) | the reference's reward and history | paper: C1 paper and A4 + A6; local: C1 local and A3 + A6 | as C1 |
+| C2 | **built** (`btr`, residual trunk, 64-lane collection); **waiting** on C1 closing | 4 seeds `btr` **paper** (§2b, the paper's collection, IQN 8) + 4 seeds `btr` **local** (§2b's last paragraph: A's local plumbing and the QR-DQN N 32 head) | the reference's reward and history | paper: C1 paper and A4 + A6; local: C1 local and A3 + A6 | as C1 |
 | C2 ablation | **waiting** on C2 | 4 seeds with the plain `QNet` trunk in place of the residual one + 4 seeds with spectral norm off; `SNEK_BTR_LAYER_NORM=1` (the paper's post-submission variant) as a third pair if the wave has room | C2 | C2 | is the trunk the difference, and is it the norm |
 
 The two ablations are what make the group readable: without them C2 minus C1 is one number with four
@@ -147,11 +160,11 @@ changes behind it. They are cheap because they are flag flips on arms that have 
 
 | gate | C1 Rainbow | C1 ablation | C2 BTR | C2 ablation |
 |---|---|---|---|---|
-| 1 smoke, checkpoint, restore (both names) | not run (nothing to run) | -- | not run | -- |
-| 2 `btr` equals `rainbow` at Rainbow's flags | -- | -- | not run | -- |
-| 3 mutation spec kills every mutant | no spec yet | -- | no spec yet | -- |
-| 4 predecessor closed; tuning wave done | A2 closed 2026-09-18; **A6 open** (b40 live); tuning wave not run | C1 not closed | C1 not closed | C2 not closed |
-| 5 `SNEK_MIN_EPSILON=0` refused with noisy off, accepted with noisy on | not run | -- | not run | -- |
+| 1 smoke, checkpoint, restore (both names) | **passed 2026-09-20** (`rainbow-smoke`, 3,000 steps, 6 checkpoints, `tools.restore` loads the last) | -- | **passed 2026-09-20** (`btr-smoke`, 64 lanes, 41 st/s on the laptop, 6 checkpoints, restored) | -- |
+| 2 `btr` equals `rainbow` at Rainbow's flags | -- | -- | **passed** (`test_btr_at_rainbows_flags_is_rainbow_weight_for_weight`) | -- |
+| 3 mutation spec kills every mutant | **passed**, 14/14 (`tests/mut_rainbow.json`) | -- | same spec | -- |
+| 4 predecessor closed; tuning wave done | A2 closed 2026-09-18; A6 closed 2026-09-20 (b40); **B2 not yet queued**; tuning wave not run | C1 not closed | C1 not closed | C2 not closed |
+| 5 `SNEK_MIN_EPSILON=0` refused with noisy off, accepted with noisy on | **passed** (`test_min_epsilon_zero_is_refused_with_noisy_off_and_accepted_with_it_on`) | -- | same test | -- |
 
 1. Smoke as in `a-return-tail.md` §4, for both names.
 2. The `btr`-equals-`rainbow` fixture at Rainbow's flags passes, so the ablations are exact.

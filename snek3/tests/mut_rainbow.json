@@ -1,0 +1,91 @@
+{
+ "tests": [
+  "tests/test_rainbow.py"
+ ],
+ "mutations": [
+  {
+   "desc": "the dueling mean taken over the atom axis instead of the action axis",
+   "file": "algos/rainbow/net.py",
+   "from": "        return value + advantage - advantage.mean(dim=-2, keepdim=True)",
+   "to": "        return value + advantage - advantage.mean(dim=-1, keepdim=True)"
+  },
+  {
+   "desc": "the value stream broadcast along the wrong axis",
+   "file": "algos/rainbow/net.py",
+   "from": "        value = self.value(features).view(*lead, 1, self.outputs)",
+   "to": "        value = self.value(features).view(*lead, self.outputs, 1)"
+  },
+  {
+   "desc": "the greedy policy function leaves the noise on",
+   "file": "algos/rainbow/net.py",
+   "from": "    def policy_fn(observations):\n        set_noise(net, False)",
+   "to": "    def policy_fn(observations):\n        set_noise(net, True)"
+  },
+  {
+   "desc": "noise not resampled per forward",
+   "file": "algos/rainbow/noisy.py",
+   "from": "        weight_epsilon, bias_epsilon = self.resample()\n        return F.linear(inputs, self.weight_mu + self.weight_sigma * weight_epsilon,",
+   "to": "        weight_epsilon, bias_epsilon = torch.zeros_like(self.weight_mu), torch.zeros_like(self.bias_mu)\n        return F.linear(inputs, self.weight_mu + self.weight_sigma * weight_epsilon,"
+  },
+  {
+   "desc": "the residual add dropped",
+   "file": "algos/rainbow/net.py",
+   "from": "        return inputs + hidden",
+   "to": "        return hidden"
+  },
+  {
+   "desc": "spectral norm applied to the head streams",
+   "file": "algos/rainbow/net.py",
+   "from": "    linear = nn.Linear(in_features, out_features)\n    _head_init(linear, generator)\n    return linear",
+   "to": "    linear = nn.Linear(in_features, out_features)\n    _head_init(linear, generator)\n    return parametrizations.spectral_norm(linear)"
+  },
+  {
+   "desc": "the agent acts with the noise off",
+   "file": "algos/rainbow/agent.py",
+   "from": "        self.net.eval()\n        network.set_noise(self.net, self.noisy)",
+   "to": "        self.net.eval()\n        network.set_noise(self.net, False)"
+  },
+  {
+   "desc": "the double flag ignored: the online argmax always",
+   "file": "algos/rainbow/agent.py",
+   "from": "    def _double_q_target_action(self, next_obs):\n        if self.double:",
+   "to": "    def _double_q_target_action(self, next_obs):\n        if True:"
+  },
+  {
+   "desc": "the mixture ignores the double flag",
+   "file": "algos/rainbow/agent.py",
+   "from": "        if self.double or self.munchausen_alpha > 0.0:",
+   "to": "        if True:"
+  },
+  {
+   "desc": "the wrong tau count handed to the target",
+   "file": "algos/rainbow/algo.py",
+   "from": "                                  n_tau_prime=config['dist_tau_prime_samples'])",
+   "to": "                                  n_tau_prime=config['dist_tau_samples'])"
+  },
+  {
+   "desc": "epsilon zeroed one move late",
+   "file": "algos/rainbow/algo.py",
+   "from": "        if self.epsilon_zero_after > 0 and self.moves >= self.epsilon_zero_after:",
+   "to": "        if self.epsilon_zero_after > 0 and self.moves > self.epsilon_zero_after:"
+  },
+  {
+   "desc": "the zero point counts steps, not moves",
+   "file": "algos/rainbow/algo.py",
+   "from": "        self.epsilon_zero_after = int(round(fraction * int(config.get('max_steps', 0)) * lanes)) if fraction > 0.0 else 0",
+   "to": "        self.epsilon_zero_after = int(round(fraction * int(config.get('max_steps', 0)))) if fraction > 0.0 else 0"
+  },
+  {
+   "desc": "the epsilon floor lifted regardless of the noisy flag",
+   "file": "algos/rainbow/algo.py",
+   "from": "    if not config['rainbow_noisy'] and config['min_epsilon'] < schedules.EPSILON_HARD_FLOOR:",
+   "to": "    if False and config['min_epsilon'] < schedules.EPSILON_HARD_FLOOR:"
+  },
+  {
+   "desc": "btr's paper defaults swapped for rainbow's",
+   "file": "algos/rainbow/algo.py",
+   "from": "    paper = PAPER[name]",
+   "to": "    paper = PAPER['rainbow']"
+  }
+ ]
+}

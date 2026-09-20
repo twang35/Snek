@@ -106,18 +106,22 @@ def test_the_default_architecture_is_the_one_every_record_holder_used():
     assert train.build_config()['fc_layers'] == (320,)
 
 
-def test_every_config_key_is_its_knob_lowercased():
+@pytest.mark.parametrize('name', sorted(train.ALGOS))
+def test_every_config_key_is_its_knob_lowercased(name, monkeypatch):
     """So a row in `runs/<arm>.md` can be grepped straight back to the variable that set it.
 
-    Checked by reading the `tuned(...)` calls out of this module's own source, which is the only way
-    to catch a key that was renamed without its knob or the reverse.
+    Checked by reading the `tuned(...)` calls out of the sources, which is the only way to catch a key
+    that was renamed without its knob or the reverse. **Every registered algorithm, and every module
+    under `algos/`**: until 2026-09-20 this read `train.py` and `algos/dqn/algo.py` only, so the dist and
+    SAC knobs were never checked.
     """
+    import glob
     import re
-    # **Both modules, because the knobs now live in two files.** `train.py` reads what is not
-    # algorithm-specific and `algos/dqn/algo.py` reads the rest; a test that looked at only one would pass
-    # while every DQN row in the report was unmatched.
-    source = open(train.__file__).read() + open(dqn_algo.__file__).read()
-    knobs = {name.lower() for name in re.findall(r"tuned\('([A-Z0-9_]+)'", source)}
+    sources = [train.__file__] + sorted(glob.glob(os.path.join(os.path.dirname(train.__file__), 'algos', '**', '*.py'),
+                                                  recursive=True))
+    source = ''.join(open(path).read() for path in sources)
+    knobs = {knob.lower() for knob in re.findall(r"tuned\('([A-Z0-9_]+)'", source)}
+    monkeypatch.setenv('SNEK_ALGO', name)
     keys = set(train.build_config())
     # `algo` and `min_checkpoint_score` are not `tuned()` calls — one is fixed, the other is read in
     # `env/constants.py` so the eval workers inherit it.
