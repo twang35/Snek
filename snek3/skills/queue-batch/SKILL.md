@@ -27,9 +27,15 @@ cd /Users/tony_wang/Projects/Snek
 git fetch origin ops
 git worktree prune          # drop worktrees whose directory is gone
 OPS=$(git worktree list --porcelain | awk '/^worktree /{p=substr($0,10)} /^branch refs\/heads\/ops$/{print p}')
-[ -n "$OPS" ] || { git worktree add /tmp/snek-ops-wt ops && OPS=/tmp/snek-ops-wt; }
+[ -n "$OPS" ] || { git worktree add /Users/tony_wang/.snek3-laptop/ops ops && OPS=/Users/tony_wang/.snek3-laptop/ops; }
 git -C "$OPS" merge --ff-only origin/ops && echo "ops worktree: $OPS"
 ```
+
+**Not under `/tmp`.** macOS clears files under `/tmp` that have not been touched for three days but leaves the
+directories, so a worktree there turns into a hollow tree with no `.git` file: on 2026-09-19 the `ops` worktree
+at `/tmp/snek-ops-wt` still had its directories, took eight new specs, and then `git -C` said "not a git
+repository". `git worktree list` shows such a worktree as `prunable`. It lives beside the scheduler's own
+worktrees under `~/.snek3-laptop/` for that reason.
 
 **`substr($0,10)` rather than `$2`, and that is not a style choice.** Invoking a skill with arguments
 substitutes `$1`, `$2`, ... inside its body, including inside fenced code — measured when a skill

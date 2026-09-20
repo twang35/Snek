@@ -49,6 +49,7 @@ are in git history before 2026-09-10.
 
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
+| [b40](#b40--munchausen-on-the-local-plumbing-m-dqn-beside-m-qr-dqn) | the value target: Munchausen's log-policy reward term and soft target (`SNEK_MUNCHAUSEN_ALPHA` 0.9, `_TAU` 0.03, `_L0` -1) on DQN / on QR-DQN N 32 | b35's local cell / b37's QR-DQN cell | 2 × 4 | 3M steps | registered | — |
 | [b39](#b39--fqf-at-n-8-on-the-local-plumbing) | the head: FQF, 8 learned fractions (`SNEK_DIST_QUANTILES` 8) | b35's local cell, `SNEK_ALGO=fqf` | 1 × 4 | 2M steps | registered | — |
 | [b38](#b38--iqn-risk-neutral-beside-trained-under-cvar-025-on-the-local-plumbing) | IQN (N = N′ 8) trained risk-neutral / under CVaR 0.25 (`SNEK_DIST_RISK_ALPHA` 0.25, `SNEK_DIST_RISK_TRAIN` 1) | b35's local cell, `SNEK_ALGO=iqn` | 2 × 4 | 2M steps | falsified | no checkpoint reached 97: the neutral cell climbs to 50% by 0.1-0.2M and sits at 55-65% to the cap (max eval 82); the CVaR-trained cell 40-54%, one seed dead from 0.9M. Zero stage-B rows, the first value batch with none. FQF at the same N 8 (b39) is drawing the same band |
 | [b37](#b37--c51-and-qr-dqn-on-the-local-plumbing) | the head: C51 (51 atoms) / QR-DQN (N 32) | b35's local cell | 2 × 4 | 3M steps | held on the plateau, split on onset | both heads hold 88-93 after onset where DQN oscillates at 72-87 (evals below 80: C51 1-6%, QR-DQN 0.3-7%, DQN 12-76%); C51 reaches 90% at 0.27-0.34M, QR-DQN not until 1.1-1.8M; best rows 96.8 / 98.0 against 96.6, no `hof5000` candidate. The head buys the hold, not the ceiling |
@@ -114,6 +115,25 @@ evals below 50% and 80%), then best30. `hof5000` re-measures the top rows at 5,0
 at complete separation (Mann-Whitney p=0.029). Details in [`protocol.md`](protocol.md).
 
 ---
+
+## b40 — Munchausen on the local plumbing: M-DQN beside M-QR-DQN
+
+| | |
+|---|---|
+| base | b35's local cell (`b35e`-`b35h`'s knobs, verbatim: hist8, b27's reward, `fc 320`, γ 0.99, lr 1e-5, batch 128, 100k PER 0.6, target every 8 updates, the eval-driven ε with shield 0.8 and fork 4), with Munchausen's two changes to the value target: the clipped, τ-scaled log-policy of the taken action added to the reward, and a soft (log-sum-exp) bootstrap in place of the double-Q argmax. `SNEK_MUNCHAUSEN_ALPHA=0.9`, `SNEK_MUNCHAUSEN_TAU=0.03`, `SNEK_MUNCHAUSEN_L0=-1`, the paper's values; ε-greedy acting, 1-step |
+| varies | the head under the term. **mdqnlocal** (`b40a`-`b40d`): `SNEK_ALGO=dqn`, M-DQN. **mqrdqnlocal** (`b40e`-`b40h`): `SNEK_ALGO=qrdqn`, N 32, κ 1 -- M-QR-DQN, the "M-best" arm on the rung with the densest stage B of A2-A5 (b37's QR-DQN, 346 rows, best 98.0; C51 239 / 96.8; IQN and FQF at N 8 none) |
+| cells × seeds | 2 × 4, seeds 1-8 pinned to the letter |
+| cap | 3M counted steps = 12M moves, b37's cap, so M-QR-DQN and QR-DQN read on one x-axis (QR-DQN's onset was 1.1-1.8M) |
+| control | b35's local DQN cell and b37's QR-DQN cell, each against its Munchausen twin; the two twins against each other. The term is α·clip(τ log π, l₀, 0) ∈ [−0.9, 0] a step -- up to 90% of a food reward, under 1% of the +100 win |
+| predicted | registered 2026-09-19 by the agent: M-DQN holds a steadier plateau than DQN -- the entropy-regularised target is a hold mechanism, so fewer evals below 80 and best30 above 88 -- but does not raise the best row past 97; M-QR-DQN arrives no earlier than QR-DQN and its plateau and best row are within noise of `b37e`-`h`, because QR-DQN already holds and the ceiling on this game is not in the value target |
+
+**Why.** Row A6 closes Group A: every rung so far changed what the critic *represents*, and Munchausen
+changes what it is *trained toward* -- an entropy-regularised, KL-damped target that the paper shows lifting
+DQN to Rainbow's level and IQN past it. b37 said the distribution buys the hold and not the ceiling; b38
+and b39 said eight sampled fractions buy neither. If the ceiling is in the target rather than the head,
+this is the row that moves it. Two cells so the term is read on a scalar critic and on the best quantile
+one. Unpinned, and the desktop now runs waves of 4 (`max_trainers` 4 with this batch) because eight arms on
+the box ran each arm 3.4x slower than four; the laptop takes arms one at a time while its scheduler is up.
 
 ## b39 — FQF at N 8 on the local plumbing
 
