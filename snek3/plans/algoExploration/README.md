@@ -6,11 +6,11 @@ implementation plan here, and every plan leans on the conventions below rather t
 | plan | group | rows |
 |---|---|---|
 | [`a-return-tail.md`](a-return-tail.md) | A | DQN, C51, QR-DQN, IQN, FQF, Munchausen |
-| [`b-value-stack.md`](b-value-stack.md) | B | Rainbow, Beyond the Rainbow |
+| [`b-data-efficiency.md`](b-data-efficiency.md) | B | BBF |
 | [`c-entropy.md`](c-entropy.md) | C | Discrete SAC, Revisiting Discrete SAC |
-| [`d-memory.md`](d-memory.md) | D | recurrent PPO, R2D2 |
-| [`e-exploration.md`](e-exploration.md) | E | NGU, Agent57 |
-| [`f-data-efficiency.md`](f-data-efficiency.md) | F | BBF |
+| [`d-value-stack.md`](d-value-stack.md) | D | Rainbow, Beyond the Rainbow |
+| [`e-memory.md`](e-memory.md) | E | recurrent PPO, R2D2 |
+| [`f-exploration.md`](f-exploration.md) | F | NGU, Agent57 |
 | [`g-planning.md`](g-planning.md) | G | AlphaZero-style MCTS, MuZero, EfficientZero V2, Muesli |
 | [`h-gdi.md`](h-gdi.md) | H | GDI / LBC |
 
@@ -25,7 +25,7 @@ These are the rules the codebase already enforces; a plan says only where its al
 | knobs | every config key is its `SNEK_` variable lowercased, prefixed with the algorithm's name where the meaning is not shared (`SNEK_PPO_LEARNING_RATE`); `COLLECT_ENVS` and `DISCOUNT` are shared names. **Another algorithm's knobs are refused by name, never ignored** (`algos/ppo/algo.py` §2) | `test_every_config_key_is_its_knob_lowercased`; a `REJECTED` tuple per module |
 | the sidecar | `arch.json` carries `algo`, `fc_layer_params`, `num_actions`, `obs_len`, `obs_era`. An algorithm whose network has more shape than that (atoms, quantiles, a recurrent width) **adds a field**, and `tools/arch.py`'s signature includes it, so a checkpoint cannot load into the wrong head silently | `tools/arch.py` `write_arch` refuses a different signature |
 | restore | one entry in `tools/restore.ALGORITHMS` returning a module with `build(arch, device)` and a greedy policy. Every shard, `watch.py`, `record_gif.py` and the HOF tooling load through it and nothing else | `tools/restore.py` |
-| the policy seam | `policy_fn` is `(m, obs_len) float32 -> (m,) int64`, stateless, over the rows the engine hands it. `vectorized/` imports no torch. **Two groups need more than this** (D and E need per-row state, G needs the board) and the extension is designed once, in `d-memory.md` §1 and `g-planning.md` §1, and reused | `tests/test_module_layering.py` |
+| the policy seam | `policy_fn` is `(m, obs_len) float32 -> (m,) int64`, stateless, over the rows the engine hands it. `vectorized/` imports no torch. **Two groups need more than this** (D and E need per-row state, G needs the board) and the extension is designed once, in `e-memory.md` §1 and `g-planning.md` §1, and reused | `tests/test_module_layering.py` |
 | a step | `step_granularity` says what a counted step is; `advance()` returns `(steps, transitions)` and every row carries `transitions`. A plan states what its step is, because `SNEK_MAX_STEPS`, `SNEK_EVAL_INTERVAL` and every chart's x-axis read it | `algos/ppo/algo.py` §1 |
 | tests | a `tests/test_<name>_*.py` per module with the arithmetic pinned (a loss on a hand-worked batch, a target on a known transition), and a `tests/mut_<name>.json` mutation spec whose mutants all die before the row is queued | `skills/mutation-test` |
 | the batch | 4 seeds a cell, seed pinned to the arm letter, the current PPO reference config for everything the algorithm does not own (reward preset, `SNEK_OBS_HISTORY`, `SNEK_FC_LAYERS`), stage A at 100 episodes on every checkpoint, stage B, `hof5000`, `hof30k`. Judged on stage-B density, the depth passes and the drawdown count, never on a single eval | `docs/protocol.md` |
@@ -48,7 +48,7 @@ ones below do not, and every plan translates them the same way so the rows stay 
 | **batch 32, one update per 4 agent steps** (8 replayed samples per transition) | batch 32, `SNEK_REPLAY_RATIO` set for 8 samples per transition | the paper's replay ratio is a load-bearing setting (BBF is *about* it), so the paper cell matches samples per transition rather than gradient steps |
 | **a CNN trunk (Nature DQN, IMPALA, ResNet)** | the reference's `fc 320` MLP over the 26+16-value observation for the paper cell; a plan that needs a trunk with more shape (a residual stack, a wider net) states the MLP analogue and its budget | there is no image; the trunk substitution is stated per row so it is not mistaken for the paper's |
 | **an LSTM of 512 (R2D2) or a 256-wide recurrent core** | the paper's width where the trunk is comparable, otherwise the width the plan states with the paper's as the reference | the observation is 42 values, not 3136 CNN features; a plan says which |
-| **200M frames, 5 seeds; 100k steps, 10-50 seeds** | 4 seeds a cell as everywhere here; a plan budgets the moves per arm from the paper's frames when the paper's budget is the question (F1, G3) and from the reference's 100M transitions otherwise | the protocol's seed count is fixed by the boxes |
+| **200M frames, 5 seeds; 100k steps, 10-50 seeds** | 4 seeds a cell as everywhere here; a plan budgets the moves per arm from the paper's frames when the paper's budget is the question (B1, G3) and from the reference's 100M transitions otherwise | the protocol's seed count is fixed by the boxes |
 
 ## What every plan decides
 

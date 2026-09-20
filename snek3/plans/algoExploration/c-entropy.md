@@ -80,7 +80,7 @@ the online-minus-target difference, the penalty using the entropy's sign rather 
 | critic loss | MSE | (Eq. 17 above) | Huber for C1 (the +100 terminal, as `algos/dqn/agent.py` argues) -- **a stated departure**; C2's clip is on the squared error as the paper writes it |
 | discount | 0.99 | 0.99 | 0.99 |
 | reward | clipped [−1, 1] | clipped | not clipped |
-| budget | 100k agent steps, 5 seeds | 10M env steps, 3 seeds | 50M moves a cell, raised if still rising; C1's paper budget is tiny and is the reason it also runs at F1's 500k-step cap |
+| budget | 100k agent steps, 5 seeds | 10M env steps, 3 seeds | 50M moves a cell, raised if still rising; C1's paper budget is tiny and is the reason it also runs at B1's 500k-step cap |
 
 **On this game the fixed α is the thing to watch.** α 0.05 was set against a unit reward; here food is 1,
 so the entropy term is the paper's relative to a meal and 2,000× smaller relative to the win. The paper
@@ -91,7 +91,7 @@ tuning wave (§4) is over α ∈ {0.05, 0.2, 1.0}, and `auto` is the comparison.
 
 | batch | arms | base | read against | judged on |
 |---|---|---|---|---|
-| C1 | 4 seeds `sac` on the 2019 paper's settings (§2b) + 4 seeds `sac` at F1's 500k-step cap (the paper's own regime, scaled) | the PPO reference's reward preset, `SNEK_OBS_HISTORY=8`, `SNEK_FC_LAYERS=320` | A1 paper (DQN) and PPO's `hist8` table | stage-B density, `hof5000`, `hof30k`, drawdowns; **and the policy entropy trace** beside PPO's, which is in every PPO row already |
+| C1 | 4 seeds `sac` on the 2019 paper's settings (§2b) + 4 seeds `sac` at B1's 500k-step cap (the paper's own regime, scaled) | the PPO reference's reward preset, `SNEK_OBS_HISTORY=8`, `SNEK_FC_LAYERS=320` | A1 paper (DQN) and PPO's `hist8` table | stage-B density, `hof5000`, `hof30k`, drawdowns; **and the policy entropy trace** beside PPO's, which is in every PPO row already |
 | C2 | 4 seeds `sac2` on the 2022 paper's settings (§2b) + 4 seeds `sac2` with `SNEK_SAC_ALPHA=auto` | C1's | C1 | as C1; the fixed-vs-auto α pair says whether the temperature was a fix |
 | C2 halves | 4 seeds entropy-penalty only, 4 seeds avg-Q + Q-clip only (the paper's two ablations) | C2's | C1, C2 | which fix did it |
 
@@ -112,7 +112,7 @@ if C1 and C2 are level there is nothing to attribute.
 
 - **C1 matches PPO.** Entropy regularisation, not the on-policy update, is what PPO's result rests on.
   That makes A6's Munchausen result (an entropy-regularised value target) the natural comparison, and
-  argues for adding a tuned-temperature entropy term to the value rows in B and D.
+  argues for adding a tuned-temperature entropy term to the value rows in D and E.
 - **C1 collapses and C2 does not.** The implementation, not the idea; the halves say which fix. This
   is the paper's result and the expected one.
 - **Both trail A1.** A stochastic actor is a cost on a deterministic game and the group closes; the
