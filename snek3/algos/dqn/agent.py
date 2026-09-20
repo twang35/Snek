@@ -43,6 +43,7 @@ import torch
 import torch.nn.functional as F
 
 from algos.dqn import net as network
+from algos.dqn import resets
 from env import constants
 
 # Where "is this move survivable" lives in the observation, read from the layout table rather than
@@ -133,9 +134,14 @@ class DdqnAgent(object):
     def __init__(self, arch, learning_rate=1e-5, adam_epsilon=1e-7, target_update_period=8,
                  target_update_tau=1.0, gradient_clipping=0.0, use_is_weights=True,
                  seed=None, device='cpu', munchausen_alpha=0.0, munchausen_tau=0.03,
-                 munchausen_l0=-1.0):
+                 munchausen_l0=-1.0, reset_interval=0, reset_alpha=0.5, reset_stop_after=0):
         self.arch = arch
         self.device = device
+        self.seed = seed
+        # Shrink-and-perturb resets on a gradient-step schedule, off at interval 0 (Group D, row D1).
+        # See `algos/dqn/resets.py`; `maybe_reset` runs after every update, like the target copy.
+        self.reset_schedule = resets.ResetSchedule(reset_interval, reset_alpha, reset_stop_after)
+        self.resets = 0
         self.num_actions = int(arch['num_actions'])
         # Munchausen (Vieillard, Pietquin & Geist 2020): `alpha > 0` adds the clipped, scaled
         # log-policy of the taken action to the reward and replaces the double-Q bootstrap with the
@@ -242,8 +248,9 @@ class DdqnAgent(object):
 
         self.train_step += 1
         self.maybe_update_target()
+        self.maybe_reset()
         metrics = {'loss': float(loss.detach()), 'train_step': self.train_step,
-                   'mean_abs_td': float(td_error.detach().abs().mean())}
+                   'mean_abs_td': float(td_error.detach().abs().mean()), 'resets': self.resets}
         if grad_norm is not None:
             metrics['grad_norm'] = grad_norm
         return td_error.detach().cpu().numpy(), metrics
@@ -289,18 +296,45 @@ class DdqnAgent(object):
                 lagged.mul_(1.0 - self.target_update_tau).add_(online, alpha=self.target_update_tau)
         return True
 
+    # ---------------------------------------------------------------- resets
+
+    def fresh_net(self, seed):
+        """A network of this agent's shape at a fresh initialisation. The dist agent overrides the builder."""
+        return network.build(self.arch, self.device, seed=seed)
+
+    def optimizers(self):
+        """Every optimiser whose state a reset clears."""
+        return [self.optimizer]
+
+    def maybe_reset(self):
+        """Shrink-and-perturb the online net when the schedule says so; the target becomes its copy.
+
+        Runs on the same `train_step` the target copy gates on, after it, so a reset step's target is
+        the reset net rather than the pre-reset one. Returns whether a reset happened.
+        """
+        if not self.reset_schedule.due(self.train_step):
+            return False
+        fresh = self.fresh_net(resets.reset_seed(self.seed, self.resets + 1))
+        resets.shrink_and_perturb(self.net, fresh, self.reset_schedule.alpha)
+        self.target.load_state_dict(self.net.state_dict())
+        for optimizer in self.optimizers():
+            resets.clear_optimizer(optimizer)
+        self.resets += 1
+        return True
+
     # ---------------------------------------------------------------- persistence
 
     def state_dict(self):
         """Everything a resume needs beyond the policy weights themselves."""
         return {'model': self.net.state_dict(), 'target': self.target.state_dict(),
                 'optimizer': self.optimizer.state_dict(), 'train_step': self.train_step,
-                'rng': self.rng.bit_generator.state}
+                'rng': self.rng.bit_generator.state, 'resets': self.resets}
 
     def load_state_dict(self, state):
         self.net.load_state_dict(state['model'])
         self.target.load_state_dict(state['target'])
         self.optimizer.load_state_dict(state['optimizer'])
         self.train_step = int(state.get('train_step', 0))
+        self.resets = int(state.get('resets', 0))
         if state.get('rng') is not None:
             self.rng.bit_generator.state = state['rng']

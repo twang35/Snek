@@ -61,6 +61,14 @@ class DistAgent(DdqnAgent):
                                                           lr=float(fraction_lr), alpha=0.95,
                                                           eps=1e-5, centered=True, momentum=0.0)
 
+    # ---------------------------------------------------------------- resets
+
+    def fresh_net(self, seed):
+        return network.build(self.arch, self.device, seed=seed)
+
+    def optimizers(self):
+        return [self.optimizer] + ([self.fraction_optimizer] if self.fraction_optimizer is not None else [])
+
     # ---------------------------------------------------------------- acting
 
     @property
@@ -153,8 +161,9 @@ class DistAgent(DdqnAgent):
 
         self.train_step += 1
         self.maybe_update_target()
+        self.maybe_reset()
         metrics = {'loss': float(loss.detach()), 'train_step': self.train_step,
-                   'mean_abs_td': float(per_sample.detach().abs().mean())}
+                   'mean_abs_td': float(per_sample.detach().abs().mean()), 'resets': self.resets}
         if grad_norm is not None:
             metrics['grad_norm'] = grad_norm
         if fraction_loss is not None:

@@ -37,6 +37,7 @@ spellings of the same quantities — what the arm *ran under*, and what this eva
 from algos.dqn import collect
 from algos.dqn import schedules
 from algos.dqn.agent import DdqnAgent
+from algos.dqn import resets
 from algos.dqn.replay import PrioritizedReplay
 from tools import checkpoints
 from vectorized.vec_env import VecSnake
@@ -93,8 +94,15 @@ def build_config(tuned):
         'munchausen_alpha': tuned('MUNCHAUSEN_ALPHA', 0.0),
         'munchausen_tau': tuned('MUNCHAUSEN_TAU', 0.03),
         'munchausen_l0': tuned('MUNCHAUSEN_L0', -1.0),
+        # Shrink-and-perturb resets, off at interval 0 (Group D, row D1). Gradient steps, all three.
+        # See `algos/dqn/resets.py`.
+        'reset_interval': int(tuned('RESET_INTERVAL', 0, int)),
+        'reset_alpha': tuned('RESET_ALPHA', 0.5),
+        'reset_stop_after': int(tuned('RESET_STOP_AFTER', 0, int)),
         'fork': fork,
     }
+    # Validated here so a bad value names its knob before anything is built.
+    resets.ResetSchedule(config['reset_interval'], config['reset_alpha'], config['reset_stop_after'])
     if config['epsilon_schedule'] not in EPSILON_SCHEDULES:
         raise ValueError('SNEK_EPSILON_SCHEDULE={0!r} is not one of {1}'.format(
             config['epsilon_schedule'], sorted(EPSILON_SCHEDULES)))
@@ -144,7 +152,10 @@ class DqnAlgo(object):
                                seed=config['seed'], device=device,
                                munchausen_alpha=config['munchausen_alpha'],
                                munchausen_tau=config['munchausen_tau'],
-                               munchausen_l0=config['munchausen_l0'])
+                               munchausen_l0=config['munchausen_l0'],
+                               reset_interval=config['reset_interval'],
+                               reset_alpha=config['reset_alpha'],
+                               reset_stop_after=config['reset_stop_after'])
         self.buffer = PrioritizedReplay(config['replay_buffer_max_length'], arch['obs_len'],
                                         alpha=config['priority_exponent'],
                                         initial_beta=config['is_beta'],
@@ -200,6 +211,8 @@ class DqnAlgo(object):
             extra += ', munchausen alpha {0} tau {1} l0 {2}'.format(
                 self.config['munchausen_alpha'], self.config['munchausen_tau'],
                 self.config['munchausen_l0'])
+        if self.agent.reset_schedule.enabled:
+            extra += ', ' + self.agent.reset_schedule.describe()
         return '{0} lane(s), replay ratio {1}{2}'.format(self.collector.vec.n,
                                                          self.config['replay_ratio'], extra)
 
@@ -314,10 +327,14 @@ class DqnAlgo(object):
         return 'eps {0:<7}'.format(row.get('epsilon', '?'))
 
     def log_extra(self, row):
+        lines = []
+        if self.agent.reset_schedule.enabled:
+            lines.append('           resets {0}  (every {1:,} gradient steps, at {2:,})'.format(
+                self.agent.resets, self.agent.reset_schedule.interval, self.agent.train_step))
         if not row.get('fork'):
-            return []
+            return lines
         fork = row['fork']
-        return ['           forks {0:,}  live {1}  ended {2:,}/trunc {3:,}  '
+        return lines + ['           forks {0:,}  live {1}  ended {2:,}/trunc {3:,}  '
                 'eligible {4:,}  no slot {5:,}'.format(
                     fork['forks'], fork['live_branches'], fork['terminated'], fork['truncated'],
                     fork['eligible'], fork['skipped_full'])]

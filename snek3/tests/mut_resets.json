@@ -1,0 +1,67 @@
+{
+ "tests": [
+  "tests/test_resets.py"
+ ],
+ "mutations": [
+  {
+   "desc": "the head interpolated like the trunk instead of replaced",
+   "file": "algos/dqn/resets.py",
+   "from": "            if name in head:\n                parameter.copy_(new)\n            else:\n                parameter.mul_(alpha).add_(new, alpha=1.0 - alpha)",
+   "to": "            parameter.mul_(alpha).add_(new, alpha=1.0 - alpha)"
+  },
+  {
+   "desc": "alpha and 1 - alpha swapped",
+   "file": "algos/dqn/resets.py",
+   "from": "                parameter.mul_(alpha).add_(new, alpha=1.0 - alpha)",
+   "to": "                parameter.mul_(1.0 - alpha).add_(new, alpha=alpha)"
+  },
+  {
+   "desc": "the trunk replaced outright like the head",
+   "file": "algos/dqn/resets.py",
+   "from": "                parameter.mul_(alpha).add_(new, alpha=1.0 - alpha)",
+   "to": "                parameter.copy_(new)"
+  },
+  {
+   "desc": "the stop guard dropped",
+   "file": "algos/dqn/resets.py",
+   "from": "        return self.stop_after <= 0 or train_step <= self.stop_after",
+   "to": "        return True"
+  },
+  {
+   "desc": "the interval fires every step",
+   "file": "algos/dqn/resets.py",
+   "from": "        if not self.enabled or train_step <= 0 or train_step % self.interval:",
+   "to": "        if not self.enabled or train_step <= 0:"
+  },
+  {
+   "desc": "the optimiser state kept across a reset",
+   "file": "algos/dqn/resets.py",
+   "from": "    optimizer.state.clear()",
+   "to": "    pass"
+  },
+  {
+   "desc": "the target not copied after a reset",
+   "file": "algos/dqn/agent.py",
+   "from": "        self.target.load_state_dict(self.net.state_dict())\n        for optimizer in self.optimizers():",
+   "to": "        for optimizer in self.optimizers():"
+  },
+  {
+   "desc": "the reset count not persisted",
+   "file": "algos/dqn/agent.py",
+   "from": "        self.resets = int(state.get('resets', 0))",
+   "to": "        self.resets = 0"
+  },
+  {
+   "desc": "the fresh seed ignores the reset count",
+   "file": "algos/dqn/resets.py",
+   "from": "    return (int(seed) * 1000003 + int(count) * 7919 + 101) % (2 ** 63 - 1)",
+   "to": "    return int(seed)"
+  },
+  {
+   "desc": "the dist agent's fraction optimiser not cleared",
+   "file": "algos/dist/agent.py",
+   "from": "        return [self.optimizer] + ([self.fraction_optimizer] if self.fraction_optimizer is not None else [])",
+   "to": "        return [self.optimizer]"
+  }
+ ]
+}
