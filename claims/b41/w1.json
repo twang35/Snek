@@ -1,0 +1,14 @@
+{
+ "arms": [
+  "b41a-sacpaper-seed1",
+  "b41b-sacpaper-seed2",
+  "b41c-sacpaper-seed3",
+  "b41d-sacpaper-seed4"
+ ],
+ "batch": "b41",
+ "box": "desktop",
+ "claimed_iso": "2026-09-20T11:43:18",
+ "claimed_ts": 1789929798.3843398,
+ "kind": "wave",
+ "wave": 1
+}
