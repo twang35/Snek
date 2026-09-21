@@ -1,4 +1,5 @@
 {
+ "box": "desktop",
  "env": {
   "SNEK_ALGO": "qrdqn",
   "SNEK_CHASE_SAFE_GATE": "75",
