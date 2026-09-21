@@ -1,0 +1,14 @@
+{
+ "arms": [
+  "b42e-sac2local-seed5",
+  "b42f-sac2local-seed6",
+  "b42g-sac2local-seed7",
+  "b42h-sac2local-seed8"
+ ],
+ "batch": "b42",
+ "box": "laptop",
+ "claimed_iso": "2026-09-20T23:26:00",
+ "claimed_ts": 1789971960.8343449,
+ "kind": "wave",
+ "wave": 2
+}
