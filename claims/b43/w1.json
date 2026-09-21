@@ -1,0 +1,14 @@
+{
+ "arms": [
+  "b43a-reset600k-seed1",
+  "b43b-reset600k-seed2",
+  "b43c-reset600k-seed3",
+  "b43d-reset600k-seed4"
+ ],
+ "batch": "b43",
+ "box": "desktop",
+ "claimed_iso": "2026-09-20T22:55:35",
+ "claimed_ts": 1789970135.1159227,
+ "kind": "wave",
+ "wave": 1
+}
