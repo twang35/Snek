@@ -63,7 +63,7 @@ are in git history before 2026-09-10.
 
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
-| [b43](#b43--bbfs-resets-on-b40s-m-qr-dqn-cell) | BBF's shrink-and-perturb resets (`SNEK_RESET_INTERVAL` 600k / 2.4M gradient steps, `_ALPHA` 0.5, `_STOP_AFTER` 10.5M) | b40's M-QR-DQN cell (`b40e`-`h`) | 2 × 4 | 3M steps | registered | — |
+| [b43](#b43--bbf-style-resets-on-b40s-m-qr-dqn-cell) | BBF-style shrink-and-perturb resets, the reset alone (no replay ratio 8, wider net, AdamW, EMA target, SPR or within-cycle anneal) (`SNEK_RESET_INTERVAL` 600k / 2.4M gradient steps, `_ALPHA` 0.5, `_STOP_AFTER` 10.5M) | b40's M-QR-DQN cell (`b40e`-`h`) | 2 × 4 | 3M steps | registered | — |
 | [b42](#b42--revisiting-discrete-sac-paper-cell-beside-b41s-local-cell-with-the-fixes) | Zhou et al. 2022's fixes: per-state entropy-penalty 0.5, double average Q with Q-clip 0.5. Paper cell as written (lr 1e-5, α 0.05 fixed, batch 64, 1e5 uniform, 0.1 updates a move, Polyak 0.005, 3-step, 2 × 512, MSE) / b41's local cell plus the two fixes | PPO's reward, hist8, 16 lanes / `b41e`-`h` | 2 × 4 | 3.125M steps = 50M moves | registered | — |
 | [b41](#b41--discrete-sac-paper-cell-beside-local-cell) | the algorithm: discrete SAC (`SNEK_ALGO=sac`). Paper cell as written (target entropy 0.98 ln 3, batch 64, 1M uniform, 0.25 updates a move) / local cell (target 0.1 ln 3, batch 128, PER 0.6, 100k, 0.5 updates a move, target every 8) | PPO's reward, hist8, `fc 320`; 16 lanes | 2 × 4 | 3.125M steps = 50M moves | paper half held; local cell live | paper cell stopped at 0.57M counted steps: zero perfect games on all four seeds, α 2.5 × 10⁸, entropy pinned at the 0.98 ln 3 target (1.077 nats); the local cell (0.1 ln 3) started 12:49 on the desktop |
 | [b40](#b40--munchausen-on-the-local-plumbing-m-dqn-beside-m-qr-dqn) | the value target: Munchausen's log-policy reward term and soft target (`SNEK_MUNCHAUSEN_ALPHA` 0.9, `_TAU` 0.03, `_L0` -1) on DQN / on QR-DQN N 32 | b35's local cell / b37's QR-DQN cell | 2 × 4 | 3M steps | held (the M-DQN best row 97.8, 0.8 over the line) | the target is not where the ceiling is: M-QR-DQN is QR-DQN with a slightly tighter hold (onset 1.13-1.54M, 89-93 after onset with 0-3% below 80, 436 rows, best 98.0 against 346 / 98.0), M-DQN is DQN with shallower drawdowns (73-87 after onset, 13-59% below 80 against 12-76%; 100 rows, 93 of them one seed's, best 97.8 against 96.6). No arm reached 99.2; both passes empty. Group A closes with every rung at 96.6-98.0 |
@@ -133,7 +133,7 @@ at complete separation (Mann-Whitney p=0.029). Details in [`protocol.md`](protoc
 
 ---
 
-## b43 — BBF's resets on b40's M-QR-DQN cell
+## b43 — BBF-style resets on b40's M-QR-DQN cell
 
 | | |
 |---|---|
@@ -142,11 +142,12 @@ at complete separation (Mann-Whitney p=0.029). Details in [`protocol.md`](protoc
 | cells × seeds | 2 × 4, seeds 1-8 pinned to the letter |
 | cap | 3M counted steps, b40's, so the reset cells read on b40's x-axis |
 | control | `b40e`-`h`, the same cell without resets (89-93 after onset, 0-3% of evals below 80, 436 stage-B rows, best 98.0, no `hof5000` candidate). Judged on the **hold**: the perfect rate after each reset's dip and in the reset-free tail, drawdowns, `zero_since`; then the three passes |
-| predicted | registered 2026-09-20 by the agent, from the plan: the 600k cell shows a visible dip after each reset and a higher late perfect rate than `b40e`-`h`'s; the 2.4M cell fewer, deeper dips. If neither holds better than b40 the reset is not the lever here and Group D closes as a null |
+| predicted | registered 2026-09-20 by the agent, from the plan: the 600k cell shows a visible dip after each reset and a higher late perfect rate than `b40e`-`h`'s; the 2.4M cell fewer, deeper dips. **What a negative can and cannot say** (scoped the same day after a review): b43 is the reset alone, without BBF's within-cycle n-step / γ anneal that lets a reset head relearn, so if neither cell holds the anneal wave runs before the row closes, and no b43 result is a verdict on BBF |
 
 **Why.** Row D1, re-planned 2026-09-20 from "how many steps does BBF need" to the late-plasticity probe: every
 Group A cell reached 88-94% and then drifted or never held, late drift is the shape of most of this project's
-collapses, and BBF's shrink-and-perturb reset is the one mechanism in the series aimed at exactly that. The
+collapses, and BBF's shrink-and-perturb reset is the one mechanism in the series aimed at exactly that. **It is
+not BBF**: the
 rest of BBF (the ×4 net, replay ratio 8, AdamW, EMA target, SPR) is data-efficiency machinery and stays out
 until the reset earns a second wave; the within-cycle n-step / γ anneal is that wave, if the cells dip but do
 not hold. Queued on b40's close, the same day, since the base cell's numbers are in. Gates: smoke with resets

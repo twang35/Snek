@@ -1,4 +1,4 @@
-# Group D: data efficiency -- BBF, as the reset probe
+# Group D: data efficiency -- BBF-style resets, as the late-plasticity probe
 
 **Status: re-planned 2026-09-20 as the reset probe; the knob is built** (`algos/dqn/resets.py`, `SNEK_RESET_*` on
 `algos/dqn/algo.py`, `maybe_reset` on both agents; tests `tests/test_resets.py`, mutants `tests/mut_resets.json`
@@ -19,7 +19,15 @@ collapses, so the row is now that probe. The budget rule is replaced by what A p
 
 ## 1. The row
 
-### D1 -- BBF's resets on A6's best cell (Schwarzer et al. 2023, "Bigger, Better, Faster", §4)
+### D1 -- BBF-style resets on A6's best cell (Schwarzer et al. 2023, "Bigger, Better, Faster", §4)
+
+**What this row is, and is not** (scoped 2026-09-20 after a review): b43 tests **shrink-and-perturb resets alone, on one cell**. It is not BBF
+and not a test of BBF's data efficiency -- the replay ratio of 8, the ×4 IMPALA/C51 net, AdamW, the EMA target, SPR and the 100k regime are
+all absent, by the decision below -- and **its result is never to be reported as a verdict on BBF.** The conclusion it can reach is "the reset
+alone is / is not a hold mechanism on this cell", and even the negative half of that waits for the anneal wave (§5). This is also the one
+group that departs from the series' rule of a paper cell as written (`algorithm-series.md` §0): BBF as written needs SPR built and a CNN
+encoder that has no meaning on a 26-value observation. A reduced paper cell -- BBF without SPR and the CNN -- is buildable and is the user's
+call, not a consequence of b43.
 
 BBF resets the encoder toward a fresh initialisation every 40k gradient steps -- **shrink-and-perturb**, θ ← α θ
 + (1 − α) θ_fresh at α 0.5 -- and re-initialises the layers after it fully, with the optimiser state for those
@@ -33,7 +41,7 @@ first wave.
 | the base cell | Impala ×4 C51 at replay ratio 8, 100k steps | **b40's `mqrdqnlocal`** (A6): QR-DQN N 32, Munchausen α 0.9 τ 0.03 l₀ −1, the local plumbing (fork 4, shield, PER, target period 8, replay ratio 1, batch 128, lr 1e-5), `hist8`, `fc 320`, **3M steps**. The densest, steadiest value cell of A2-A6 (`docs/runs.md` b40) |
 | the cadence | every 40k gradient steps ≈ 20 cycles in a 100k-step run at ratio 8 | the cell runs ~4 gradient steps a counted step (fork 4 lanes, ratio 1), so 3M steps is **~12M gradient steps**. Two cells: **every 600k** (~20 cycles, the paper's count) and **every 2.4M** (~5 cycles); both stop after **10.5M** (the last eighth reset-free) |
 | wider net, replay ratio 8, AdamW, EMA target, SPR, the 100k regime | the rest of the recipe | **dropped**: they are the data-efficiency levers, and the probe is the reset alone on a cell whose other knobs are already tuned. Each is a later cell if the reset earns one |
-| n-step and γ annealed within each cycle (10 → 3, 0.97 → 0.997 over 10k gradient steps) | what lets a freshly reset net relearn fast | **not in the first wave.** The base cell is n-step 1 at γ 0.99. If the reset cells show the relearning dip but not the hold, this is the second wave (`SNEK_RESET_ANNEAL_*`, not built) |
+| n-step and γ annealed within each cycle (10 → 3, 0.97 → 0.997 over 10k gradient steps) | what lets a freshly reset net relearn fast -- BBF's own ablations put the schedules among the pieces that matter most *in the reset regime*, because a freshly reset head relearns from a shorter, more myopic target | **not in the first wave**, and that is the first wave's known limitation: the base cell is n-step 1 at γ 0.99 throughout. **Poor recovery after a reset in b43 therefore says nothing about resets as BBF uses them**, and the anneal wave (`SNEK_RESET_ANNEAL_*`, not built; §6) runs before the row can close on a negative -- whether b43 dips without holding or is worse everywhere. Built while b43 runs, so it can follow at once |
 
 Tests (`tests/test_resets.py`): the partition puts every hidden linear in the trunk and the rest in the head, for
 `QNet` and for FQF's net; α = 1 leaves the trunk and still re-initialises the head; α = 0 equals a fresh init at
@@ -88,7 +96,30 @@ Group G (planning) for what the value family cannot hold.
 
 - **The reset cells hold better than b40.** The knob goes to E2 and C's best; the anneal wave runs if the dip
   is large.
-- **They dip and recover to the same plateau.** Resets cost re-learning and buy nothing here; the anneal wave is
-  skipped and the group closes as a null.
-- **They are worse everywhere.** The trunk needs its history on this observation; closed, and `README.md`'s
-  running order drops the row.
+- **They dip and recover to the same plateau, or are worse everywhere.** Neither closes the row (changed 2026-09-20, review): without
+  the within-cycle n-step / γ anneal a reset head relearns against the wrong target, so a poor recovery is expected from the *omission*, not
+  evidence about the mechanism. The anneal wave runs; only if the annealed cells also fail to hold does the group close, as "the reset is not
+  the lever on this game" -- not as a verdict on BBF.
+
+## 6. The anneal wave: where it lands in the code
+
+The knobs are `SNEK_RESET_ANNEAL_N_STEP` (`10,3`: n-step from the first value to the second over `SNEK_RESET_ANNEAL_STEPS`
+gradient steps after every reset, BBF's 10 → 3 over 10k) and `SNEK_RESET_ANNEAL_GAMMA` (`0.97,0.997`), both off by default and
+both inert unless `SNEK_RESET_INTERVAL` is set. **Nothing in the queue, the scheduler or the claims changes**: a spec carries `SNEK_*`
+knobs already, and an unknown knob is ignored silently, which is why the knobs must be deployed before a spec names them
+(`deploy-before-queueing-specs-that-need-new-knobs`). The change is three places in the training code, all on the shared DQN path
+and all gated by the knob:
+
+| place | what changes | why it is not free |
+|---|---|---|
+| `algos/dqn/collect.py` | `n_step` becomes settable between `step()` calls; a change flushes every lane's window (a window holds one n) | the window is per lane and its length is the invariant every n-step test pins |
+| `algos/dqn/agent.py` (via `resets.py`) | the bootstrap's γ read from the schedule each update, `discount ** n` in the emitted transition following it | the emitted transition's `discount` is `γ^n` at *collection* time, so a change in γ is seen by new transitions only, as in BBF's own replay |
+| `vectorized/vec_env.py` | `shaping_discount` follows γ | **the reward/discount coupling** (`docs/invariants.md`): the potential-based shaping terms are scaled by the agent's γ, so a γ that moves without the env's copy moving changes the reward, not only the target |
+
+**Not a copy under `algos/bbf/`.** A directory holding copies of the collector and agent would contain the anneal, but it would also
+hold ~1,000 duplicated lines whose bugs are then fixed in one place and not the other -- the root `CLAUDE.md`'s rule against two
+implementations of one behaviour, and the reason `dist/` is subclasses of `DqnAlgo` rather than copies. The resets knob was put on the
+shared agent so every value rung could take it, and the anneal follows it. What an `algos/bbf/` directory *can* be is what `sac2.py`
+is to `sac`: a registration module naming a `bbf` algorithm whose defaults are the paper's values on the shared code, which is how a
+reduced paper cell would be named if one is queued. The blast radius on the default path is the same as the reset knob's: a schedule
+that returns the constant when off, pinned by the suite and by a fixed-seed arm at interval 0 being the same arm.
