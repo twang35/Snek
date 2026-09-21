@@ -1,0 +1,14 @@
+{
+ "arms": [
+  "b43e-reset2400k-seed5",
+  "b43f-reset2400k-seed6",
+  "b43g-reset2400k-seed7",
+  "b43h-reset2400k-seed8"
+ ],
+ "batch": "b43",
+ "box": "desktop",
+ "claimed_iso": "2026-09-21T12:09:50",
+ "claimed_ts": 1790017790.3121572,
+ "kind": "wave",
+ "wave": 2
+}
