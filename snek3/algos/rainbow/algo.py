@@ -65,6 +65,7 @@ REJECTED = (
     'PPO_ADAM_EPSILON', 'PPO_TARGET_KL', 'PPO_GRADIENT_CLIPPING', 'PPO_NORMALIZE_ADV', 'PPO_VALUE_LOSS',
     # FQF's proposal net and the risk-sensitive read are A5's and A4's; neither paper here has them.
     'DIST_FRACTION_LR', 'DIST_FRACTION_ENTROPY', 'DIST_RISK_ALPHA', 'DIST_RISK_TRAIN',
+    'BBF_WEIGHT_DECAY', 'BBF_SPR_WEIGHT', 'BBF_SPR_STEPS', 'BBF_PROJECTION', 'BBF_TRANSITION_WIDTH', 'BBF_DUELING', 'BBF_DOUBLE',
 ) + sac_algo.SAC_KNOBS
 
 
@@ -136,7 +137,9 @@ def build_config(tuned, name):
         'btr_layer_norm': bool(int(tuned('BTR_LAYER_NORM', 0, int))),
         'fork': fork,
     }
+    config.update(resets.anneal_config(tuned))
     resets.ResetSchedule(config['reset_interval'], config['reset_alpha'], config['reset_stop_after'])
+    resets.cycle_from_config(config)
     if config['epsilon_schedule'] not in dqn_algo.EPSILON_SCHEDULES:
         raise ValueError('SNEK_EPSILON_SCHEDULE={0!r} is not one of {1}'.format(
             config['epsilon_schedule'], sorted(dqn_algo.EPSILON_SCHEDULES)))
@@ -205,6 +208,7 @@ class RainbowAlgo(dqn_algo.DqnAlgo):
                                   reset_interval=config['reset_interval'],
                                   reset_alpha=config['reset_alpha'],
                                   reset_stop_after=config['reset_stop_after'],
+                                  cycle=resets.cycle_from_config(config), on_cycle=self.apply_cycle,
                                   kappa=config['dist_kappa'],
                                   n_tau=config['dist_tau_samples'],
                                   n_tau_prime=config['dist_tau_prime_samples'])

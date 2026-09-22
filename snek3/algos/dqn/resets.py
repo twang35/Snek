@@ -22,7 +22,18 @@ agent's own and the reset count, so two arms with the same `SNEK_SEED` reset to 
 containing `hidden.` is the trunk (`QNet.hidden`, and `qnet.hidden` inside every distributional net);
 every other parameter is head-side. Buffers (C51's support, IQN's harmonics) are constants and are
 not touched.
+
+**The within-cycle anneal** (`CycleSchedule`, 2026-09-20) is BBF's companion to the reset: after every
+reset the n-step horizon and the discount restart at a short, myopic setting and move back to the long
+one over `steps` gradient steps -- n from 10 to 3 and gamma from 0.97 to 0.997 in the paper, both on an
+exponential schedule (Dopamine's `exponential_decay_scheduler`; gamma interpolated in `log(1 - gamma)`).
+A freshly reset head relearns from a target it can fit, then the horizon lengthens again. Off unless
+both `SNEK_RESET_ANNEAL_N_STEP` and `SNEK_RESET_ANNEAL_GAMMA` are set, and inert unless resets are on:
+with no reset the cycle never restarts, so the schedule sits at its final values from step `steps` on
+(the first cycle begins at gradient step 0, as BBF's does).
 """
+
+import math
 
 import torch
 
@@ -60,6 +71,82 @@ class ResetSchedule(object):
         if self.stop_after > 0:
             text += ', none after {0:,}'.format(self.stop_after)
         return text
+
+
+class CycleSchedule(object):
+    """n-step and gamma as functions of the gradient steps since the last reset. Both exponential:
+    `n(p) = round(n0 * (n1 / n0) ** p)`, `gamma(p) = 1 - exp((1 - p) log(1 - g0) + p log(1 - g1))`, with
+    `p = min(1, steps_since_reset / steps)`. `enabled` is False when either pair is None, and then
+    `n_step_at` / `gamma_at` return the constants they were given (`n_step`, `gamma`)."""
+
+    def __init__(self, n_steps=None, gammas=None, steps=10000, n_step=1, gamma=0.99):
+        self.n_steps = None if n_steps is None else (int(n_steps[0]), int(n_steps[1]))
+        self.gammas = None if gammas is None else (float(gammas[0]), float(gammas[1]))
+        self.steps = int(steps)
+        self.n_step, self.gamma = int(n_step), float(gamma)
+        if (self.n_steps is None) != (self.gammas is None):
+            raise ValueError('reset_anneal needs both SNEK_RESET_ANNEAL_N_STEP and SNEK_RESET_ANNEAL_GAMMA, or neither')
+        if self.enabled:
+            if self.steps < 1:
+                raise ValueError('reset_anneal_steps must be >= 1, got {0}'.format(steps))
+            if min(self.n_steps) < 1:
+                raise ValueError('reset_anneal_n_step values must be >= 1, got {0}'.format(n_steps))
+            if not all(0.0 < g < 1.0 for g in self.gammas):
+                raise ValueError('reset_anneal_gamma values must be in (0, 1), got {0}'.format(gammas))
+
+    @property
+    def enabled(self):
+        return self.n_steps is not None
+
+    def progress(self, since_reset):
+        return min(1.0, max(0.0, float(since_reset) / float(self.steps)))
+
+    def n_step_at(self, since_reset):
+        if not self.enabled:
+            return self.n_step
+        n0, n1 = self.n_steps
+        return max(1, int(round(n0 * (n1 / n0) ** self.progress(since_reset))))
+
+    def gamma_at(self, since_reset):
+        if not self.enabled:
+            return self.gamma
+        g0, g1 = self.gammas
+        p = self.progress(since_reset)
+        return 1.0 - math.exp((1.0 - p) * math.log(1.0 - g0) + p * math.log(1.0 - g1))
+
+    def describe(self):
+        if not self.enabled:
+            return ''
+        return 'n-step {0} -> {1} and gamma {2} -> {3} over {4:,} gradient steps after each reset'.format(
+            self.n_steps[0], self.n_steps[1], self.gammas[0], self.gammas[1], self.steps)
+
+
+def parse_pair(text, cast, knob):
+    """`'10,3'` -> `(10, 3)`; empty or None -> None (off). Anything else names the knob."""
+    if text is None or str(text).strip() == '':
+        return None
+    parts = [part.strip() for part in str(text).split(',')]
+    if len(parts) != 2:
+        raise ValueError('SNEK_{0}={1!r} must be two comma-separated values, start,end'.format(knob, text))
+    return cast(parts[0]), cast(parts[1])
+
+
+def anneal_config(tuned):
+    """The three anneal knobs as config keys (each its `SNEK_` name lowercased), read through `tuned`."""
+    return {
+        'reset_anneal_n_step': str(tuned('RESET_ANNEAL_N_STEP', '', str)).strip(),
+        'reset_anneal_gamma': str(tuned('RESET_ANNEAL_GAMMA', '', str)).strip(),
+        'reset_anneal_steps': int(tuned('RESET_ANNEAL_STEPS', 10000, int)),
+    }
+
+
+def cycle_from_config(config):
+    """A `CycleSchedule` from the config keys `anneal_config` wrote plus the run's `n_step_update` and
+    `discount` as the constants. Validates, so a bad value names its knob before anything is built."""
+    return CycleSchedule(parse_pair(config.get('reset_anneal_n_step'), int, 'RESET_ANNEAL_N_STEP'),
+                         parse_pair(config.get('reset_anneal_gamma'), float, 'RESET_ANNEAL_GAMMA'),
+                         steps=config.get('reset_anneal_steps', 10000),
+                         n_step=config.get('n_step_update', 1), gamma=config.get('discount', 0.99))
 
 
 def partition(net):

@@ -162,6 +162,7 @@ class DistAgent(DdqnAgent):
         self.train_step += 1
         self.maybe_update_target()
         self.maybe_reset()
+        self.maybe_anneal()
         metrics = {'loss': float(loss.detach()), 'train_step': self.train_step,
                    'mean_abs_td': float(per_sample.detach().abs().mean()), 'resets': self.resets}
         if grad_norm is not None:

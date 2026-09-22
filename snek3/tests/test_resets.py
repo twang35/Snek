@@ -236,3 +236,131 @@ def test_ppo_refuses_the_reset_knobs(monkeypatch):
     monkeypatch.setenv('SNEK_RESET_INTERVAL', '5')
     with pytest.raises(ValueError, match='SNEK_RESET_INTERVAL'):
         train.build_config()
+
+
+# ---------------------------------------------------------------- the within-cycle anneal (BBF)
+
+def a_cycle(steps=10000):
+    return resets.CycleSchedule((10, 3), (0.97, 0.997), steps=steps)
+
+
+def test_the_cycle_runs_from_the_short_horizon_to_the_long_one_and_holds():
+    cycle = a_cycle()
+    assert [cycle.n_step_at(s) for s in (0, 2500, 5000, 7500, 10000, 50000)] == [10, 7, 5, 4, 3, 3]
+    gammas = [cycle.gamma_at(s) for s in (0, 5000, 10000, 50000)]
+    assert gammas[0] == pytest.approx(0.97) and gammas[-1] == pytest.approx(0.997) and gammas[2] == pytest.approx(0.997)
+    # Exponential in log(1 - gamma): the midpoint is the geometric mean of the two horizons.
+    assert 1.0 - gammas[1] == pytest.approx(((1 - 0.97) * (1 - 0.997)) ** 0.5)
+
+
+def test_an_off_cycle_returns_the_constants_it_was_given():
+    off = resets.CycleSchedule(n_step=3, gamma=0.9)
+    assert not off.enabled
+    assert (off.n_step_at(0), off.gamma_at(0), off.n_step_at(10 ** 6), off.gamma_at(10 ** 6)) == (3, 0.9, 3, 0.9)
+    assert off.describe() == ''
+
+
+def test_a_bad_cycle_names_its_knob():
+    with pytest.raises(ValueError, match='RESET_ANNEAL_N_STEP'):
+        resets.CycleSchedule((10, 3), None)
+    with pytest.raises(ValueError, match='reset_anneal_steps'):
+        resets.CycleSchedule((10, 3), (0.97, 0.997), steps=0)
+    with pytest.raises(ValueError, match='reset_anneal_gamma'):
+        resets.CycleSchedule((10, 3), (0.97, 1.0))
+    with pytest.raises(ValueError, match='RESET_ANNEAL_GAMMA'):
+        resets.parse_pair('0.97', float, 'RESET_ANNEAL_GAMMA')
+    assert resets.parse_pair('', int, 'X') is None and resets.parse_pair('10, 3', int, 'X') == (10, 3)
+
+
+def test_the_agent_restarts_the_cycle_at_a_reset_and_hands_both_values_to_the_hook():
+    seen = []
+    agent = an_agent(reset_interval=6, cycle=a_cycle(steps=4), on_cycle=lambda n, g: seen.append((n, round(g, 4))))
+    for _ in range(9):
+        agent.update(a_batch())
+    # Steps 1..5 climb the cycle; step 6 resets and the values jump back; 7..9 climb again.
+    assert [n for n, _ in seen[:5]] == [7, 5, 4, 3, 3] and seen[1][1] == 0.9905 and seen[3][1] == 0.997
+    assert seen[5] == (10, 0.97), seen
+    assert seen[6][0] < 10 and seen[6][1] > 0.97
+    assert agent.steps_since_reset == 3 and agent.last_reset_step == 6
+
+
+def test_the_hook_is_not_called_when_the_cycle_is_off():
+    seen = []
+    agent = an_agent(reset_interval=3, on_cycle=lambda n, g: seen.append((n, g)))
+    for _ in range(4):
+        agent.update(a_batch())
+    assert seen == [] and agent.resets == 1
+
+
+def test_the_cycle_position_survives_a_resume():
+    agent = an_agent(reset_interval=4, cycle=a_cycle())
+    for _ in range(6):
+        agent.update(a_batch())
+    state = agent.state_dict()
+    restored = an_agent(reset_interval=4, cycle=a_cycle())
+    restored.load_state_dict(state)
+    assert (restored.last_reset_step, restored.steps_since_reset) == (4, 2)
+    assert restored.cycle_values() == agent.cycle_values()
+
+
+def test_the_algo_moves_the_collector_and_the_env_together(monkeypatch):
+    monkeypatch.setenv('SNEK_ALGO', 'c51')
+    monkeypatch.setenv('SNEK_RESET_INTERVAL', '40')
+    monkeypatch.setenv('SNEK_RESET_ANNEAL_N_STEP', '10,3')
+    monkeypatch.setenv('SNEK_RESET_ANNEAL_GAMMA', '0.97,0.997')
+    monkeypatch.setenv('SNEK_RESET_ANNEAL_STEPS', '20')
+    monkeypatch.setenv('SNEK_N_STEP_UPDATE', '3')
+    monkeypatch.setenv('SNEK_DISCOUNT', '0.997')
+    config = train.build_config()
+    assert (config['reset_anneal_n_step'], config['reset_anneal_gamma'], config['reset_anneal_steps']) == ('10,3', '0.97,0.997', 20)
+    config.update({'seed': 3, 'replay_buffer_max_length': 500, 'initial_collect_steps': 40, 'batch_size': 8})
+    module = train.ALGOS['c51']
+    arch = arch_tools.build_arch(config['fc_layers'], constants.NUM_ACTIONS, constants.OBS_LEN,
+                                 constants.OBS_ERA, algo='c51', **module.arch_fields(config))
+    algo = module.build(config, arch)
+    # The first cycle starts at gradient step 0: the collector opens at the short horizon.
+    assert algo.collector.n_step == 10 and algo.collector.discount == pytest.approx(0.97)
+    assert algo.collector.vec.shaping_discount == pytest.approx(0.97)
+    assert 'n-step 10 -> 3 and gamma 0.97 -> 0.997 over 20 gradient steps after each reset' in algo.describe()
+    algo.prefill()
+    for _ in range(30):
+        algo.advance()
+    since = algo.agent.steps_since_reset
+    assert 0 < since < 40
+    n, g = algo.agent.cycle_values()
+    assert algo.collector.n_step == n and algo.collector.discount == pytest.approx(g)
+    assert algo.collector.vec.shaping_discount == pytest.approx(g)
+    if since >= 20:
+        assert (n, g) == (3, pytest.approx(0.997))
+    fields = algo.fields()
+    assert fields['cycle'] == {'n_step': n, 'gamma': round(g, 5), 'since_reset': since}
+    assert any('cycle n-step' in line for line in algo.log_extra(fields))
+
+
+def test_without_the_anneal_knobs_the_collector_keeps_the_run_constants(monkeypatch):
+    monkeypatch.setenv('SNEK_ALGO', 'dqn')
+    monkeypatch.setenv('SNEK_RESET_INTERVAL', '40')
+    monkeypatch.setenv('SNEK_N_STEP_UPDATE', '3')
+    config = train.build_config()
+    assert config['reset_anneal_n_step'] == '' and config['reset_anneal_gamma'] == ''
+    config.update({'seed': 3, 'replay_buffer_max_length': 500, 'initial_collect_steps': 40, 'batch_size': 8})
+    arch = arch_tools.build_arch(config['fc_layers'], constants.NUM_ACTIONS, constants.OBS_LEN,
+                                 constants.OBS_ERA, algo='dqn')
+    algo = train.ALGOS['dqn'].build(config, arch)
+    assert algo.collector.n_step == 3 and algo.collector.discount == pytest.approx(0.99)
+    assert 'cycle' not in algo.fields() and 'gamma' not in algo.describe()
+
+
+def test_half_an_anneal_pair_is_refused_at_config_time(monkeypatch):
+    monkeypatch.setenv('SNEK_ALGO', 'dqn')
+    monkeypatch.setenv('SNEK_RESET_ANNEAL_N_STEP', '10,3')
+    with pytest.raises(ValueError, match='RESET_ANNEAL_GAMMA'):
+        train.build_config()
+
+
+def test_ppo_and_sac_refuse_the_anneal_knobs(monkeypatch):
+    for algo in ('ppo', 'sac2'):
+        monkeypatch.setenv('SNEK_ALGO', algo)
+        monkeypatch.setenv('SNEK_RESET_ANNEAL_STEPS', '5')
+        with pytest.raises(ValueError, match='SNEK_RESET_ANNEAL_STEPS'):
+            train.build_config()

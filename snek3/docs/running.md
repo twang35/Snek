@@ -91,6 +91,8 @@ existed, b2's shaping dose had to be confirmed by reading `/proc/<pid>/environ` 
 | `SNEK_RESET_INTERVAL` | 0 (off) | BBF's shrink-and-perturb resets (Schwarzer et al. 2023) on any DQN-family algorithm, every this many **gradient steps**: the trunk (every hidden linear) is pulled toward a fresh initialisation, the head (and IQN's embedding, FQF's fraction net) is re-initialised, the target becomes a copy of the reset net and every optimiser's state is cleared. `algos/dqn/resets.py`; `plans/algoExploration/d-data-efficiency.md` |
 | `SNEK_RESET_ALPHA` | 0.5 | how much of the old trunk survives a reset: θ ← α θ + (1 − α) θ_fresh. 1 keeps the trunk and still re-initialises the head; 0 is a full re-initialisation |
 | `SNEK_RESET_STOP_AFTER` | 0 (never) | the gradient step after which no reset fires, so the final stretch of training settles |
+| `SNEK_RESET_ANNEAL_N_STEP`, `SNEK_RESET_ANNEAL_GAMMA` | off | BBF's within-cycle anneal, both or neither: `10,3` and `0.97,0.997` restart n-step and γ at the first value after every reset and take them to the second over `SNEK_RESET_ANNEAL_STEPS` gradient steps (exponential in n and in log(1 − γ), Dopamine's schedule; the first cycle starts at gradient step 0). On the DQN-family path the collector's window, its discount and the env's `shaping_discount` move **together** (`docs/invariants.md` §6), so a banked transition keeps the `γ^n` it was collected under and new ones carry the new; each eval row carries a `cycle` block. Inert without resets beyond the first cycle. 2026-09-20; `algos/dqn/resets.py` `CycleSchedule` |
+| `SNEK_RESET_ANNEAL_STEPS` | 10,000 | the anneal's length in gradient steps |
 
 ### Replay
 
@@ -171,6 +173,42 @@ and distributional knob is **refused by name**, as under PPO; `SNEK_COLLECT_ENVS
 Each eval row carries `alpha` and a `sac` block -- `entropy`, `target_entropy`, `critic_loss`, `actor_loss`,
 `alpha_loss`, `entropy_penalty`, `clip_fraction` (the share of critic samples the clipped branch won) and
 `episodes` -- so the gates in `b-entropy.md` §4 read off the history file.
+
+### BBF — only under `SNEK_ALGO=bbf`
+
+Bigger, Better, Faster (Schwarzer et al. 2023), the paper's recipe whole (`algos/bbf/`; `plans/algoExploration/d-data-efficiency.md`
+§7), built 2026-09-20 to read how it does on Snake and expected to rest after a few batches. Its own package because two pieces do not
+fit the shared path: the n-step return is summed **when a batch is drawn**, from a replay that keeps each lane's rows in order, so the
+anneal of n and γ reaches every drawn transition; and SPR needs the K observations after each state. It shares the collector (at n-step
+1, fork and shield off), the Rainbow network (dueling C51, noisy off; **a `bbf` checkpoint restores as a Rainbow one**, the SPR heads
+live in `resume.pt`), Group A's C51 losses, the reset and cycle schedules, and every eval and pass. Knobs DQN owns keep DQN's names at
+the paper's defaults; BBF's own carry `BBF_`; every other algorithm's knob is refused by name.
+
+| knob | paper default | notes |
+|---|---|---|
+| `SNEK_LEARNING_RATE`, `SNEK_ADAM_EPSILON`, `SNEK_BBF_WEIGHT_DECAY` | 1e-4, 1.5e-4, 0.1 | one AdamW over the Q net and the SPR heads |
+| `SNEK_BATCH_SIZE`, `SNEK_REPLAY_RATIO` | 32, 8 | gradient steps per game move |
+| `SNEK_DISCOUNT`, `SNEK_N_STEP_UPDATE` | 0.997, 3 | the **end** of each cycle; with the anneal off, the constants throughout |
+| `SNEK_RESET_INTERVAL`, `_ALPHA`, `_STOP_AFTER` | 40,000, 0.5, 0 | the encoder (`trunk.hidden.*`) and the transition model shrunk, the streams, projection and predictor replaced, both targets copied, AdamW cleared |
+| `SNEK_RESET_ANNEAL_N_STEP`, `_GAMMA`, `_STEPS` | `10,3`, `0.97,0.997`, 10,000 | as above, applied at sample time here |
+| `SNEK_TARGET_UPDATE_TAU` | 0.005 | EMA every gradient step, Q net and SPR heads |
+| `SNEK_GRADIENT_CLIPPING` | 10 | |
+| `SNEK_INITIAL_EPSILON`, `SNEK_MIN_EPSILON`, `SNEK_EPSILON_ANNEAL_STEPS` | 1, 0, 2001 | linear in moves after the prefill; **no hard floor**, the paper trains at ε 0 |
+| `SNEK_INITIAL_COLLECT_STEPS`, `SNEK_REPLAY_BUFFER_MAX_LENGTH`, `SNEK_PRIORITY_EXPONENT` | 2,000, 1,000,000, 0.5 | prefill at ε 1; PER with Dopamine's weights (`p^-0.5` over the batch max) |
+| `SNEK_COLLECT_ENVS` | 1 | lanes; the replay keeps each lane's sequence and refuses a row that does not continue its lane |
+| `SNEK_DIST_ATOMS`, `SNEK_DIST_V_MIN`, `SNEK_DIST_V_MAX` | 51, -10, 110 | this game's return range |
+| `SNEK_BBF_SPR_WEIGHT`, `SNEK_BBF_SPR_STEPS`, `SNEK_BBF_PROJECTION` | 5, 5, 512 | the SPR weight, K, the projection width; 0 weight or 0 steps is no SPR |
+| `SNEK_BBF_TRANSITION_WIDTH` | 256 | the transition model's hidden width (0: the latent's). BBF's is two 64-channel convolutions beside a far larger encoder; at the latent's 2048 it was 8x the whole step's cost |
+| `SNEK_BBF_DUELING`, `SNEK_BBF_DOUBLE` | 1, 1 | |
+| `SNEK_FC_LAYERS` | `1280,2048` in the paper cell | the plan's analogue of the ×4 IMPALA encoder plus the 2048 dense layer |
+
+Each eval row carries `cycle` (`n_step`, `gamma`, `since_reset`) and a `bbf` block (`resets`, `train_step`, `td_loss`, `spr_loss`,
+`grad_norm`). **The reward/discount coupling** holds exactly only with the potential shaping off (`SNEK_CHASE_SAFE_SHAPING=0`, the paper
+cell): under a sample-time anneal a transition collected at γ 0.97 can be drawn into a 0.997 target.
+
+Throughput on the laptop **under a live 4-arm wave**, 1 thread, replay ratio 8 (2026-09-20, lower bounds): `fc 1280,2048` transition
+256: **25 gradient steps/s = 3 moves/s**; transition 2048: 8/s; transition 64: 31/s; `fc 1280`: 61/s; `fc 320`: 210/s; 4 threads was
+slower than 1 under that load. A 100k-move paper arm is ~800k gradient steps, about nine hours of learning before stage A.
 
 ### PPO — only under `SNEK_ALGO=ppo`
 

@@ -60,7 +60,9 @@ def _sac():
 
 
 ALGORITHMS = {'dqn': _dqn, 'ppo': _ppo, 'c51': _dist, 'qrdqn': _dist, 'iqn': _dist, 'fqf': _dist,
-              'sac': _sac, 'sac2': _sac, 'rainbow': _rainbow, 'btr': _rainbow}
+              'sac': _sac, 'sac2': _sac, 'rainbow': _rainbow, 'btr': _rainbow,
+              # A BBF checkpoint is its dueling C51 Rainbow network alone; the SPR heads live in `resume.pt`.
+              'bbf': _rainbow}
 
 
 def _module_for(arch):

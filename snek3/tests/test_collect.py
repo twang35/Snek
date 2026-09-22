@@ -803,3 +803,29 @@ def test_an_agent_without_a_side_value_stores_zero():
     collector = collect.Collector(vec, FixedAgent(), buffer, collect_envs=1, fork=collect.ForkConfig(branches=1), seed=1)
     collector.step(0.0)
     assert buffer.added and all(entry['aux'] == 0.0 for entry in buffer.added)
+
+
+# ---------------------------------------------------------------- a settable horizon (the reset anneal)
+
+def test_set_n_step_drops_every_partial_window_and_emits_at_the_new_length():
+    collector, buffer, agent, vec = make(width=2, collect_envs=2, n_step=4, discount=0.9, survival=True)
+    for _ in range(2):
+        collector.step(0.0)
+    assert all(len(window) == 2 for window in collector.windows)
+    assert collector.set_n_step(2) is True
+    assert collector.n_step == 2 and all(window == [] for window in collector.windows)
+    before = len(buffer.added)
+    collector.step(0.0)
+    assert len(buffer.added) == before          # one step into a fresh two-step window: nothing yet
+    collector.step(0.0)
+    emitted = buffer.added[before:]
+    assert len(emitted) == 2 and all(abs(row['discount'] - 0.9 ** 2) < 1e-6 or row['discount'] == 0.0 for row in emitted)
+
+
+def test_set_n_step_to_the_same_value_changes_nothing_and_a_bad_value_is_refused():
+    collector, buffer, agent, vec = make(width=1, n_step=3, survival=True)
+    collector.step(0.0)
+    kept = [list(window) for window in collector.windows]
+    assert collector.set_n_step(3) is False and [list(w) for w in collector.windows] == kept
+    with pytest.raises(ValueError):
+        collector.set_n_step(0)

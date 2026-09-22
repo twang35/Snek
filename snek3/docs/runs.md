@@ -30,7 +30,10 @@ are in git history before 2026-09-10.
   onset, is Group B's question now, and b42 puts Zhou et al.'s two hold mechanisms on exactly that cell. Whether the target should track
   PPO's 0.001-0.009 nats instead, and whether the Q-clip binds at all at lr 1e-5 (0.8% of samples at most in the gate arm), stay open.
 - **Group D's reset probe** (b43 queued 2026-09-20 on b40's close): whether BBF's shrink-and-perturb resets hold where b40's M-QR-DQN
-  drifts. If they do, `SNEK_RESET_*` goes to every later value row; if not, late drift is not a plasticity problem here.
+  drifts. If they do, `SNEK_RESET_*` goes to every later value row; if not, late drift is not a plasticity problem here -- and the anneal wave
+  (`SNEK_RESET_ANNEAL_*`, built 2026-09-20) runs before the row closes on a negative. **b44** (written 2026-09-20, awaiting the go-ahead) is a
+  different question beside it: BBF's whole recipe as written (`algos/bbf/`), four seeds at the paper's 100k-move budget, to read how the
+  algorithm itself does on Snake.
 - **Queue what does not depend** (2026-09-20, the user's rule): a batch waits for another only when it reads that batch's numbers to be
   specified or judged. b42 and b43 were queued together with b41 still live for that reason; Groups C, E, F, G and H have nothing built yet
   and are the next implementation work, in the series' order.
@@ -63,6 +66,7 @@ are in git history before 2026-09-10.
 
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
+| [b44](#b44--bbf-the-papers-recipe-on-snake) | the algorithm: BBF as written (`SNEK_ALGO=bbf`: ×4 dueling C51 `fc 1280,2048`, replay ratio 8, batch 32, AdamW 1e-4 wd 0.1, EMA τ 0.005, SPR K 5 weight 5, resets every 40k gradient steps with n 10 → 3 and γ 0.97 → 0.997 over 10k, ε 1 → 0 over 2,001 moves, PER 0.5, 1M replay) | none: the paper cell alone; hist8, b2 reward, step penalty 0.01, shaping **off**, 1 lane | 1 × 4 | **100k moves** (= 100k steps at 1 lane, ~800k gradient steps) | registered | — |
 | [b43](#b43--bbf-style-resets-on-b40s-m-qr-dqn-cell) | BBF-style shrink-and-perturb resets, the reset alone (no replay ratio 8, wider net, AdamW, EMA target, SPR or within-cycle anneal) (`SNEK_RESET_INTERVAL` 600k / 2.4M gradient steps, `_ALPHA` 0.5, `_STOP_AFTER` 10.5M) | b40's M-QR-DQN cell (`b40e`-`h`) | 2 × 4 | 3M steps | registered | — |
 | [b42](#b42--revisiting-discrete-sac-paper-cell-beside-b41s-local-cell-with-the-fixes) | Zhou et al. 2022's fixes: per-state entropy-penalty 0.5, double average Q with Q-clip 0.5. Paper cell as written (lr 1e-5, α 0.05 fixed, batch 64, 1e5 uniform, 0.1 updates a move, Polyak 0.005, 3-step, 2 × 512, MSE) / b41's local cell plus the two fixes | PPO's reward, hist8, 16 lanes / `b41e`-`h` | 2 × 4 | 3.125M steps = 50M moves | registered | — |
 | [b41](#b41--discrete-sac-paper-cell-beside-local-cell) | the algorithm: discrete SAC (`SNEK_ALGO=sac`). Paper cell as written (target entropy 0.98 ln 3, batch 64, 1M uniform, 0.25 updates a move) / local cell (target 0.1 ln 3, batch 128, PER 0.6, 100k, 0.5 updates a move, target every 8) | PPO's reward, hist8, `fc 320`; 16 lanes | 2 × 4 | 3.125M steps = 50M moves | paper half held; local cell live | paper cell stopped at 0.57M counted steps: zero perfect games on all four seeds, α 2.5 × 10⁸, entropy pinned at the 0.98 ln 3 target (1.077 nats); the local cell (0.1 ln 3) started 12:49 on the desktop |
@@ -132,6 +136,24 @@ evals below 50% and 80%), then best30. `hof5000` re-measures the top rows at 5,0
 at complete separation (Mann-Whitney p=0.029). Details in [`protocol.md`](protocol.md).
 
 ---
+
+## b44 — BBF: the paper's recipe, on Snake
+
+| | |
+|---|---|
+| base | none. `SNEK_ALGO=bbf` at its defaults, which are the paper's (Schwarzer et al. 2023, Table 1 and the released code): dueling C51 (51 atoms on [−10, 110]) on `fc 1280,2048` (the plan's MLP analogue of the ×4 IMPALA encoder plus the 2048 dense layer), replay ratio 8 at batch 32, AdamW lr 1e-4 ε 1.5e-4 wd 0.1, grad clip 10, EMA target τ 0.005, SPR K 5 weight 5 (transition width 256, projection 512), shrink-and-perturb resets every 40k gradient steps at α 0.5 with n-step 10 → 3 and γ 0.97 → 0.997 over the 10k gradient steps after each, ε 1 → 0 over 2,001 moves after a 2,000-move prefill, PER 0.5, 1M replay, 1 lane; hist8, the b2 reward with step penalty 0.01 and the potential shaping **off** (the sample-time anneal keeps the reward/discount coupling only with it off) |
+| varies | nothing: one cell, `bbfpaper`, 4 seeds |
+| cells × seeds | 1 × 4, seeds 1-4 pinned to the letter |
+| cap | **100k moves**, the paper's regime (at 1 lane, 100k counted steps and ~800k gradient steps; about nine hours of learning an arm at the laptop's 25 gradient steps/s, more on the desktop) |
+| control | none in-family. b35's paper cells (DQN-Adam, C51 at 10M moves: 7-16%) and b43 give the shape of a value paper cell here; BBF's claim is 100× fewer moves |
+| predicted | registered 2026-09-20 by the agent: the stage-A trace saw-tooths at every reset (every 5k moves, 20 in the run) and the perfect rate at 100k moves stays under 20% on every seed, with no checkpoint at 97 and stage B empty; the SPR loss falls within the first cycle and stays low. If a seed reaches 50% the recipe has done in 100k moves what b35's paper cells could not in 10M, which would be the finding |
+
+**Why.** The user's ask (2026-09-20): a read on how BBF itself does on Snake, separate from Group D's reset probe (b43, the reset alone
+on a tuned cell) -- the plan had dropped the paper cell because SPR and the CNN had no meaning here, and the package `algos/bbf/` now
+carries the recipe whole with the MLP analogue stated (`plans/algoExploration/d-data-efficiency.md` §7). Read for the shape first:
+whether anything is learned in 100k moves, what each reset costs and recovers, whether the anneal's early myopic cycles show. Gates: 25
+tests and 18 / 18 mutants, a smoke with resets every 2,000 gradient steps that checkpointed, resumed with its buffer and restored through
+`evaluate.py`; the whole suite passes. Waits for the go-ahead to commit, deploy and push.
 
 ## b43 — BBF-style resets on b40's M-QR-DQN cell
 

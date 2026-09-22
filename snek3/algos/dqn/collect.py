@@ -56,6 +56,14 @@ An agent that sets `act_aux` in `act()` -- one float per lane, SAC's policy entr
 acted in -- has it stored with that state's transition (`buffer.add(..., aux=)`), through the n-step
 window: the value banked is the one from the window's *first* step, the state the transition is about.
 An agent without the attribute stores 0.
+
+## Changing the horizon mid-run
+
+`set_n_step(n)` (the reset anneal, `algos/dqn/resets.py`) changes the window length between `step()`
+calls. Every lane's partial window is dropped, not re-cut: a window is `n` steps of one episode and the
+transitions it would have emitted are the ones the new `n` will emit from the next step on. Nothing
+already banked changes -- a banked transition's `discount` is `gamma ** n` at the `n` and `gamma` it was
+collected under, which is what the agent bootstraps with.
 """
 
 import numpy as np
@@ -232,6 +240,19 @@ class Collector(object):
         # Redrawn once per episode, never per step: an episode is guided end to end or not at all,
         # or the buffer holds a trajectory that was half shielded and cannot be reasoned about.
         self.guided[finished] = self.rng.random(finished.size) < self.guided_fraction
+
+    def set_n_step(self, n_step):
+        """A new window length from the next step on; every lane's partial window is dropped. Returns
+        whether it changed. `discount` is the caller's to move (`self.discount`), as the anneal does."""
+        n_step = int(n_step)
+        if n_step < 1:
+            raise ValueError('n_step must be at least 1, got {0}'.format(n_step))
+        if n_step == self.n_step:
+            return False
+        self.n_step = n_step
+        for window in self.windows:
+            del window[:]
+        return True
 
     def set_guided_fraction(self, fraction):
         """Follows the schedule between evals. Takes effect at each lane's next episode boundary.

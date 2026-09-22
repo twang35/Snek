@@ -21,6 +21,7 @@ Knobs, all `SNEK_DIST_*` and each its config key lowercased, over DQN's own (whi
 from algos.dist import net as network
 from algos.dist.agent import DistAgent
 from algos.dqn import algo as dqn_algo
+from algos.dqn import resets
 
 RUNGS = ('c51', 'qrdqn', 'iqn', 'fqf')
 HEAD_TYPE = {'c51': 'c51', 'qrdqn': 'quantile', 'iqn': 'iqn', 'fqf': 'fqf'}
@@ -95,6 +96,7 @@ class DistAlgo(dqn_algo.DqnAlgo):
                                reset_interval=config['reset_interval'],
                                reset_alpha=config['reset_alpha'],
                                reset_stop_after=config['reset_stop_after'],
+                               cycle=resets.cycle_from_config(config), on_cycle=self.apply_cycle,
                                kappa=config['dist_kappa'],
                                n_tau=config['dist_tau_samples'],
                                n_tau_prime=config['dist_tau_prime_samples'],

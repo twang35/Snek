@@ -1,6 +1,7 @@
 {
  "tests": [
-  "tests/test_resets.py"
+  "tests/test_resets.py",
+  "tests/test_collect.py"
  ],
  "mutations": [
   {
@@ -62,6 +63,72 @@
    "file": "algos/dist/agent.py",
    "from": "        return [self.optimizer] + ([self.fraction_optimizer] if self.fraction_optimizer is not None else [])",
    "to": "        return [self.optimizer]"
+  },
+  {
+   "desc": "the anneal's gamma interpolated linearly instead of in log(1 - gamma)",
+   "file": "algos/dqn/resets.py",
+   "from": "        return 1.0 - math.exp((1.0 - p) * math.log(1.0 - g0) + p * math.log(1.0 - g1))",
+   "to": "        return (1.0 - p) * g0 + p * g1"
+  },
+  {
+   "desc": "the anneal's n-step interpolated linearly",
+   "file": "algos/dqn/resets.py",
+   "from": "        return max(1, int(round(n0 * (n1 / n0) ** self.progress(since_reset))))",
+   "to": "        return max(1, int(round(n0 + (n1 - n0) * self.progress(since_reset))))"
+  },
+  {
+   "desc": "the progress never saturates at 1",
+   "file": "algos/dqn/resets.py",
+   "from": "        return min(1.0, max(0.0, float(since_reset) / float(self.steps)))",
+   "to": "        return max(0.0, float(since_reset) / float(self.steps))"
+  },
+  {
+   "desc": "a reset does not restart the cycle",
+   "file": "algos/dqn/agent.py",
+   "from": "        self.resets += 1\n        self.last_reset_step = self.train_step",
+   "to": "        self.resets += 1"
+  },
+  {
+   "desc": "the hook called with the cycle off",
+   "file": "algos/dqn/agent.py",
+   "from": "        if not self.cycle.enabled or self.on_cycle is None:",
+   "to": "        if self.on_cycle is None:"
+  },
+  {
+   "desc": "the cycle position not persisted",
+   "file": "algos/dqn/agent.py",
+   "from": "        self.last_reset_step = int(state.get('last_reset_step', 0))",
+   "to": "        self.last_reset_step = 0"
+  },
+  {
+   "desc": "the env's shaping discount not moved with gamma",
+   "file": "algos/dqn/algo.py",
+   "from": "        self.collector.vec.shaping_discount = float(gamma)",
+   "to": "        pass"
+  },
+  {
+   "desc": "the collector's discount not moved with gamma",
+   "file": "algos/dqn/algo.py",
+   "from": "        self.collector.discount = float(gamma)\n",
+   "to": "\n"
+  },
+  {
+   "desc": "the first cycle not applied at build",
+   "file": "algos/dqn/algo.py",
+   "from": "        if self.agent.cycle.enabled:\n            self.apply_cycle(*self.agent.cycle_values())",
+   "to": "        pass"
+  },
+  {
+   "desc": "set_n_step keeps the partial windows",
+   "file": "algos/dqn/collect.py",
+   "from": "        for window in self.windows:\n            del window[:]\n        return True",
+   "to": "        return True"
+  },
+  {
+   "desc": "half an anneal pair accepted",
+   "file": "algos/dqn/resets.py",
+   "from": "        if (self.n_steps is None) != (self.gammas is None):",
+   "to": "        if False:"
   }
  ]
 }

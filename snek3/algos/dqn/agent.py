@@ -134,7 +134,8 @@ class DdqnAgent(object):
     def __init__(self, arch, learning_rate=1e-5, adam_epsilon=1e-7, target_update_period=8,
                  target_update_tau=1.0, gradient_clipping=0.0, use_is_weights=True,
                  seed=None, device='cpu', munchausen_alpha=0.0, munchausen_tau=0.03,
-                 munchausen_l0=-1.0, reset_interval=0, reset_alpha=0.5, reset_stop_after=0):
+                 munchausen_l0=-1.0, reset_interval=0, reset_alpha=0.5, reset_stop_after=0,
+                 cycle=None, on_cycle=None):
         self.arch = arch
         self.device = device
         self.seed = seed
@@ -142,6 +143,12 @@ class DdqnAgent(object):
         # See `algos/dqn/resets.py`; `maybe_reset` runs after every update, like the target copy.
         self.reset_schedule = resets.ResetSchedule(reset_interval, reset_alpha, reset_stop_after)
         self.resets = 0
+        # BBF's within-cycle anneal of n-step and gamma (`resets.CycleSchedule`), read after every update
+        # from the gradient steps since the last reset; `on_cycle(n_step, gamma)` is the algorithm's hook
+        # that moves the collector and the env. Off (`cycle` None or disabled) it is never called.
+        self.cycle = cycle if cycle is not None else resets.CycleSchedule()
+        self.on_cycle = on_cycle
+        self.last_reset_step = 0
         self.num_actions = int(arch['num_actions'])
         # Munchausen (Vieillard, Pietquin & Geist 2020): `alpha > 0` adds the clipped, scaled
         # log-policy of the taken action to the reward and replaces the double-Q bootstrap with the
@@ -249,6 +256,7 @@ class DdqnAgent(object):
         self.train_step += 1
         self.maybe_update_target()
         self.maybe_reset()
+        self.maybe_anneal()
         metrics = {'loss': float(loss.detach()), 'train_step': self.train_step,
                    'mean_abs_td': float(td_error.detach().abs().mean()), 'resets': self.resets}
         if grad_norm is not None:
@@ -320,6 +328,27 @@ class DdqnAgent(object):
         for optimizer in self.optimizers():
             resets.clear_optimizer(optimizer)
         self.resets += 1
+        self.last_reset_step = self.train_step
+        return True
+
+    @property
+    def steps_since_reset(self):
+        return self.train_step - self.last_reset_step
+
+    def cycle_values(self):
+        """`(n_step, gamma)` the anneal asks for now."""
+        since = self.steps_since_reset
+        return self.cycle.n_step_at(since), self.cycle.gamma_at(since)
+
+    def maybe_anneal(self):
+        """Hands the cycle's current `(n_step, gamma)` to `on_cycle` after every update while the anneal is
+        on. The hook is cheap when nothing changed (the collector compares), so it is called every step
+        rather than on a change test here, which keeps the reset step itself -- where both values jump
+        back -- on the same path as every other step."""
+        if not self.cycle.enabled or self.on_cycle is None:
+            return False
+        n_step, gamma = self.cycle_values()
+        self.on_cycle(n_step, gamma)
         return True
 
     # ---------------------------------------------------------------- persistence
@@ -328,7 +357,8 @@ class DdqnAgent(object):
         """Everything a resume needs beyond the policy weights themselves."""
         return {'model': self.net.state_dict(), 'target': self.target.state_dict(),
                 'optimizer': self.optimizer.state_dict(), 'train_step': self.train_step,
-                'rng': self.rng.bit_generator.state, 'resets': self.resets}
+                'rng': self.rng.bit_generator.state, 'resets': self.resets,
+                'last_reset_step': self.last_reset_step}
 
     def load_state_dict(self, state):
         self.net.load_state_dict(state['model'])
@@ -336,5 +366,6 @@ class DdqnAgent(object):
         self.optimizer.load_state_dict(state['optimizer'])
         self.train_step = int(state.get('train_step', 0))
         self.resets = int(state.get('resets', 0))
+        self.last_reset_step = int(state.get('last_reset_step', 0))
         if state.get('rng') is not None:
             self.rng.bit_generator.state = state['rng']

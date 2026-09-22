@@ -101,8 +101,12 @@ def build_config(tuned):
         'reset_stop_after': int(tuned('RESET_STOP_AFTER', 0, int)),
         'fork': fork,
     }
+    # BBF's within-cycle anneal of n-step and gamma after each reset (`resets.CycleSchedule`), off unless
+    # both pairs are set: `SNEK_RESET_ANNEAL_N_STEP=10,3 SNEK_RESET_ANNEAL_GAMMA=0.97,0.997`.
+    config.update(resets.anneal_config(tuned))
     # Validated here so a bad value names its knob before anything is built.
     resets.ResetSchedule(config['reset_interval'], config['reset_alpha'], config['reset_stop_after'])
+    resets.cycle_from_config(config)
     if config['epsilon_schedule'] not in EPSILON_SCHEDULES:
         raise ValueError('SNEK_EPSILON_SCHEDULE={0!r} is not one of {1}'.format(
             config['epsilon_schedule'], sorted(EPSILON_SCHEDULES)))
@@ -155,7 +159,8 @@ class DqnAlgo(object):
                                munchausen_l0=config['munchausen_l0'],
                                reset_interval=config['reset_interval'],
                                reset_alpha=config['reset_alpha'],
-                               reset_stop_after=config['reset_stop_after'])
+                               reset_stop_after=config['reset_stop_after'],
+                               cycle=resets.cycle_from_config(config), on_cycle=self.apply_cycle)
         self.buffer = PrioritizedReplay(config['replay_buffer_max_length'], arch['obs_len'],
                                         alpha=config['priority_exponent'],
                                         initial_beta=config['is_beta'],
@@ -183,6 +188,10 @@ class DqnAlgo(object):
             collect_envs=config['collect_envs'], fork=config['fork'],
             guided_fraction=0.0, seed=config['seed'])
 
+        # With the anneal on, the first cycle starts at gradient step 0: the collector begins at the
+        # short horizon and the myopic gamma, not at the run's constants.
+        if self.agent.cycle.enabled:
+            self.apply_cycle(*self.agent.cycle_values())
         self.epsilon = config['initial_epsilon']
         self.gradient_debt = 0.0
         # Game moves banked so far, for the linear schedule. Persisted, so a resume continues the
@@ -190,6 +199,18 @@ class DqnAlgo(object):
         self.moves = 0
         if self.linear_schedule:
             self.collector.set_guided_fraction(config['guided_fraction'])
+
+    # ------------------------------------------------------------ the anneal's hook
+
+    def apply_cycle(self, n_step, gamma):
+        """The agent's `on_cycle`: the collector's window and discount, and the env's shaping discount,
+        move together. **All three or none**: potential-based shaping pays `c (gamma Phi(s') - Phi(s))`
+        with the agent's gamma (the paragraph on `shaping_discount` above), so a gamma that moved in the
+        target and not in the env would change the reward, not only the bootstrap. New transitions carry
+        the new `gamma ** n`; banked ones keep theirs."""
+        self.collector.set_n_step(int(n_step))
+        self.collector.discount = float(gamma)
+        self.collector.vec.shaping_discount = float(gamma)
 
     # ------------------------------------------------------------ what a checkpoint and an eval see
 
@@ -213,6 +234,8 @@ class DqnAlgo(object):
                 self.config['munchausen_l0'])
         if self.agent.reset_schedule.enabled:
             extra += ', ' + self.agent.reset_schedule.describe()
+        if self.agent.cycle.enabled:
+            extra += ', ' + self.agent.cycle.describe()
         return '{0} lane(s), replay ratio {1}{2}'.format(self.collector.vec.n,
                                                          self.config['replay_ratio'], extra)
 
@@ -290,9 +313,13 @@ class DqnAlgo(object):
         step with an epsilon it never ran under. The fork counters are the same kind of thing — a
         window of training that is over and cannot be reconstructed.
         """
-        return {'epsilon': round(float(self.epsilon), 5),
-                'guided_fraction': round(float(self.collector.guided_fraction), 3),
-                'fork': self.collector.snapshot() if self.config['fork'].enabled else None}
+        out = {'epsilon': round(float(self.epsilon), 5),
+               'guided_fraction': round(float(self.collector.guided_fraction), 3),
+               'fork': self.collector.snapshot() if self.config['fork'].enabled else None}
+        if self.agent.cycle.enabled:
+            out['cycle'] = {'n_step': int(self.collector.n_step), 'gamma': round(float(self.collector.discount), 5),
+                            'since_reset': int(self.agent.steps_since_reset)}
+        return out
 
     def on_eval(self, eval_rows, measured):
         """Moves the epsilon and shield schedules on this eval, and returns what they became.
@@ -331,6 +358,10 @@ class DqnAlgo(object):
         if self.agent.reset_schedule.enabled:
             lines.append('           resets {0}  (every {1:,} gradient steps, at {2:,})'.format(
                 self.agent.resets, self.agent.reset_schedule.interval, self.agent.train_step))
+        if row.get('cycle'):
+            cycle = row['cycle']
+            lines.append('           cycle n-step {0}  gamma {1}  ({2:,} gradient steps since reset)'.format(
+                cycle['n_step'], cycle['gamma'], cycle['since_reset']))
         if not row.get('fork'):
             return lines
         fork = row['fork']

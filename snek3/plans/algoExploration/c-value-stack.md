@@ -2,7 +2,8 @@
 
 **Status: built 2026-09-20, nothing queued** (`algos/rainbow/`: `noisy.py`, `net.py`, `agent.py`, `algo.py`, the names `rainbow` and `btr` in
 `train.ALGOS` and `tools/restore.py`; `tests/test_rainbow.py`, mutants `tests/mut_rainbow.json`, 14 of 14 killed). Gates 1, 2, 3 and 5 passed the same day
-(§4); **C1 is not queued until B2 has been queued** (decided 2026-09-20) and its tuning wave has run. Originally: planned 2026-09-16, nothing built. **Where each piece and each row stands is the `status` column of §1 and §3 and the gate table of §4** (added 2026-09-20, on the same rule as `a-return-tail.md`: a cell is filled in the pass that does the work, and an empty cell means *not done*, not *passed*). Group C of [`algorithm-series.md`](algorithm-series.md);
+(§4); **C1 is not queued until B2 has been queued** (decided 2026-09-20) and its tuning wave has run -- **B2 was queued as b42 later the same
+day** (`docs/runs.md`), so under the queue-what-does-not-depend rule C1 is now queueable and is the next batch to write. Originally: planned 2026-09-16, nothing built. **Where each piece and each row stands is the `status` column of §1 and §3 and the gate table of §4** (added 2026-09-20, on the same rule as `a-return-tail.md`: a cell is filled in the pass that does the work, and an empty cell means *not done*, not *passed*). Group C of [`algorithm-series.md`](algorithm-series.md);
 conventions in [`README.md`](README.md). Phase 4 of the running order, after Group B (SAC); waits for Group A to close -- as of 2026-09-20 A1-A5 are closed (b39 closed today: FQF climbs where IQN flattened but never holds, stage B empty) and A6 (b40) is live on the laptop.
 
 **Decided 2026-09-20, before implementation** (the questions raised when the plan was re-read against the code):

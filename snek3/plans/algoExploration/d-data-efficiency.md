@@ -41,7 +41,7 @@ first wave.
 | the base cell | Impala ×4 C51 at replay ratio 8, 100k steps | **b40's `mqrdqnlocal`** (A6): QR-DQN N 32, Munchausen α 0.9 τ 0.03 l₀ −1, the local plumbing (fork 4, shield, PER, target period 8, replay ratio 1, batch 128, lr 1e-5), `hist8`, `fc 320`, **3M steps**. The densest, steadiest value cell of A2-A6 (`docs/runs.md` b40) |
 | the cadence | every 40k gradient steps ≈ 20 cycles in a 100k-step run at ratio 8 | the cell runs ~4 gradient steps a counted step (fork 4 lanes, ratio 1), so 3M steps is **~12M gradient steps**. Two cells: **every 600k** (~20 cycles, the paper's count) and **every 2.4M** (~5 cycles); both stop after **10.5M** (the last eighth reset-free) |
 | wider net, replay ratio 8, AdamW, EMA target, SPR, the 100k regime | the rest of the recipe | **dropped**: they are the data-efficiency levers, and the probe is the reset alone on a cell whose other knobs are already tuned. Each is a later cell if the reset earns one |
-| n-step and γ annealed within each cycle (10 → 3, 0.97 → 0.997 over 10k gradient steps) | what lets a freshly reset net relearn fast -- BBF's own ablations put the schedules among the pieces that matter most *in the reset regime*, because a freshly reset head relearns from a shorter, more myopic target | **not in the first wave**, and that is the first wave's known limitation: the base cell is n-step 1 at γ 0.99 throughout. **Poor recovery after a reset in b43 therefore says nothing about resets as BBF uses them**, and the anneal wave (`SNEK_RESET_ANNEAL_*`, not built; §6) runs before the row can close on a negative -- whether b43 dips without holding or is worse everywhere. Built while b43 runs, so it can follow at once |
+| n-step and γ annealed within each cycle (10 → 3, 0.97 → 0.997 over 10k gradient steps) | what lets a freshly reset net relearn fast -- BBF's own ablations put the schedules among the pieces that matter most *in the reset regime*, because a freshly reset head relearns from a shorter, more myopic target | **not in b43**, and that is its known limitation: the base cell is n-step 1 at γ 0.99 throughout. **Poor recovery after a reset in b43 therefore says nothing about resets as BBF uses them**, and the anneal wave (`SNEK_RESET_ANNEAL_*`, **built 2026-09-20**, §6) runs before the row can close on a negative -- whether b43 dips without holding or is worse everywhere |
 
 Tests (`tests/test_resets.py`): the partition puts every hidden linear in the trunk and the rest in the head, for
 `QNet` and for FQF's net; α = 1 leaves the trunk and still re-initialises the head; α = 0 equals a fresh init at
@@ -60,7 +60,8 @@ not cleared.
 | batch | status | arms | base | read against | judged on |
 |---|---|---|---|---|---|
 | D1 | **queued 2026-09-20 as b43** (b40 closed the same day: 436 stage-B rows, best 98.0, no `hof5000` candidate) | 4 seeds `mqrdqnlocal` + `SNEK_RESET_INTERVAL=600000` + 4 seeds at `2400000`, both `SNEK_RESET_ALPHA=0.5`, `SNEK_RESET_STOP_AFTER=10500000`, 3M steps, one 8-arm wave | b40's `mqrdqnlocal` spec, verbatim, plus the three knobs | **b40e-h**, the same cell without resets | **hold**: the perfect rate after each reset's dip and in the reset-free tail, drawdown count, `zero_since`; then stage-B density, `hof5000`, `hof30k` against b40's |
-| D1 anneal | not planned unless D1's dip is the problem | the 600k cell with n-step and γ annealed within each cycle | D1 | D1 | whether the anneal removes the dip without losing the hold |
+| D1 anneal | **built 2026-09-20** (§6), queued only if b43 dips without holding or is worse everywhere (§5) | the 600k cell with `SNEK_RESET_ANNEAL_N_STEP=10,3 SNEK_RESET_ANNEAL_GAMMA=0.97,0.997` (`_STEPS` 10,000) | D1 | D1 | whether the anneal removes the dip without losing the hold |
+| **BBF, the paper's recipe** | **built 2026-09-20 as `algos/bbf/` (§7); b44 written, waits for the go-ahead** | 4 seeds `bbfpaper`: `SNEK_ALGO=bbf` at its defaults, `fc 1280,2048`, shaping off, **100k moves** (the paper's regime; 1 lane, so 100k counted steps, ~800k gradient steps) | none: the paper as written, translated by `README.md`'s rules | b35's paper cells and b43 for shape only; it is its own question | whether BBF's recipe learns Snake at all in its regime: the perfect rate at 100k moves, the saw-tooth at each reset (every 5k moves), stage B if anything reaches 97 |
 
 The prediction to register when it is queued: the 600k cell shows a visible dip after each reset and a higher
 late perfect rate than b40's; the 2.4M cell shows fewer, deeper dips. If neither holds better than b40 the
@@ -77,6 +78,8 @@ reset is not the lever here and the group closes.
 | 2 mutation spec kills every mutant | **passed 2026-09-20**: `mut_resets.json` 10 / 10 |
 | 3 the default is unchanged | **passed 2026-09-20**: interval 0 adds one `due()` check that returns False; the whole suite (1,317 tests) passes with the knob wired into both agents |
 | 4 the base cell closed | **passed 2026-09-20**: b40 closed on the laptop, both waves, all three passes (`docs/results.md`) |
+| anneal: schedule, hook, three places move together, resume | **passed 2026-09-20**: `tests/test_resets.py` (the cycle's values, the hook, a reset restarts it, the position survives a resume, the c51 algo moves collector n, collector γ and `shaping_discount` together, off is the constants, half a pair refused, PPO and SAC refuse); `mut_resets.json` **21 / 21** (10 reset + 11 anneal mutants) |
+| BBF: replay, agent, seam, smoke, restore, resume | **passed 2026-09-20**: `tests/test_bbf.py` 25 tests, `mut_bbf.json` **18 / 18**; `train.py bbf-smoke` (fc 64,64, resets every 2,000 gradient steps) ran to 1,200 steps, resumed with the buffer to 2,000, wrote `ckpt-1600`/`ckpt-2000`, and `evaluate.py bbf-smoke one` restored the checkpoint through the Rainbow module; the whole suite (1,442 tests) passes |
 
 1. `SNEK_ALGO=qrdqn SNEK_DIST_QUANTILES=32 SNEK_MUNCHAUSEN_ALPHA=0.9 SNEK_RESET_INTERVAL=1000 SNEK_MAX_STEPS=2500 ...
    train.py smoke` runs, resets several times, checkpoints, and the checkpoint restores through
@@ -103,9 +106,11 @@ Group G (planning) for what the value family cannot hold.
 
 ## 6. The anneal wave: where it lands in the code
 
-The knobs are `SNEK_RESET_ANNEAL_N_STEP` (`10,3`: n-step from the first value to the second over `SNEK_RESET_ANNEAL_STEPS`
-gradient steps after every reset, BBF's 10 → 3 over 10k) and `SNEK_RESET_ANNEAL_GAMMA` (`0.97,0.997`), both off by default and
-both inert unless `SNEK_RESET_INTERVAL` is set. **Nothing in the queue, the scheduler or the claims changes**: a spec carries `SNEK_*`
+**Built 2026-09-20.** The knobs are `SNEK_RESET_ANNEAL_N_STEP` (`10,3`: n-step from the first value to the second over `SNEK_RESET_ANNEAL_STEPS`
+gradient steps after every reset, BBF's 10 → 3 over 10k) and `SNEK_RESET_ANNEAL_GAMMA` (`0.97,0.997`), both off by default; with no
+reset the first cycle still runs from gradient step 0 and then sits at the end values. The schedule is `resets.CycleSchedule` (exponential in n
+and in log(1 − γ), Dopamine's), the agent's `maybe_anneal` hands `(n, γ)` to the algorithm's `apply_cycle` after every update, and the
+reset restarts the cycle (`last_reset_step`, persisted). **Nothing in the queue, the scheduler or the claims changes**: a spec carries `SNEK_*`
 knobs already, and an unknown knob is ignored silently, which is why the knobs must be deployed before a spec names them
 (`deploy-before-queueing-specs-that-need-new-knobs`). The change is three places in the training code, all on the shared DQN path
 and all gated by the knob:
@@ -116,10 +121,29 @@ and all gated by the knob:
 | `algos/dqn/agent.py` (via `resets.py`) | the bootstrap's γ read from the schedule each update, `discount ** n` in the emitted transition following it | the emitted transition's `discount` is `γ^n` at *collection* time, so a change in γ is seen by new transitions only, as in BBF's own replay |
 | `vectorized/vec_env.py` | `shaping_discount` follows γ | **the reward/discount coupling** (`docs/invariants.md`): the potential-based shaping terms are scaled by the agent's γ, so a γ that moves without the env's copy moving changes the reward, not only the target |
 
-**Not a copy under `algos/bbf/`.** A directory holding copies of the collector and agent would contain the anneal, but it would also
-hold ~1,000 duplicated lines whose bugs are then fixed in one place and not the other -- the root `CLAUDE.md`'s rule against two
+**The anneal is not a copy under `algos/bbf/`.** A directory holding copies of the collector and agent would contain the anneal, but it
+would also hold ~1,000 duplicated lines whose bugs are then fixed in one place and not the other -- the root `CLAUDE.md`'s rule against two
 implementations of one behaviour, and the reason `dist/` is subclasses of `DqnAlgo` rather than copies. The resets knob was put on the
-shared agent so every value rung could take it, and the anneal follows it. What an `algos/bbf/` directory *can* be is what `sac2.py`
-is to `sac`: a registration module naming a `bbf` algorithm whose defaults are the paper's values on the shared code, which is how a
-reduced paper cell would be named if one is queued. The blast radius on the default path is the same as the reset knob's: a schedule
-that returns the constant when off, pinned by the suite and by a fixed-seed arm at interval 0 being the same arm.
+shared agent so every value rung could take it, and the anneal follows it. The blast radius on the default path is the reset knob's: a
+schedule that returns the constants when off, pinned by the suite (`mut_resets.json` 21 / 21).
+
+## 7. The BBF package: `algos/bbf/`, the paper's recipe whole (built 2026-09-20)
+
+Asked for the same day: **four arms as close to the paper as the game allows, to read how BBF does on Snake** -- not to answer D1's
+question, and expected to run a few batches and then rest. It is its own package (`replay.py`, `agent.py`, `algo.py`; `bbf` in
+`train.ALGOS` and `tools/restore.py`) because two of its pieces do not fit the shared path, and the rest it imports:
+
+| piece | the paper | here | why not shared |
+|---|---|---|---|
+| replay | sequential, n-step return computed at sample time at the current n and γ (Dopamine), prioritised 0.5 | `SequentialReplay`: rows in play order per lane, the return summed **when drawn**, the bootstrap `γ^n` zeroed across a terminal, K next observations and an in-episode mask for SPR; Dopamine's `p^-0.5` weights over the batch max; a row is drawable once its `max(n, K)` successors exist; a resumed buffer ends each lane's saved sequence | the shared replay stores the summed return, so the anneal would reach new rows only; and SPR needs sequences |
+| network | IMPALA ×4, dueling C51, no noisy nets | `algos/rainbow/net.py` with `dueling` on and `noisy` off, `fc 1280,2048` (`README.md`: the MLP analogue is stated per row); **the checkpoint is that net alone**, restored as a Rainbow one | shared |
+| SPR | transition model on (latent, action) rolled K = 5, projection, predictor, target encoder = the EMA target; normalised-L2, weight 5 | `SprHeads`: transition `Linear(width + 3, 256) → ReLU → Linear(256, width)`, projection 512, predictor; targets from the EMA target net's trunk and the EMA projection; `2 − 2 cos` per in-episode step, summed over K. **Transition width 256** (`SNEK_BBF_TRANSITION_WIDTH`): BBF's transition model is two 64-channel convolutions beside an encoder many times their size, and at the latent's own width (2048) it cost 8x the step (8 gradient steps/s against 25) | none of it exists elsewhere |
+| optimiser, target | AdamW 1e-4, ε 1.5e-4, wd 0.1, clip 10; EMA τ 0.005 | the same, one AdamW over Q net and SPR heads, EMA every step on both | the shared agent is Adam with a periodic hard copy |
+| resets, anneal | every 40k gradient steps, encoder and transition shrunk (α 0.5), the rest replaced, optimiser cleared; n 10 → 3, γ 0.97 → 0.997 over 10k | `resets.shrink_and_perturb` on the Q net, the same rule on the SPR heads, `CycleSchedule` read at sample time | shared schedules, own application |
+| exploration, prefill, ratio, batch | ε 1 → 0 over 2001 moves after 2,000 at ε 1; replay ratio 8; batch 32 | the same; 1 lane | the epsilon floor and the shield are the shared path's |
+| reward | clipped to [−1, 1] | **unclipped**, the series' rule; the C51 support is this game's [−10, 110] | |
+| budget | 100k agent steps | **100k moves** (`SNEK_MAX_STEPS=100000` at 1 lane), ~800k gradient steps; at 25 gradient steps/s about nine hours of learning an arm plus stage A | |
+
+Departures a reader should hold: the MLP analogue of the encoder; the transition width; the reward unclipped; and **the reward/discount
+coupling is exact only with the potential shaping off**, which is why the paper cell runs `SNEK_CHASE_SAFE_SHAPING=0` (a sample-time
+anneal can draw a transition collected under γ 0.97 into a 0.997 target). Tests and gates are in §3; knobs in `docs/running.md`.

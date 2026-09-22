@@ -1,0 +1,115 @@
+{
+ "tests": [
+  "tests/test_bbf.py"
+ ],
+ "mutations": [
+  {
+   "desc": "the n-step sum not truncated at a terminal",
+   "file": "algos/bbf/replay.py",
+   "from": "        reward = (self.reward[rows[:, :n_step]] * alive[:, :n_step] * gammas).sum(axis=1)",
+   "to": "        reward = (self.reward[rows[:, :n_step]] * gammas).sum(axis=1)"
+  },
+  {
+   "desc": "the bootstrap not zeroed across a terminal",
+   "file": "algos/bbf/replay.py",
+   "from": "        discount = (float(gamma) ** n_step) * survived",
+   "to": "        discount = np.full(batch_size, float(gamma) ** n_step, dtype=np.float32)"
+  },
+  {
+   "desc": "the bootstrap observation taken from the first row instead of n - 1 on",
+   "file": "algos/bbf/replay.py",
+   "from": "        next_obs = self.next_obs[rows[:, n_step - 1]]",
+   "to": "        next_obs = self.next_obs[rows[:, 0]]"
+  },
+  {
+   "desc": "the SPR mask ignores terminals",
+   "file": "algos/bbf/replay.py",
+   "from": "            batch['spr_mask'] = (alive[:, :spr_steps] * (1.0 - done[:, :spr_steps].astype(np.float32))).astype(np.float32)",
+   "to": "            batch['spr_mask'] = np.ones((batch_size, spr_steps), dtype=np.float32)"
+  },
+  {
+   "desc": "the newest rows drawable before their successors exist",
+   "file": "algos/bbf/replay.py",
+   "from": "        return (indexes < self.size) & (self.age(indexes) >= self.horizon * self.lanes)",
+   "to": "        return indexes < self.size"
+  },
+  {
+   "desc": "the weights normalised by the mean",
+   "file": "algos/bbf/replay.py",
+   "from": "        weights = (weights / weights.max()).astype(np.float32)",
+   "to": "        weights = (weights / weights.mean()).astype(np.float32)"
+  },
+  {
+   "desc": "the lane continuity check dropped",
+   "file": "algos/bbf/replay.py",
+   "from": "            if not self.done[previous] and not np.array_equal(self.next_obs[previous], np.asarray(obs, dtype=np.float32)):",
+   "to": "            if False:"
+  },
+  {
+   "desc": "the EMA target is a hard copy",
+   "file": "algos/bbf/agent.py",
+   "from": "            t.mul_(1.0 - tau).add_(o, alpha=tau)",
+   "to": "            t.copy_(o)"
+  },
+  {
+   "desc": "the transition model replaced instead of shrunk at a reset",
+   "file": "algos/bbf/agent.py",
+   "from": "                if name.startswith('transition.'):\n                    parameter.mul_(alpha).add_(new, alpha=1.0 - alpha)\n                else:\n                    parameter.copy_(new)",
+   "to": "                parameter.copy_(new)"
+  },
+  {
+   "desc": "the projection shrunk instead of replaced at a reset",
+   "file": "algos/bbf/agent.py",
+   "from": "                if name.startswith('transition.'):",
+   "to": "                if True:"
+  },
+  {
+   "desc": "the optimiser kept across a reset",
+   "file": "algos/bbf/agent.py",
+   "from": "        resets.clear_optimizer(self.optimizer)\n        self.resets += 1",
+   "to": "        self.resets += 1"
+  },
+  {
+   "desc": "a reset does not restart the cycle",
+   "file": "algos/bbf/agent.py",
+   "from": "        self.resets += 1\n        self.last_reset_step = self.train_step\n        return True",
+   "to": "        self.resets += 1\n        return True"
+  },
+  {
+   "desc": "the SPR loss unmasked",
+   "file": "algos/bbf/agent.py",
+   "from": "    return (per_step * mask).sum(dim=1)",
+   "to": "    return per_step.sum(dim=1)"
+  },
+  {
+   "desc": "the SPR target from the online encoder",
+   "file": "algos/bbf/agent.py",
+   "from": "            targets = self.target_spr.projection(self.target.features(flat)).view(",
+   "to": "            targets = self.target_spr.projection(self.net.features(flat)).view("
+  },
+  {
+   "desc": "the double flag ignored",
+   "file": "algos/bbf/agent.py",
+   "from": "            if self.double:\n                best = self.net.q_values(next_obs).argmax(dim=1)\n            else:\n                best = self.target.q_values(next_obs).argmax(dim=1)",
+   "to": "            best = self.net.q_values(next_obs).argmax(dim=1)"
+  },
+  {
+   "desc": "the collector's gamma not following the cycle",
+   "file": "algos/bbf/algo.py",
+   "from": "        self.collector.discount = gamma\n        self.collector.vec.shaping_discount = gamma\n        transitions",
+   "to": "        transitions"
+  },
+  {
+   "desc": "the batch drawn at the constant n instead of the cycle's",
+   "file": "algos/bbf/algo.py",
+   "from": "            drawn = self.buffer.sample(self.config['batch_size'], n_step, gamma, self.config['bbf_spr_steps'])",
+   "to": "            drawn = self.buffer.sample(self.config['batch_size'], self.config['n_step_update'], self.config['discount'], self.config['bbf_spr_steps'])"
+  },
+  {
+   "desc": "the foreign-knob refusal dropped",
+   "file": "algos/bbf/algo.py",
+   "from": "    present = sorted(knob for knob in REJECTED if os.environ.get('SNEK_' + knob) is not None)\n    if present:\n        raise ValueError('SNEK_ALGO=bbf",
+   "to": "    present = []\n    if present:\n        raise ValueError('SNEK_ALGO=bbf"
+  }
+ ]
+}

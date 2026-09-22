@@ -43,6 +43,7 @@ import time
 import numpy as np
 import torch
 
+from algos.bbf import algo as bbf_algo
 from algos.dist import c51 as c51_algo
 from algos.dist import fqf as fqf_algo
 from algos.sac import algo as sac_algo
@@ -74,7 +75,7 @@ from vectorized import engine
 # value names itself in the error instead of falling through to a default.
 ALGOS = {module.NAME: module for module in
          (dqn_algo, ppo_algo, c51_algo, qrdqn_algo, iqn_algo, fqf_algo, sac_algo, sac2_algo,
-          rainbow_algo, btr_algo)}
+          rainbow_algo, btr_algo, bbf_algo)}
 
 # ---------------------------------------------------------------- config
 
