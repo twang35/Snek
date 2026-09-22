@@ -24,14 +24,18 @@ are in git history before 2026-09-10.
   Group A closes with seven rungs at 96.6-98.0 against PPO's 99.8 best30. Still open, and both now second-order: FQF at N 16
   or 32 in waves of 4 (a steadier plateau at best, not the ceiling), and whether the paper cell arrives at its full 50M-move
   budget (~18 h an arm).
-- **Group B's temperature target and hold** (b41 queued 2026-09-20, its paper cell stopped dead the same day; b42 queued 2026-09-20): the
+- **Group B: what separates 95 from 99** (b41 and b42 closed 2026-09-22): the `sac2` paper cell holds at 93-96% with no drawdown, the best
+  value-family hold in the project, and still has no `hof5000` candidate; the local cell with the fixes holds at 82-90. Candidates for the next
+  batch: the paper cell at the local replay ratio and batch, PPO's entropy range (0.001-0.009 nats) as the target, and the clipped reward the paper
+  cell never had. Earlier framing, kept for the record --
   2019 paper's 0.98 · ln|A| forces a near-uniform policy on three actions and α runs away, confirmed four times over in b41a-d. b41's local
   cell at 0.1 gave the fastest onset in the project (best30 89-93 by 60k-78k steps) and then drifted to 67-72% by 1M -- the hold, not the
   onset, is Group B's question now, and b42 puts Zhou et al.'s two hold mechanisms on exactly that cell. Whether the target should track
   PPO's 0.001-0.009 nats instead, and whether the Q-clip binds at all at lr 1e-5 (0.8% of samples at most in the gate arm), stay open.
-- **Group D's reset probe** (b43 queued 2026-09-20 on b40's close): whether BBF's shrink-and-perturb resets hold where b40's M-QR-DQN
-  drifts. If they do, `SNEK_RESET_*` goes to every later value row; if not, late drift is not a plasticity problem here -- and the anneal wave
-  (`SNEK_RESET_ANNEAL_*`, built 2026-09-20) runs before the row closes on a negative. **b44** (written 2026-09-20, awaiting the go-ahead) is a
+- **Group D's anneal wave is due** (b43 closed 2026-09-22, falsified: the reset alone is harmful on b40's cell, both cadences far under
+  `b40e`-`h`, a climb only after the resets stop). By the plan's §5 the row does not close on this: the 600k cell with
+  `SNEK_RESET_ANNEAL_N_STEP=10,3 SNEK_RESET_ANNEAL_GAMMA=0.97,0.997` (built 2026-09-20) runs next, and only if that also fails to hold does
+  D1 close as "the reset is not the lever here". Not queued yet (the user's call, 2026-09-22). **b44** (written 2026-09-20, awaiting the go-ahead) is a
   different question beside it: BBF's whole recipe as written (`algos/bbf/`), four seeds at the paper's 100k-move budget, to read how the
   algorithm itself does on Snake.
 - **Queue what does not depend** (2026-09-20, the user's rule): a batch waits for another only when it reads that batch's numbers to be
@@ -67,9 +71,9 @@ are in git history before 2026-09-10.
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
 | [b44](#b44--bbf-the-papers-recipe-on-snake) | the algorithm: BBF as written (`SNEK_ALGO=bbf`: ×4 dueling C51 `fc 1280,2048`, replay ratio 8, batch 32, AdamW 1e-4 wd 0.1, EMA τ 0.005, SPR K 5 weight 5, resets every 40k gradient steps with n 10 → 3 and γ 0.97 → 0.997 over 10k, ε 1 → 0 over 2,001 moves, PER 0.5, 1M replay) | none: the paper cell alone; hist8, b2 reward, step penalty 0.01, shaping **off**, 1 lane | 1 × 4 | **100k moves** (= 100k steps at 1 lane, ~800k gradient steps) | registered | — |
-| [b43](#b43--bbf-style-resets-on-b40s-m-qr-dqn-cell) | BBF-style shrink-and-perturb resets, the reset alone (no replay ratio 8, wider net, AdamW, EMA target, SPR or within-cycle anneal) (`SNEK_RESET_INTERVAL` 600k / 2.4M gradient steps, `_ALPHA` 0.5, `_STOP_AFTER` 10.5M) | b40's M-QR-DQN cell (`b40e`-`h`) | 2 × 4 | 3M steps | registered | — |
-| [b42](#b42--revisiting-discrete-sac-paper-cell-beside-b41s-local-cell-with-the-fixes) | Zhou et al. 2022's fixes: per-state entropy-penalty 0.5, double average Q with Q-clip 0.5. Paper cell as written (lr 1e-5, α 0.05 fixed, batch 64, 1e5 uniform, 0.1 updates a move, Polyak 0.005, 3-step, 2 × 512, MSE) / b41's local cell plus the two fixes | PPO's reward, hist8, 16 lanes / `b41e`-`h` | 2 × 4 | 3.125M steps = 50M moves | registered | — |
-| [b41](#b41--discrete-sac-paper-cell-beside-local-cell) | the algorithm: discrete SAC (`SNEK_ALGO=sac`). Paper cell as written (target entropy 0.98 ln 3, batch 64, 1M uniform, 0.25 updates a move) / local cell (target 0.1 ln 3, batch 128, PER 0.6, 100k, 0.5 updates a move, target every 8) | PPO's reward, hist8, `fc 320`; 16 lanes | 2 × 4 | 3.125M steps = 50M moves | paper half held; local cell live | paper cell stopped at 0.57M counted steps: zero perfect games on all four seeds, α 2.5 × 10⁸, entropy pinned at the 0.98 ln 3 target (1.077 nats); the local cell (0.1 ln 3) started 12:49 on the desktop |
+| [b43](#b43--bbf-style-resets-on-b40s-m-qr-dqn-cell) | BBF-style shrink-and-perturb resets, the reset alone (no replay ratio 8, wider net, AdamW, EMA target, SPR or within-cycle anneal) (`SNEK_RESET_INTERVAL` 600k / 2.4M gradient steps, `_ALPHA` 0.5, `_STOP_AFTER` 10.5M) | b40's M-QR-DQN cell (`b40e`-`h`) | 2 × 4 | 3M steps | falsified | the reset alone is harmful: 600k never above ~60% (0 stage-B rows), 2.4M at 30-70 with a climb only after the resets stop (`b43g` 90 at 2.94M, 2 rows); both far under `b40e`-`h`. "Worse everywhere", so the anneal wave runs before D1 closes; not a verdict on BBF |
+| [b42](#b42--revisiting-discrete-sac-paper-cell-beside-b41s-local-cell-with-the-fixes) | Zhou et al. 2022's fixes: per-state entropy-penalty 0.5, double average Q with Q-clip 0.5. Paper cell as written (lr 1e-5, α 0.05 fixed, batch 64, 1e5 uniform, 0.1 updates a move, Polyak 0.005, 3-step, 2 × 512, MSE) / b41's local cell plus the two fixes | PPO's reward, hist8, 16 lanes / `b41e`-`h` | 2 × 4 | 3.125M steps = 50M moves | paper cell falsified upward, local cell held | the paper cell is the best value-family hold yet: 93-96% from 0.3M to the cap on every seed, no eval below 80, 2,789 stage-B rows, best 98.8, entropy 0.05-0.07; the local cell holds at 82-90 where b41 drifted (206 rows, best 97.4). No `hof5000` candidate in either; 2.5% ≥98/500 against PPO's 95.4% |
+| [b41](#b41--discrete-sac-paper-cell-beside-local-cell) | the algorithm: discrete SAC (`SNEK_ALGO=sac`). Paper cell as written (target entropy 0.98 ln 3, batch 64, 1M uniform, 0.25 updates a move) / local cell (target 0.1 ln 3, batch 128, PER 0.6, 100k, 0.5 updates a move, target every 8) | PPO's reward, hist8, `fc 320`; 16 lanes | 2 × 4 | 3.125M steps = 50M moves | paper half held; local half split | paper cell stopped at 0.57M (α 2.5 × 10⁸, entropy pinned at 1.077 nats, zero perfect games); local cell 90 by 23-45k then 67-82% to the cap with 33-76% of late evals below 80, 12 stage-B rows, best 97.2 -- the onset without the hold |
 | [b40](#b40--munchausen-on-the-local-plumbing-m-dqn-beside-m-qr-dqn) | the value target: Munchausen's log-policy reward term and soft target (`SNEK_MUNCHAUSEN_ALPHA` 0.9, `_TAU` 0.03, `_L0` -1) on DQN / on QR-DQN N 32 | b35's local cell / b37's QR-DQN cell | 2 × 4 | 3M steps | held (the M-DQN best row 97.8, 0.8 over the line) | the target is not where the ceiling is: M-QR-DQN is QR-DQN with a slightly tighter hold (onset 1.13-1.54M, 89-93 after onset with 0-3% below 80, 436 rows, best 98.0 against 346 / 98.0), M-DQN is DQN with shallower drawdowns (73-87 after onset, 13-59% below 80 against 12-76%; 100 rows, 93 of them one seed's, best 97.8 against 96.6). No arm reached 99.2; both passes empty. Group A closes with every rung at 96.6-98.0 |
 | [b39](#b39--fqf-at-n-8-on-the-local-plumbing) | the head: FQF, 8 learned fractions (`SNEK_DIST_QUANTILES` 8) | b35's local cell, `SNEK_ALGO=fqf` | 1 × 4 | 2M steps | falsified on onset, held on the rest | not IQN's band: three of four seeds cross 90 at 1.25-1.65M (IQN at N 8 never did), best30 85 against 65, but none holds -- 71-82 after onset, 27-84% of evals below 80 -- and no checkpoint reached 97, so stage B is empty. Eight learned fractions beat eight sampled ones and still trail N 32 fixed |
 | [b38](#b38--iqn-risk-neutral-beside-trained-under-cvar-025-on-the-local-plumbing) | IQN (N = N′ 8) trained risk-neutral / under CVaR 0.25 (`SNEK_DIST_RISK_ALPHA` 0.25, `SNEK_DIST_RISK_TRAIN` 1) | b35's local cell, `SNEK_ALGO=iqn` | 2 × 4 | 2M steps | falsified | no checkpoint reached 97: the neutral cell climbs to 50% by 0.1-0.2M and sits at 55-65% to the cap (max eval 82); the CVaR-trained cell 40-54%, one seed dead from 0.9M. Zero stage-B rows, the first value batch with none. FQF at the same N 8 (b39) is drawing the same band |
@@ -164,7 +168,13 @@ tests and 18 / 18 mutants, a smoke with resets every 2,000 gradient steps that c
 | cells × seeds | 2 × 4, seeds 1-8 pinned to the letter |
 | cap | 3M counted steps, b40's, so the reset cells read on b40's x-axis |
 | control | `b40e`-`h`, the same cell without resets (89-93 after onset, 0-3% of evals below 80, 436 stage-B rows, best 98.0, no `hof5000` candidate). Judged on the **hold**: the perfect rate after each reset's dip and in the reset-free tail, drawdowns, `zero_since`; then the three passes |
-| predicted | registered 2026-09-20 by the agent, from the plan: the 600k cell shows a visible dip after each reset and a higher late perfect rate than `b40e`-`h`'s; the 2.4M cell fewer, deeper dips. **What a negative can and cannot say** (scoped the same day after a review): b43 is the reset alone, without BBF's within-cycle n-step / γ anneal that lets a reset head relearn, so if neither cell holds the anneal wave runs before the row closes, and no b43 result is a verdict on BBF |
+| predicted | registered 2026-09-20 by the agent, from the plan: the 600k cell shows a visible dip after each reset and a higher late perfect rate than `b40e`-`h`'s; the 2.4M cell fewer, deeper dips. **What a negative can and cannot say** (scoped the same day after a review): b43 is the reset alone, without BBF's within-cycle n-step / γ anneal that lets a reset head relearn, so if neither cell holds the anneal wave runs before the row closes, and no b43 result is a verdict on BBF -- **falsified 2026-09-22**: neither cell holds (600k best30 58-63, 0 stage-B rows; 2.4M 67-90, 2 rows), both far under `b40e`-`h`; the plan's "worse everywhere" branch, so the anneal wave runs before D1 closes |
+
+**Learned (closed 2026-09-22).** The reset alone is harmful on this cell. Twenty cycles (600k) hold the perfect rate at 30-60% for the whole
+run -- every reset a 30-pp dip, the next arriving before the head relearns -- with no stage-A eval at 97; five cycles (2.4M) give the same shape
+with a climb once the resets stop at ~2.6M, `b43g` reaching 90 at 2.94M and 2 stage-B rows. Both far under `b40e`-`h`'s 436 rows and 89-93
+plateau. By the plan's §5 this is the "worse everywhere" branch: b43 lacks BBF's within-cycle n-step / γ anneal, so the anneal wave
+(`SNEK_RESET_ANNEAL_N_STEP=10,3 SNEK_RESET_ANNEAL_GAMMA=0.97,0.997`, built 2026-09-20) runs before D1 closes, and nothing here is a verdict on BBF.
 
 **Why.** Row D1, re-planned 2026-09-20 from "how many steps does BBF need" to the late-plasticity probe: every
 Group A cell reached 88-94% and then drifted or never held, late drift is the shape of most of this project's
@@ -184,7 +194,14 @@ every 1,000 gradient steps checkpoints, restores and resumes with the count; `mu
 | cells × seeds | 2 × 4, seeds 1-8 pinned to the letter; the local cell shares seeds 5-8 with `b41e`-`h` |
 | cap | 3,125,000 counted steps = 50M moves, b41's |
 | control | `b41e`-`h` for the local cell (best30 89-93 by 59k-78k steps, then 67-72% perfect at 1.03M with a strong-eval fraction of 15-20%: the fastest onset in the project and no hold); PPO's hist8 strip; b41's paper cell for the paper cell (dead at 0.57M, α 2.5 × 10⁸) |
-| predicted | registered 2026-09-20 by the agent: the paper cell reads a non-zero perfect rate -- the temperature is fixed, so b41's α runaway cannot recur -- but at lr 1e-5 its onset is late, after 1.5M if within the budget at all, its plateau below `b41e`-`h`'s and its Q-clip fraction near 0. The local cell has `b41e`-`h`'s onset (best30 above 85 by 0.1M) and the test is the hold: entropy within 0.02 nats of the 0.11 target, perfect rate after 1M above 80 against b41's 67-72, a higher strong-eval fraction at the same horizon, the clip binding on 1-5% of samples at 3e-4; still short of PPO's 95% stage-B density |
+| predicted | registered 2026-09-20 by the agent: the paper cell reads a non-zero perfect rate -- the temperature is fixed, so b41's α runaway cannot recur -- but at lr 1e-5 its onset is late, after 1.5M if within the budget at all, its plateau below `b41e`-`h`'s and its Q-clip fraction near 0. The local cell has `b41e`-`h`'s onset (best30 above 85 by 0.1M) and the test is the hold: entropy within 0.02 nats of the 0.11 target, perfect rate after 1M above 80 against b41's 67-72, a higher strong-eval fraction at the same horizon, the clip binding on 1-5% of samples at 3e-4; still short of PPO's 95% stage-B density -- **paper cell: the late-onset and low-plateau clauses falsified** (90 by 0.25-0.33M, then 93-96 to the cap with no eval below 80; 2,789 stage-B rows, best 98.8), the non-zero rate and the clip near 0 (1%) held; **local cell held on every clause** (entropy 0.109, 82-90 after 1M, strong-eval 85-95, clip 3.1-3.5%, short of PPO). 2026-09-22 |
+
+**Learned (closed 2026-09-22).** The paper cell is the best value-family hold in the project: 90 by 0.25-0.33M counted steps, then 93-96% to
+the cap on every seed with no late eval below 80, 2,789 stage-B rows against b40's 436, best 98.8, entropy 0.05-0.07 nats -- the prediction
+called it late and low and it was neither. It still reaches no 99.2 (`hof5000` empty) and its 2.5% ≥98/500 density is a fortieth of PPO's. The
+local cell held every predicted clause: b41's onset kept, the drift stopped (82-90 after 1M, 4-17% of late evals below 80 against 33-76%),
+entropy pinned at the 0.11 target, the clip binding on 3%. The two fixes are a hold mechanism, and the paper's slow fixed-α recipe holds better
+still; what separates 95 from 99 is Group B's next question.
 
 **Why.** Row B2 asks whether B1's result was the idea or the implementation, and b41's local cell has just
 given it a sharp question: the fastest onset the project has seen followed by a drift the two 2022 fixes are
@@ -204,7 +221,7 @@ non-zero per-state penalty on every eval. Queued before b41 closes: nothing in i
 | cells × seeds | 2 × 4, seeds 1-8 pinned to the letter |
 | cap | 3,125,000 counted steps = 50M moves at 16 lanes, the plan's budget; ~5 h for the paper cell's four arms, ~10 h for the local cell's |
 | control | PPO's hist8 cell (`b27q`-`x`, the viewer's reference strip), b35's local DQN, b40's M-DQN (the entropy-regularised value target). Judged on stage-B density, the passes, drawdowns, and the **policy entropy trace** beside PPO's |
-| predicted | registered 2026-09-20 by the agent: the paper cell's α runs away within 100k moves and the cell never reads a non-zero perfect rate -- the paper's own failure on three actions; the local cell reaches 90% before 0.3M counted steps, the fastest onset of any value agent yet, holds steadier than DQN, does not reach PPO's 95% stage-B density, and its entropy settles at 0.05-0.12 nats, an order above PPO's 0.001-0.009 -- **paper half held** (stopped 2026-09-20 at 0.57M: zero perfect games on every seed, α 2.5 × 10⁸, entropy pinned at 1.0766 nats); the local half is live |
+| predicted | registered 2026-09-20 by the agent: the paper cell's α runs away within 100k moves and the cell never reads a non-zero perfect rate -- the paper's own failure on three actions; the local cell reaches 90% before 0.3M counted steps, the fastest onset of any value agent yet, holds steadier than DQN, does not reach PPO's 95% stage-B density, and its entropy settles at 0.05-0.12 nats, an order above PPO's 0.001-0.009 -- **paper half held** (stopped 2026-09-20 at 0.57M: zero perfect games on every seed, α 2.5 × 10⁸, entropy pinned at 1.0766 nats); the local half is live; **local half (2026-09-22): onset (90 by 23-45k), entropy (0.11 nats) and the gap to PPO held; "holds steadier than DQN" falsified** (33-76% of late evals below 80, 12 stage-B rows) |
 
 **Why.** Group B asks whether PPO's advantage on this game is the entropy bonus rather than the policy
 gradient; SAC learns a maximum-entropy policy off-policy, so it separates the two. The series' rule
@@ -227,6 +244,11 @@ and 2.3 h of passes that would have measured nothing were returned to the local 
 at 12:49. What it cost: the paper cell never reached its 50M-move budget, so "does the paper cell arrive by
 50M" (`## Open`) is answered by extrapolation, not measurement -- with α at 10⁸ and rising there is no
 mechanism by which it could. The arms' charts and evals at 0.57M are archived in `runs/`.
+
+**Learned (local cell, closed 2026-09-22).** The fastest onset the project has seen -- 90 at 23-45k counted steps, best30 89-93 by 59-78k -- and
+then no hold: a 67-82% band for 3M steps, a third to three quarters of late evals below 80, 12 stage-B rows, best 97.2, both passes empty. The
+entropy sat at the 0.11 target throughout, so the drift is not the temperature. b42's local cell, the same seeds plus Zhou et al.'s two fixes,
+holds at 82-90, which puts the drift on the 2019 implementation rather than the idea.
 
 ## b40 — Munchausen on the local plumbing: M-DQN beside M-QR-DQN
 

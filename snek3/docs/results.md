@@ -22,6 +22,124 @@ whose published artifacts are history, and the daemon's ledger, whose keys are t
 waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
 
 
+<!-- progress_update: batch b43 -->
+## Batch b43 — the `knob` sweep, 2 values x 4 seeds, 3M, closed 2026-09-22
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b40e-mqrdqnlocal-seed5, b40f-mqrdqnlocal-seed6, b40g-mqrdqnlocal-seed7, b40h-mqrdqnlocal-seed8`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| knob | rows | ≥98%/500 | per-seed share | ≥99.2 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| reset600k | 0 | – | – – – – | 0 | – | 60.42 (58.0-63.0) | 0.0 | – | – | 0.0% |
+| reset2400k | 2 | 0.0% | – – 0.0 – | 0 | 93.8 | 79.45 (67.3-89.9) | 1.0 | 45.59% | 97.3% | 0.0% |
+| **mqrdqnlocal** (reference) | 436 | 0.2% | 0.0 0.0 0.0 0.5 | 0 | 98.0 | 95.40 (93.6-96.5) | 53.8 | 0.0% | 11.61% | 1.6% |
+
+<!-- reading -->
+
+**Falsified, and the plan's §5 says why it does not close the row.** Neither reset cell holds where `b40e`-`h` did: the 600k cell never
+reads a stage-A eval at 97 (best30 58-63 against 93.6-96.5, 0 stage-B rows, 100% of late evals below 80) and the 2.4M cell sits at 30-70%
+(best30 67-90, 2 stage-B rows from one seed, 97% of late evals below 80). Read the traces, not the table: a fall of 30 pp below the running
+mean happens 150-165 times an arm at 600k and 55-66 at 2.4M -- every reset is a dip, and at 600k the next reset arrives before the head has
+relearned. The one movement worth keeping is the **reset-free tail**: after gradient step 10.5M (~step 2.6M) all four 2.4M seeds climb (last-bin
+means 56-74 against ~45 before) and `b43g` reaches 90 at 2.94M, so the plateau was being suppressed by the resets, not lost. This is the
+"worse everywhere" branch of the plan: b43 is the reset **without** BBF's within-cycle n-step / γ anneal, a reset head relearning against the
+wrong target, and the anneal wave (`SNEK_RESET_ANNEAL_*`, built 2026-09-20) runs before D1 closes. Not a verdict on BBF; b44 is that question.
+
+<!-- /reading -->
+
+### Every arm
+
+| arm | knob | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b43a-reset600k-seed1` | reset600k | 0 | – | – | – | 63.0 @2.0M | 0.0 | – |
+| `b43b-reset600k-seed2` | reset600k | 0 | – | – | – | 62.4 @2.9M | 0.0 | – |
+| `b43c-reset600k-seed3` | reset600k | 0 | – | – | – | 58.3 @0.3M | 0.0 | – |
+| `b43d-reset600k-seed4` | reset600k | 0 | – | – | – | 58.0 @1.9M | 0.0 | – |
+| `b43e-reset2400k-seed5` | reset2400k | 0 | – | – | – | 78.1 @1.8M | 0.4 | 46.64% |
+| `b43f-reset2400k-seed6` | reset2400k | 0 | – | – | – | 82.5 @3.0M | 1.1 | 45.59% |
+| `b43g-reset2400k-seed7` | reset2400k | 2 | 0.0% | 0 | 93.8 | 89.9 @3.0M | 2.5 | 0.0% |
+| `b43h-reset2400k-seed8` | reset2400k | 0 | – | – | – | 67.3 @2.4M | 0.0 | – |
+
+<!-- /progress_update: batch b43 -->
+
+<!-- progress_update: batch b42 -->
+## Batch b42 — the `knob` sweep, 2 values x 4 seeds, 3M, closed 2026-09-22
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b41e-saclocal-seed5, b41f-saclocal-seed6, b41g-saclocal-seed7, b41h-saclocal-seed8`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| knob | rows | ≥98%/500 | per-seed share | ≥99.2 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| sac2paper | 2,789 | 2.5% | 1.5 2.9 1.2 4.2 | 0 | 98.8 | 96.82 (96.6-97.1) | 90.9 | 0.0% | 1.83% | 11.3% |
+| sac2local | 206 | 0.0% | 0.0 0.0 0.0 0.0 | 0 | 97.4 | 92.70 (92.3-93.0) | 91.0 | 1.06% | 7.77% | 0.5% |
+| **saclocal** (reference) | 12 | 0.0% | 0.0 0.0 0.0 0.0 | 0 | 97.2 | 91.62 (89.0-93.2) | 31.8 | 6.4% | 69.03% | 0.1% |
+
+<!-- reading -->
+
+**The paper cell is the best value-family hold in the project, and the prediction had it backwards.** `sac2paper` (lr 1e-5, α fixed 0.05,
+batch 64, 1e5 uniform, 0.1 updates a move, 2 × 512) reaches 90 at 0.25-0.33M counted steps -- late beside the local cell's 20-30k but a tenth of
+the "after 1.5M if at all" predicted -- and then sits at 93-96% to the cap on every seed with **no** late eval below 80 and no drawdown, 2,789
+stage-B rows (Group A's best cell, b40's M-QR-DQN, had 436), best row 98.8 twice (`b42c` @914k, `b42d` @1.73M), best30 96.6-97.1, strong-eval
+fraction 91. Its entropy settles at 0.05-0.07 nats, under the local cell's 0.11 target, and the Q-clip binds on 1% of samples as predicted. What
+it does not do: reach 99.2 -- zero `hof5000` candidates, both passes empty -- and its 2.5% ≥98/500 density is far from PPO's 95.4%. The local cell
+(`b41e`-`h` plus the two fixes) held on every predicted clause: the same fast onset (90 by 18-31k), entropy pinned at 0.109 against the 0.11
+target, the late perfect rate 82-90 against b41's 67-82, late evals below 80 down from 33-76% to 4-17%, the clip binding on 3.1-3.5%, strong-eval
+fraction 85-95 against 18-47; 206 stage-B rows, best 97.4. So the fixes are a hold mechanism on this game, and the paper's slow, uniform, fixed-α
+recipe holds better still. Next for Group B: what separates 95 from 99 -- the paper cell with the local replay ratio, and PPO's entropy range
+(0.001-0.009 nats) as the target -- and the clipped reward the paper cell never had.
+
+<!-- /reading -->
+
+### Every arm
+
+| arm | knob | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b42a-sac2paper-seed1` | sac2paper | 718 | 1.5% | 0 | 98.4 | 96.6 @2.4M | 91.6 | 0.0% |
+| `b42b-sac2paper-seed2` | sac2paper | 661 | 2.9% | 0 | 98.6 | 97.1 @2.7M | 91.0 | 0.0% |
+| `b42c-sac2paper-seed3` | sac2paper | 644 | 1.2% | 0 | 98.8 | 96.6 @1.7M | 90.2 | 0.0% |
+| `b42d-sac2paper-seed4` | sac2paper | 766 | 4.2% | 0 | 98.8 | 97.0 @1.8M | 90.8 | 0.0% |
+| `b42e-sac2local-seed5` | sac2local | 30 | 0.0% | 0 | 96.4 | 92.7 @0.3M | 84.8 | 1.03% |
+| `b42f-sac2local-seed6` | sac2local | 78 | 0.0% | 0 | 96.6 | 93.0 @0.6M | 95.2 | 0.9% |
+| `b42g-sac2local-seed7` | sac2local | 47 | 0.0% | 0 | 97.4 | 92.8 @0.2M | 89.9 | 1.54% |
+| `b42h-sac2local-seed8` | sac2local | 51 | 0.0% | 0 | 95.8 | 92.3 @0.3M | 93.9 | 1.09% |
+
+<!-- /progress_update: batch b42 -->
+
+<!-- progress_update: batch b41 -->
+## Batch b41 — the `knob` sweep, 2 values x 4 seeds, 3M, closed 2026-09-22
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b27q-hist8-seed17, b27r-hist8-seed18, b27s-hist8-seed19, b27t-hist8-seed20, b27u-hist8-seed21, b27v-hist8-seed22, b27w-hist8-seed23, b27x-hist8-seed24`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| knob | rows | ≥98%/500 | per-seed share | ≥99.2 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| sacpaper | 0 | – | – – – – | 0 | – | 0.00 (0.0-0.0) | 0.0 | – | – | 0.0% |
+| saclocal | 12 | 0.0% | 0.0 0.0 0.0 0.0 | 0 | 97.2 | 91.62 (89.0-93.2) | 31.8 | 6.4% | 69.03% | 0.1% |
+| **ppo** (reference) | 22,192 | 95.4% | 95.7 94.3 95.6 95.6 95.5 95.6 95.1 95.7 | 12479 | 100.0 | 99.79 (99.7-99.9) | 95.5 | 0.0% | 0.68% | 85.4% |
+
+<!-- reading -->
+
+**The local cell closed 2026-09-22: the project's fastest onset and no hold, as predicted on the first and not the second.** `saclocal`
+reaches 90 at 23-45k counted steps (best30 89-93 by 59-78k), then drifts to a 67-82% band for the remaining 3M with 33-76% of late evals below 80
+and a strong-eval fraction of 18-47: 12 stage-B rows in all, best 97.2, no `hof5000` candidate, both passes empty. "Holds steadier than DQN" is
+falsified -- b35's local DQN had 12-76% below 80 and 45 rows -- while the onset, the entropy at 0.11 nats and the gap to PPO's density all held.
+The paper cell is the stopped-dead record above (α 2.5 × 10⁸, entropy pinned at the 0.98 · ln 3 target). Read this cell as b42's control: the
+same seeds with Zhou et al.'s two fixes (`b42e`-`h`) hold at 82-90 with 4-17% below 80, so the drift was the implementation, not the idea.
+
+<!-- /reading -->
+
+### Every arm
+
+| arm | knob | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b41a-sacpaper-seed1` | sacpaper | – | – | – | – | 0.0 @0.9M | 0.0 | – |
+| `b41b-sacpaper-seed2` | sacpaper | – | – | – | – | 0.0 @0.9M | 0.0 | – |
+| `b41c-sacpaper-seed3` | sacpaper | – | – | – | – | 0.0 @0.9M | 0.0 | – |
+| `b41d-sacpaper-seed4` | sacpaper | – | – | – | – | 0.0 @0.9M | 0.0 | – |
+| `b41e-saclocal-seed5` | saclocal | 4 | 0.0% | 0 | 96.8 | 91.8 @0.1M | 26.0 | 6.22% |
+| `b41f-saclocal-seed6` | saclocal | 2 | 0.0% | 0 | 96.4 | 93.2 @0.1M | 47.4 | 4.35% |
+| `b41g-saclocal-seed7` | saclocal | 2 | 0.0% | 0 | 95.8 | 89.0 @0.1M | 35.5 | 6.58% |
+| `b41h-saclocal-seed8` | saclocal | 4 | 0.0% | 0 | 97.2 | 92.5 @0.1M | 18.2 | 7.53% |
+
+<!-- /progress_update: batch b41 -->
+
 <!-- progress_update: batch b40 -->
 ## Batch b40 — the `knob` sweep, 2 values x 4 seeds, 3M, closed 2026-09-20
 

@@ -17,6 +17,23 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### Discrete SAC with Zhou et al.'s fixes holds where nothing in the value family has: the paper cell at 93-96% to the cap with no drawdown, and the fixes stop b41's drift on the local cell
+
+b42 (closed 2026-09-22, `docs/results.md`). `sac2paper` -- lr 1e-5, α fixed 0.05, batch 64, uniform 1e5 replay, 0.1 updates a move, Polyak
+0.005, 3-step, per-state entropy-penalty 0.5, double average Q with a Q-clip of 0.5 -- reaches 90 at 0.25-0.33M counted steps and then sits at
+93-96% on all four seeds with **no** late eval below 80: 2,789 stage-B rows (b40's M-QR-DQN, Group A's best, had 436), best row 98.8, best30
+96.6-97.1, strong-eval fraction 91. The local cell (`b41e`-`h` plus the two fixes) keeps b41's 20-30k onset and holds at 82-90 where b41 drifted
+to 67-82 (late evals below 80: 4-17% against 33-76%), with entropy pinned at the 0.11 target and the clip binding on 3% of samples -- so the drift
+was the implementation, not the maximum-entropy idea. Neither cell reaches 99.2 (`hof5000` empty in both) and the paper cell's 2.5% ≥98/500 is a
+fortieth of PPO's 95.4%: SAC holds the plateau PPO holds, two to three points lower.
+
+### Shrink-and-perturb resets alone, on a tuned value cell, are harmful; the reset-free tail recovers, so the plateau is suppressed rather than lost
+
+b43 (closed 2026-09-22). On b40's M-QR-DQN cell, resets every 600k gradient steps (twenty cycles) hold the perfect rate at 30-60% for the
+whole run with no eval at 97; every 2.4M (five cycles) gives 30-70 with a climb once the resets stop at ~2.6M steps (`b43g` reaches 90 at
+2.94M). Both far under the same cell without resets (89-93, 436 stage-B rows). **Scoped, not general**: b43 lacks BBF's within-cycle n-step / γ
+anneal, and the plan (`d-data-efficiency.md` §5) reads a poor recovery without it as the omission's effect; the annealed wave decides the row.
+
 ### The value target is not where the ceiling is either: Munchausen tightens the hold on both critics and moves no best row, and Group A closes with every rung at 96.6-98.0
 
 b40 (2026-09-20, `docs/runs.md`, `docs/results.md`): Munchausen's two changes to the value target -- the clipped, τ-scaled
