@@ -10,7 +10,7 @@ the question "does the tail carry information the mean throws away" gets a paire
 weights. It is `a-return-tail.md` §5's second-greedy-policy mechanism, broadened.
 
 **Cells**: b37 `qrdqnlocal` (e-h), b38 `iqnlocal` (a-d), b39 `fqflocal` (a-d), b40 `mqrdqnlocal` (e-h).
-Optionally b37 `c51local` (a-d), see §6.
+Plus b37 `c51local` (a-d), included at review (§6).
 
 ## 1. The reads
 
