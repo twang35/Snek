@@ -1,24 +1,24 @@
 {
-  "project": "snek3",
-  "id": "b45-reads-iqnlocal-leastnegmean",
-  "type": "eval",
-  "policies": [
-    "b38a-iqnlocal-seed1",
-    "b38b-iqnlocal-seed2",
-    "b38c-iqnlocal-seed3",
-    "b38d-iqnlocal-seed4"
-  ],
-  "selector": "topa:25",
-  "episodes": 1000,
-  "eval_shards": 16,
-  "eval_args": [
-    "--policy-variant",
-    "leastnegmean",
-    "--label",
-    "reads-leastnegmean"
-  ],
-  "box": "desktop",
-  "priority": 100,
-  "label": "b45 reads iqnlocal leastnegmean",
-  "notes": "plans/quantile-reads.md: variant 1 mass-blind: conditional mean of the negative quantiles closest to 0 wins, ties by the positive conditional mean. Top 25 checkpoints per arm by stage-A perfect rate, 1,000 episodes, no stop rule; paired against reads-meanfixed by tools/read_compare.py."
+ "project": "snek3",
+ "id": "b45-reads-iqnlocal-leastnegmean",
+ "type": "eval",
+ "policies": [
+  "b38a-iqnlocal-seed1",
+  "b38b-iqnlocal-seed2",
+  "b38c-iqnlocal-seed3",
+  "b38d-iqnlocal-seed4"
+ ],
+ "selector": "topa:25",
+ "episodes": 500,
+ "eval_shards": 16,
+ "eval_args": [
+  "--policy-variant",
+  "leastnegmean",
+  "--label",
+  "reads-leastnegmean"
+ ],
+ "box": "desktop",
+ "priority": 100,
+ "label": "b45 reads iqnlocal leastnegmean",
+ "notes": "plans/quantile-reads.md: variant 1 mass-blind: conditional mean of the negative quantiles closest to 0 wins, ties by the positive conditional mean. Top 25 checkpoints per arm by stage-A perfect rate, 500 episodes (IQN cells only, cut from 1,000 on 2026-09-22 for time: IQN's forward pass is about eight times C51's; the mean:fixed baseline stayed at 1,000), no stop rule; paired against reads-meanfixed by tools/read_compare.py."
 }
