@@ -1,0 +1,14 @@
+{
+ "arms": [
+  "b40e-mqrdqnlocal-seed5",
+  "b40f-mqrdqnlocal-seed6",
+  "b40g-mqrdqnlocal-seed7",
+  "b40h-mqrdqnlocal-seed8"
+ ],
+ "batch": "b45",
+ "box": "desktop",
+ "claimed_iso": "2026-09-23T01:17:33",
+ "claimed_ts": 1790151453.1759386,
+ "id": "b45-reads-mqrdqnlocal-leastneg",
+ "kind": "eval"
+}
