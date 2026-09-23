@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Snek b45 reads</title>
+<meta name="description" content="Sixteen acting rules over the same frozen distributional checkpoints, paired against the mean read: Snek batch b45.">
+<style>
+  /* Same chrome as the sweep page; chart colours are the dataviz reference palette's dark steps.
+     Diverging: blue (better than the control) / neutral / red (worse). The control's ghost is grey. */
+  :root { --bg:#111; --panel:#1a1a19; --fg:#ddd; --ink:#fff; --dim:#898781; --line:#2c2c2a; --axis:#383835; --hi:#4c9;
+          --blue:#3987e5; --red:#e66767; --mid:#383835; --ghost:#9a9890; }
+  html, body { margin:0; background:var(--bg); color:var(--fg); font:13px/1.4 -apple-system, system-ui, sans-serif; }
+  header { display:flex; flex-wrap:wrap; gap:.5em 1.1em; align-items:center; padding:.5em .8em; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--bg); z-index:4; }
+  header label { color:var(--dim); white-space:nowrap; }
+  select, button { background:#222; color:var(--fg); border:1px solid #444; border-radius:4px; padding:.2em .5em; font:inherit; max-width:22em; }
+  button:hover { border-color:var(--hi); cursor:pointer; }
+  button.on { border-color:var(--hi); color:var(--hi); }
+  #summary { color:var(--dim); margin-left:auto; }
+  main { padding:.6em .8em 3em; }
+  h2 { font-size:14px; font-weight:600; color:var(--ink); margin:.4em 0 .2em; }
+  h2 span, h3 span { color:var(--dim); font-weight:normal; }
+  h3 { font-size:13px; font-weight:600; color:var(--ink); margin:0; }
+  .sub { color:var(--dim); margin:0 0 .6em; }
+  .sub b, .sub code { color:var(--fg); font-weight:normal; }
+  code { font-family: ui-monospace, Menlo, monospace; font-size:12px; }
+  svg { display:block; background:var(--panel); border:1px solid var(--line); border-radius:4px; max-width:100%; }
+  svg text { fill:var(--dim); font:10px -apple-system, system-ui, sans-serif; }
+  svg text.t { fill:var(--fg); font-size:10.5px; }
+  svg text.k { fill:var(--ink); font-size:11px; }
+  svg .grid { stroke:var(--line); stroke-width:1; }
+  svg .ax { stroke:var(--axis); stroke-width:1; }
+  svg .hit { cursor:pointer; }
+  /* the matrix */
+  table.matrix { border-collapse:separate; border-spacing:2px; margin:.4em 0 1em; font-size:12px; }
+  table.matrix th { color:var(--dim); font-weight:normal; text-align:left; padding:.2em .5em; white-space:nowrap; }
+  table.matrix th.col { text-align:center; cursor:pointer; }
+  table.matrix td { text-align:center; padding:.35em .4em; border-radius:3px; min-width:5.2em; cursor:pointer; font-variant-numeric:tabular-nums; color:var(--ink); }
+  table.matrix td.none { color:var(--dim); background:var(--panel); cursor:default; }
+  table.matrix td .ci { display:block; font-size:10px; color:rgba(255,255,255,.72); }
+  table.matrix tr.group td.grp { text-align:left; color:var(--dim); background:none; cursor:default; padding-top:.7em; font-size:11px; }
+  table.matrix td.name { text-align:left; cursor:pointer; color:var(--fg); background:none; }
+  table.matrix td.name code { color:var(--ink); }
+  table.matrix td.name .d { display:block; color:var(--dim); font-size:11px; }
+  .scale { display:flex; align-items:center; gap:.5em; color:var(--dim); margin:.2em 0 .8em; }
+  .scale i { display:inline-block; width:120px; height:10px; border-radius:2px; background:linear-gradient(90deg, var(--red), var(--mid) 50%, var(--blue)); }
+  /* panels (algorithm and read views) */
+  #control { position:sticky; top:2.6em; background:var(--bg); z-index:3; padding:.3em 0 .5em; border-bottom:1px solid var(--line); }
+  .panel { display:grid; grid-template-columns: minmax(0, 1fr) 190px 200px; gap:.6em; align-items:start; padding:.6em 0; border-bottom:1px solid var(--line); }
+  .panel .head { grid-column: 1 / -1; display:flex; flex-wrap:wrap; gap:.3em 1.2em; align-items:baseline; }
+  .panel .head .num { color:var(--fg); font-variant-numeric:tabular-nums; }
+  .panel .head .num b { color:var(--ink); font-weight:600; }
+  .panel .head .desc { color:var(--dim); }
+  .panel .head .go { color:var(--hi); cursor:pointer; }
+  .panel.on { outline:1px solid var(--hi); outline-offset:3px; border-radius:3px; }
+  .panel .cap { color:var(--dim); font-size:11px; margin:.15em 0 0; }
+  .legend { display:flex; flex-wrap:wrap; gap:.2em .9em; margin:.2em 0 .4em; color:var(--fg); }
+  .legend i { display:inline-block; width:14px; height:3px; vertical-align:middle; margin-right:.35em; border-radius:2px; }
+  /* the checkpoint drill */
+  .drill { display:grid; grid-template-columns: minmax(0, 1fr) auto; gap:1em; align-items:start; }
+  @media (max-width: 1000px) { .drill { grid-template-columns: 1fr; } }
+  #tip { position:fixed; pointer-events:none; background:#000; color:#fff; border:1px solid #444; border-radius:4px; padding:.3em .5em; font-size:12px; display:none; z-index:9; max-width:30em; white-space:pre-line; }
+  .help { color:var(--dim); padding:.4em .8em 1em; }
+  kbd { background:#222; border:1px solid #444; border-radius:3px; padding:0 .3em; font:inherit; }
+  a { color:var(--hi); }
+  table.plain { border-collapse:collapse; margin:.4em 0 1em; font-size:12px; }
+  table.plain th, table.plain td { border:1px solid var(--line); padding:.25em .5em; text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  table.plain th { color:var(--dim); font-weight:normal; }
+  table.plain td:first-child, table.plain th:first-child { text-align:left; }
+  table.plain tr.ctl td { color:var(--ink); }
+  table.plain td.up { color:#7fb3ee; } table.plain td.down { color:#f09a9a; }
+  @media (max-width: 760px) { .panel { grid-template-columns: 1fr; } #control { position:static; } }
+</style>
+</head>
+<body>
+<header>
+  <label>view <button data-view="matrix" title="m">matrix</button><button data-view="algo" title="a">algorithm</button><button data-view="read" title="r">read</button><button data-view="ckpt" title="c">checkpoint</button><button data-view="table" title="t">table</button></label>
+  <label id="cell-l">algorithm <select id="cell"></select></label>
+  <label id="read-l">read <select id="read"></select></label>
+  <label id="ckpt-l">checkpoint <select id="ckpt"></select></label>
+  <label id="metric-l">colour by <select id="metric">
+    <option value="delta">Δ perfect rate (pp)</option>
+    <option value="ddeath">Δ deaths (pp of episodes)</option>
+    <option value="dstarve">Δ starves (pp of episodes)</option>
+  </select></label>
+  <label id="order-l">order checkpoints by <select id="order">
+    <option value="control">control's perfect rate</option>
+    <option value="arm">arm, then step</option>
+  </select></label>
+  <span id="summary"></span>
+</header>
+<main id="main"></main>
+<p class="help"><kbd>m</kbd> matrix · <kbd>a</kbd> algorithm · <kbd>r</kbd> read · <kbd>c</kbd> checkpoint · <kbd>t</kbd> table · <kbd>←</kbd> <kbd>→</kbd> algorithm · <kbd>↑</kbd> <kbd>↓</kbd> next read · click a matrix cell to open that algorithm at that read, a column header for the algorithm, a row name for the read across algorithms · click a checkpoint's bar in a strip to open its drill · hover any mark for its numbers. Every read is one <code>--policy-variant</code> over the same frozen weights, 1,000 episodes a checkpoint, the top 25 stage-A checkpoints of each of the cell's four arms; the control is <code>mean:fixed</code>, the argmax of the mean. Design and predictions: <code>snek3/plans/quantile-reads.md</code>; the batch entry: <code>docs/runs.md</code> b45. Data inlined by a one-off reducer; the URL carries the view.</p>
+<div id="tip"></div>
+<script>
+const DATA = /*DATA*/;
+</script>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const D = DATA;
+  const cells = D.cells, reads = D.reads;
+  const CONTROL = 'meanfixed';
+  const GROUPS = [['control', 'the control'], ['down', 'reads that look at the losses'], ['mixed', 'both sides, equal weight'], ['up', 'reads that look at the gains']];
+  const VIEWS = ['matrix', 'algo', 'read', 'ckpt', 'table'];
+  const state = { view: 'matrix', cell: cells[0].key, metric: 'delta', order: 'control', read: 'cvar05', ckpt: null };
+
+  // ------------------------------------------------------------ URL state
+  function readUrl() {
+    const h = new URLSearchParams(location.hash.replace(/^#/, ''));
+    for (const k of ['view', 'cell', 'metric', 'order', 'read', 'ckpt']) if (h.get(k)) state[k] = h.get(k);
+    if (!cells.some(c => c.key === state.cell)) state.cell = cells[0].key;
+    if (!VIEWS.includes(state.view)) state.view = 'matrix';
+    if (!reads.some(r => r.key === state.read)) state.read = 'cvar05';
+  }
+  function writeUrl() {
+    const h = new URLSearchParams();
+    for (const k of ['view', 'cell', 'metric', 'order', 'read']) h.set(k, state[k]);
+    if (state.ckpt) h.set('ckpt', state.ckpt);
+    history.replaceState(null, '', '#' + h.toString());
+  }
+
+  // ------------------------------------------------------------ helpers
+  const isNum = (v) => v !== null && v !== undefined;
+  const fmt = (v, d = 1) => !isNum(v) ? '-' : (Math.round(v * 10 ** d) / 10 ** d).toFixed(d);
+  const sgn = (v, d = 2) => !isNum(v) ? '-' : (v > 0 ? '+' : '') + fmt(v, d);
+  const esc = (s) => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const cellOf = (key) => cells.find(c => c.key === key);
+  const readOf = (key) => reads.find(r => r.key === key);
+  const rowsOf = (cell, read) => (D.rows[cell] || {})[read] || null;
+  const summaryOf = (cell, read) => (D.summary[cell] || {})[read] || null;
+  const ckptLabel = (k) => { const [arm, step] = k.split('@'); return arm + ' @' + Number(step).toLocaleString(); };
+
+  // A diverging colour: blue for better, red for worse, the neutral grey at zero. `span` is the
+  // magnitude that saturates; small moves stay near the midpoint so noise reads as noise.
+  function hex(c) { return [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16)]; }
+  const MID = hex('#383835'), BLUE = hex('#3987e5'), RED = hex('#e66767');
+  function diverge(v, span, upIsGood) {
+    if (!isNum(v)) return 'var(--panel)';
+    let t = Math.max(-1, Math.min(1, v / span));
+    if (!upIsGood) t = -t;
+    const to = t >= 0 ? BLUE : RED, a = Math.abs(t);
+    return 'rgb(' + MID.map((m, i) => Math.round(m + (to[i] - m) * a)).join(',') + ')';
+  }
+
+  // ------------------------------------------------------------ tooltip
+  const tip = $('tip');
+  function showTip(e, text) { tip.textContent = text; tip.style.display = 'block'; moveTip(e); }
+  function moveTip(e) {
+    const w = tip.offsetWidth, h = tip.offsetHeight;
+    let x = e.clientX + 14, y = e.clientY + 14;
+    if (x + w > innerWidth - 8) x = e.clientX - w - 10;
+    if (y + h > innerHeight - 8) y = e.clientY - h - 10;
+    tip.style.left = x + 'px'; tip.style.top = y + 'px';
+  }
+  function hideTip() { tip.style.display = 'none'; }
+  function wire(root) {
+    root.querySelectorAll('[data-tip]').forEach(el => {
+      el.addEventListener('mouseenter', e => showTip(e, el.dataset.tip));
+      el.addEventListener('mousemove', moveTip);
+      el.addEventListener('mouseleave', hideTip);
+    });
+    root.querySelectorAll('[data-ckpt]').forEach(el => el.addEventListener('click', () => {
+      state.cell = el.dataset.cellkey || state.cell; state.ckpt = el.dataset.ckpt; setView('ckpt');
+    }));
+  }
+
+  // ------------------------------------------------------------ the matrix
+  const METRIC = {
+    delta:   { span: 5, up: true,  label: 'Δ perfect rate against the control, percentage points, mean over the paired checkpoints', unit: 'pp' },
+    ddeath:  { span: 5, up: false, label: 'Δ deaths against the control, as a share of all episodes', unit: 'pp' },
+    dstarve: { span: 5, up: false, label: 'Δ starves against the control, as a share of all episodes', unit: 'pp' },
+  };
+  const metricValue = (s, metric) => !s ? null : metric === 'delta' ? s.delta : metric === 'ddeath' ? s.ddeath : s.dstarve;
+  function tipFor(c, r, s) {
+    const ctl = r.key === CONTROL;
+    return [c.name + ' · ' + r.variant, r.desc, '',
+      'checkpoints ' + s.ckpts + (s.paired !== s.ckpts ? ' (' + s.paired + ' paired)' : ''),
+      'perfect ' + fmt(s.perfect, 2) + '%' + (ctl ? '' : '   Δ ' + sgn(s.delta, 2) + ' pp' + (s.ci ? '  95% [' + sgn(s.ci[0], 2) + ', ' + sgn(s.ci[1], 2) + ']' : '')),
+      ctl ? null : 'better on ' + s.wins + ', worse on ' + s.losses + ', level on ' + s.level,
+      'deaths ' + fmt(s.death, 2) + '% of episodes' + (ctl || !isNum(s.ddeath) ? '' : ' (' + sgn(s.ddeath, 2) + ')'),
+      'starves ' + fmt(s.starve, 2) + '% of episodes' + (ctl || !isNum(s.dstarve) ? '' : ' (' + sgn(s.dstarve, 2) + ')'),
+      'mean score ' + fmt(s.score, 2)].filter(l => l !== null).join('\n');
+  }
+  function renderMatrix() {
+    const m = METRIC[state.metric];
+    let html = '<h2>Every read against the mean, every algorithm</h2>';
+    html += '<p class="sub">' + esc(m.label) + '. Blue is better than the control, red worse, grey within noise; a cell saturates at ±' + m.span + ' ' + m.unit + '. The small line is the 95% bootstrap interval over checkpoints (Δ perfect only). Click a cell for the algorithm view at that read, a column header for the algorithm, a row name for the read across algorithms.</p>';
+    html += '<div class="scale"><span>−' + m.span + '</span><i></i><span>+' + m.span + ' ' + m.unit + '</span><span style="margin-left:1em">' + (m.up ? 'blue = higher' : 'blue = fewer') + '</span></div>';
+    html += '<table class="matrix"><thead><tr><th>read</th>';
+    for (const c of cells) html += '<th class="col" data-cell="' + c.key + '">' + esc(c.name) + '<br><span style="font-weight:normal">' + esc(c.batch) + '</span></th>';
+    html += '</tr></thead><tbody>';
+    for (const [g, title] of GROUPS) {
+      const rs = reads.filter(r => r.group === g);
+      if (!rs.length) continue;
+      html += '<tr class="group"><td class="grp" colspan="' + (cells.length + 1) + '">' + esc(title) + '</td></tr>';
+      for (const r of rs) {
+        html += '<tr><td class="name" data-read="' + r.key + '"><code>' + esc(r.variant) + '</code><span class="d">' + esc(r.desc) + '</span></td>';
+        for (const c of cells) {
+          const s = summaryOf(c.key, r.key);
+          if (!s) { html += '<td class="none">not yet</td>'; continue; }
+          if (r.key === CONTROL) {
+            html += '<td class="none" style="color:var(--fg);cursor:pointer" data-cell="' + c.key + '" data-read="' + r.key + '" data-tip="' + esc(tipFor(c, r, s)) + '">' + fmt(s.perfect, 1) + '%<span class="ci">' + s.ckpts + ' ckpts · ' + fmt(s.death, 1) + '% die · ' + fmt(s.starve, 1) + '% starve</span></td>';
+            continue;
+          }
+          const v = metricValue(s, state.metric);
+          const ci = state.metric === 'delta' && s.ci ? '[' + sgn(s.ci[0], 1) + ', ' + sgn(s.ci[1], 1) + ']' : (fmt(s.perfect, 1) + '%');
+          html += '<td style="background:' + diverge(v, m.span, m.up) + '" data-cell="' + c.key + '" data-read="' + r.key + '" data-tip="' + esc(tipFor(c, r, s)) + '">' + sgn(v, 2) + '<span class="ci">' + ci + '</span></td>';
+        }
+        html += '</tr>';
+      }
+    }
+    html += '</tbody></table>';
+    $('main').innerHTML = html;
+    $('main').querySelectorAll('td[data-cell]').forEach(td => td.addEventListener('click', () => { state.cell = td.dataset.cell; state.read = td.dataset.read === CONTROL ? state.read : td.dataset.read; setView('algo'); }));
+    $('main').querySelectorAll('td.name').forEach(td => td.addEventListener('click', () => { if (td.dataset.read !== CONTROL) state.read = td.dataset.read; setView('read'); }));
+    $('main').querySelectorAll('th.col').forEach(th => th.addEventListener('click', () => { state.cell = th.dataset.cell; setView('algo'); }));
+    wire($('main'));
+  }
+
+  // ------------------------------------------------------------ the three marks a panel is made of
+  function orderedKeys(cell) {
+    const control = rowsOf(cell, CONTROL) || {};
+    const keys = Object.keys(control);
+    if (state.order === 'arm') return keys.sort((a, b) => a.split('@')[0].localeCompare(b.split('@')[0]) || (+a.split('@')[1]) - (+b.split('@')[1]));
+    return keys.sort((a, b) => (control[a].p - control[b].p) || a.localeCompare(b));
+  }
+  function yFloor(cell) {
+    // The strip's axis starts where the cell's control starts, not at 0: a 90-95 band is the whole story
+    // on the strong cells and is a flat line on a 0-100 axis. Reads that fall under the floor are drawn
+    // as off-scale markers; their value is in the tooltip and the histogram shows where they went.
+    const ps = Object.values(rowsOf(cell, CONTROL) || {}).map(r => r.p);
+    if (!ps.length) return 0;
+    return Math.max(0, Math.min(80, Math.floor((Math.min(...ps) - 10) / 10) * 10));
+  }
+  const H = 130, PAD = { l: 34, r: 8, t: 8, b: 18 };
+  // The strip is drawn at the width its column will have, so text keeps its shape: the main column
+  // is what is left of `main` after the two 190/200px side charts and the grid gaps.
+  const mainWidth = () => Math.max(480, ($('main').clientWidth || 1200) - 4);
+  const stripWidth = () => Math.max(480, mainWidth() - 190 - 200 - 2 * 8 - 8);
+  function stripSvg(cell, read, keys, W) {
+    W = W || stripWidth();
+    // The control: bars of the perfect rate per checkpoint. A read: the same bars for the read, with the
+    // control's value as a white tick, so the Δ is the gap between bar top and tick. Click a bar for the drill.
+    const control = rowsOf(cell, CONTROL) || {}, rows = rowsOf(cell, read) || {};
+    const floor = yFloor(cell), isControl = read === CONTROL;
+    const n = keys.length || 1, bw = (W - PAD.l - PAD.r) / n;
+    const y = (p) => PAD.t + (100 - Math.max(p, floor)) / (100 - floor) * (H - PAD.t - PAD.b);
+    let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '">';
+    const ticks = floor >= 80 ? [floor, 90, 95, 100] : floor >= 50 ? [floor, 70, 90, 100] : [floor, 50, 90, 100];
+    for (const g of ticks) s += '<line class="grid" x1="' + PAD.l + '" x2="' + (W - PAD.r) + '" y1="' + y(g) + '" y2="' + y(g) + '"/><text x="' + (PAD.l - 4) + '" y="' + (y(g) + 3) + '" text-anchor="end">' + g + '</text>';
+    let lastArm = null;
+    keys.forEach((k, i) => {
+      const x = PAD.l + i * bw, arm = k.split('@')[0];
+      if (state.order === 'arm' && arm !== lastArm && i) s += '<line class="ax" x1="' + x + '" x2="' + x + '" y1="' + PAD.t + '" y2="' + (H - PAD.b) + '"/>';
+      lastArm = arm;
+      const c = control[k], r = rows[k];
+      if (!r) return;
+      const d = !isControl && c ? r.p - c.p : 0;
+      const fill = isControl || Math.abs(d) < 1e-9 ? 'var(--ghost)' : (d > 0 ? 'var(--blue)' : 'var(--red)');
+      const base = y(floor), attrs = ' data-ckpt="' + k + '" data-cellkey="' + cell + '" data-tip="' + esc(rowTip(k, r, c, isControl) + (r.p < floor ? '\n(below the axis floor of ' + floor + ')' : '') + '\nclick for this checkpoint under every read') + '"';
+      if (r.p < floor) s += '<rect class="hit" x="' + (x + 0.5) + '" y="' + (base - 4) + '" width="' + Math.max(bw - 1, 1) + '" height="4" fill="var(--red)"' + attrs + '/>';
+      else s += '<rect class="hit" x="' + (x + 0.5) + '" y="' + y(r.p) + '" width="' + Math.max(bw - 1, 1) + '" height="' + Math.max(base - y(r.p), 0.5) + '" fill="' + fill + '"' + attrs + '/>';
+      if (!isControl && c) s += '<line x1="' + x + '" x2="' + (x + bw) + '" y1="' + y(c.p) + '" y2="' + y(c.p) + '" stroke="#ddd" stroke-width="1.2" pointer-events="none"/>';
+      if (state.ckpt === k) s += '<rect x="' + x + '" y="' + PAD.t + '" width="' + bw + '" height="' + (H - PAD.t - PAD.b) + '" fill="none" stroke="var(--hi)" stroke-width="1" pointer-events="none"/>';
+    });
+    s += '<line class="ax" x1="' + PAD.l + '" x2="' + (W - PAD.r) + '" y1="' + y(floor) + '" y2="' + y(floor) + '"/>';
+    s += '<text x="' + PAD.l + '" y="' + (H - 4) + '">' + (state.order === 'arm' ? 'checkpoints by arm, then step' : "checkpoints, ordered by the control's perfect rate") + (floor ? ' · axis from ' + floor : '') + '</text>';
+    s += '<text x="' + (W - PAD.r) + '" y="' + (H - 4) + '" text-anchor="end">perfect rate, %</text></svg>';
+    return s;
+  }
+  function rowTip(k, r, c, isControl) {
+    const l = [ckptLabel(k), 'perfect ' + fmt(r.p, 1) + '%' + (isNum(r.lo) ? ' [' + fmt(r.lo, 1) + ', ' + fmt(r.hi, 1) + ']' : '') + ' of ' + r.n];
+    if (!isControl && c) l.push('control ' + fmt(c.p, 1) + '%   Δ ' + sgn(r.p - c.p, 1) + ' pp');
+    if (isNum(r.d)) l.push('deaths ' + r.d + ', starves ' + r.s + (c && isNum(c.d) && !isControl ? ' (control ' + c.d + ', ' + c.s + ')' : ''));
+    if (isNum(r.score)) l.push('mean score ' + fmt(r.score, 2));
+    return l.join('\n');
+  }
+  function outcomeSvg(s, cs, isControl) {
+    // Deaths and starves as a share of episodes: two thin bars, the control's as a white tick.
+    const w = 190, h = 130, pl = 30, pr = 8, pt = 8, pb = 18;
+    const vals = [['die', s.death, cs && cs.death], ['starve', s.starve, cs && cs.starve]];
+    const max = Math.max(5, ...vals.flatMap(v => [v[1] || 0, v[2] || 0])) * 1.15;
+    const y = (v) => pt + (1 - v / max) * (h - pt - pb);
+    let out = '<svg viewBox="0 0 ' + w + ' ' + h + '" width="' + w + '" height="' + h + '">';
+    for (const g of [0, Math.round(max / 2)]) out += '<line class="grid" x1="' + pl + '" x2="' + (w - pr) + '" y1="' + y(g) + '" y2="' + y(g) + '"/><text x="' + (pl - 4) + '" y="' + (y(g) + 3) + '" text-anchor="end">' + g + '</text>';
+    vals.forEach(([name, v, cv], i) => {
+      const x = pl + 14 + i * 74, bw = 24;
+      if (!isNum(v)) { out += '<text x="' + (x + bw / 2) + '" y="' + (h - pb - 6) + '" text-anchor="middle">no counts</text>'; return; }
+      const d = isNum(cv) && !isControl ? v - cv : 0;
+      const fill = isControl || Math.abs(d) < 1e-9 ? 'var(--ghost)' : (d > 0 ? 'var(--red)' : 'var(--blue)');
+      out += '<rect class="hit" x="' + x + '" y="' + y(v) + '" width="' + bw + '" height="' + Math.max(y(0) - y(v), 0.5) + '" rx="2" fill="' + fill + '" data-tip="' + esc(name + ' ' + fmt(v, 2) + '% of episodes' + (isNum(cv) && !isControl ? '\ncontrol ' + fmt(cv, 2) + '%   Δ ' + sgn(v - cv, 2) + ' pp' : '')) + '"/>';
+      if (isNum(cv) && !isControl) out += '<line x1="' + (x - 4) + '" x2="' + (x + bw + 4) + '" y1="' + y(cv) + '" y2="' + y(cv) + '" stroke="#ddd" stroke-width="1.2" pointer-events="none"/>';
+      out += '<text x="' + (x + bw / 2) + '" y="' + (h - 5) + '" text-anchor="middle" class="t">' + name + ' ' + fmt(v, 1) + '%</text>';
+    });
+    out += '<line class="ax" x1="' + pl + '" x2="' + (w - pr) + '" y1="' + y(0) + '" y2="' + y(0) + '"/></svg>';
+    return out;
+  }
+  const BINS = Array.from({ length: 19 }, (_, i) => [i * 5, i * 5 + 4]).concat([[95, 95]]);   // 0-4 ... 90-94, then the perfect game alone
+  function pooledHist(rows) {
+    const h = {}; let n = 0;
+    for (const r of Object.values(rows || {})) for (const [sc, c] of Object.entries(r.hist || {})) { h[sc] = (h[sc] || 0) + c; n += c; }
+    return { h, n };
+  }
+  function binned(H_, n) { return BINS.map(([a, b]) => { let c = 0; for (let sc = a; sc <= b; sc++) c += H_[sc] || 0; return n ? 100 * c / n : 0; }); }
+  function histSvg(rows, controlRows, isControl) {
+    // Final score of every episode, pooled over the read's checkpoints, as a share of episodes, in bins
+    // of five with the perfect game (95) on its own; the control's as a grey outline. The share axis is
+    // square-root: the perfect game is 90% of a good read's episodes and everything else would be under
+    // a pixel on a linear axis, and the shape of the failures is what the picture is for.
+    const w = 200, h = 130, pl = 8, pr = 8, pt = 8, pb = 18;
+    const mine = pooledHist(rows), ctl = controlRows ? pooledHist(controlRows) : null;
+    const mv = binned(mine.h, mine.n), cv = ctl ? binned(ctl.h, ctl.n) : null;
+    const maxv = Math.max(1, ...mv, ...(cv || []));
+    const bw = (w - pl - pr) / BINS.length, y = (v) => pt + (1 - Math.sqrt(v / maxv)) * (h - pt - pb);
+    let out = '<svg viewBox="0 0 ' + w + ' ' + h + '" width="' + w + '" height="' + h + '">';
+    for (const g of [1, 10, 50]) if (g < maxv) out += '<line class="grid" x1="' + pl + '" x2="' + (w - pr) + '" y1="' + y(g) + '" y2="' + y(g) + '"/><text x="' + (w - pr) + '" y="' + (y(g) - 2) + '" text-anchor="end">' + g + '%</text>';
+    BINS.forEach(([a, b], i) => {
+      const x = pl + i * bw, label = a === b ? 'a perfect game (95)' : 'score ' + a + '-' + b;
+      if (cv && !isControl && cv[i] > 0) out += '<rect x="' + (x + 0.5) + '" y="' + y(cv[i]) + '" width="' + (bw - 1) + '" height="' + (y(0) - y(cv[i])) + '" fill="none" stroke="var(--ghost)" stroke-width="1"/>';
+      const t = esc(label + ': ' + (mv[i] > 0 ? fmt(mv[i], 2) + '% of episodes' : 'none') + (cv && !isControl ? '\ncontrol ' + fmt(cv[i], 2) + '%' : ''));
+      if (mv[i] > 0) out += '<rect class="hit" x="' + (x + 1.5) + '" y="' + y(mv[i]) + '" width="' + Math.max(bw - 3, 1) + '" height="' + (y(0) - y(mv[i])) + '" fill="' + (isControl ? 'var(--ghost)' : 'var(--blue)') + '" data-tip="' + t + '"/>';
+      else out += '<rect class="hit" x="' + x + '" y="' + pt + '" width="' + bw + '" height="' + (h - pt - pb) + '" fill="transparent" data-tip="' + t + '"/>';
+    });
+    out += '<line class="ax" x1="' + pl + '" x2="' + (w - pr) + '" y1="' + y(0) + '" y2="' + y(0) + '"/>';
+    for (const [sc, i] of [[0, 0], [50, 10], [95, 19]]) out += '<text x="' + (pl + i * bw + (sc === 95 ? bw : 0)) + '" y="' + (h - 5) + '" text-anchor="' + (sc === 95 ? 'end' : 'start') + '">' + sc + '</text>';
+    if (mine.n === 0) out += '<text x="' + (w / 2) + '" y="' + (h / 2) + '" text-anchor="middle">no histograms</text>';
+    return out + '</svg>';
+  }
+  // One panel: a (cell, read) pair. `title` is what leads the head: the read (algorithm view) or the
+  // algorithm (read view).
+  function panelHtml(cell, r, keys, opts) {
+    const s = summaryOf(cell, r.key), cs = summaryOf(cell, CONTROL), c = cellOf(cell);
+    const isControl = r.key === CONTROL;
+    const lead = opts.lead === 'cell' ? '<h3>' + esc(c.name) + ' <span>' + esc(c.batch) + '</span></h3><span class="desc"><code>' + esc(r.variant) + '</code></span>'
+                                     : '<h3><code>' + esc(r.variant) + '</code>' + (isControl ? ' <span>the control, pinned</span>' : '') + '</h3><span class="desc">' + esc(r.desc) + '</span>';
+    if (!s) return '<div class="panel" data-read="' + r.key + '" data-cell="' + cell + '"><div class="head">' + lead + '<span class="num" style="color:var(--dim)">not yet measured</span></div></div>';
+    let head = '<div class="head">' + lead;
+    head += '<span class="num">perfect <b>' + fmt(s.perfect, 2) + '%</b>' + (isControl ? '' : ' Δ <b>' + sgn(s.delta, 2) + '</b> pp' + (s.ci ? ' [' + sgn(s.ci[0], 2) + ', ' + sgn(s.ci[1], 2) + ']' : '')) + '</span>';
+    if (!isControl) head += '<span class="num">better on <b>' + s.wins + '</b> · worse on <b>' + s.losses + '</b> · level on <b>' + s.level + '</b> of ' + s.paired + '</span>';
+    head += '<span class="num">deaths <b>' + fmt(s.death, 2) + '%</b>' + (isControl || !isNum(s.ddeath) ? '' : ' (' + sgn(s.ddeath, 2) + ')') + ' · starves <b>' + fmt(s.starve, 2) + '%</b>' + (isControl || !isNum(s.dstarve) ? '' : ' (' + sgn(s.dstarve, 2) + ')') + ' · mean score <b>' + fmt(s.score, 1) + '</b></span>';
+    if (opts.lead === 'cell') head += '<span class="go" data-go-cell="' + cell + '">algorithm view →</span>';
+    else if (!isControl) head += '<span class="go" data-go-read="' + r.key + '">across algorithms →</span>';
+    head += '</div>';
+    const rows = rowsOf(cell, r.key), control = rowsOf(cell, CONTROL);
+    let html = '<div class="panel' + (opts.on ? ' on' : '') + '" data-read="' + r.key + '" data-cell="' + cell + '">' + head;
+    html += '<div>' + stripSvg(cell, r.key, keys) + '<p class="cap">' + (isControl ? "each bar one checkpoint's perfect rate at 1,000 episodes" : "bars: this read's perfect rate per checkpoint, blue above the control, red below; the white tick is the control's value on that checkpoint") + '</p></div>';
+    html += '<div>' + outcomeSvg(s, cs, isControl) + '<p class="cap">' + (isControl ? 'how the non-perfect episodes end' : "deaths and starves against the control's tick") + '</p></div>';
+    html += '<div>' + histSvg(rows, control, isControl) + '<p class="cap">' + (isControl ? 'final score of every episode: bins of 5, the perfect game alone; square-root share axis' : 'final scores, the control outlined in grey; square-root share axis') + '</p></div>';
+    return html + '</div>';
+  }
+  function wireGo(root) {
+    root.querePanelFix = true;
+    root.querySelectorAll('[data-go-cell]').forEach(el => el.addEventListener('click', () => { state.cell = el.dataset.goCell; setView('algo'); }));
+    root.querySelectorAll('[data-go-read]').forEach(el => el.addEventListener('click', () => { state.read = el.dataset.goRead; setView('read'); }));
+  }
+  const LEGEND = '<div class="legend"><span><i style="background:var(--blue)"></i>better than the control</span><span><i style="background:var(--red)"></i>worse</span><span><i style="background:var(--ghost)"></i>the control</span><span><i style="background:#ddd;height:2px"></i>the control\'s value on that checkpoint</span></div>';
+
+  function scrollUnderPinned(el, behavior) {
+    // The header and the control panel are sticky, so a plain scrollIntoView puts the panel under them.
+    const pinned = (document.querySelector('header').offsetHeight || 0) + (($('control') && $('control').offsetHeight) || 0);
+    window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - pinned - 6, behavior });
+  }
+
+  // ------------------------------------------------------------ the algorithm view: control pinned, reads scroll
+  function renderAlgo() {
+    const c = cellOf(state.cell), keys = orderedKeys(state.cell);
+    let html = '<div id="control"><h2>' + esc(c.name) + ' <span>' + esc(c.batch) + ' · ' + c.arms.join(', ') + ' · ' + keys.length + ' checkpoints</span></h2>';
+    html += panelHtml(state.cell, readOf(CONTROL), keys, { lead: 'read', on: false }) + '</div>' + LEGEND;
+    for (const [g, title] of GROUPS) {
+      const rs = reads.filter(r => r.group === g && r.key !== CONTROL);
+      if (!rs.length) continue;
+      html += '<h2 style="margin-top:.9em">' + esc(title) + '</h2>';
+      for (const r of rs) html += panelHtml(state.cell, r, keys, { lead: 'read', on: state.read === r.key });
+    }
+    $('main').innerHTML = html;
+    wire($('main')); wireGo($('main'));
+    const el = $('main').querySelector('.panel.on');
+    if (el) setTimeout(() => scrollUnderPinned(el, 'instant'), 0);
+  }
+
+  // ------------------------------------------------------------ the read view: one read, every algorithm
+  function renderRead() {
+    const r = readOf(state.read);
+    let html = '<h2><code>' + esc(r.variant) + '</code> <span>' + esc(r.desc) + ' · against each algorithm\'s own control</span></h2>' + LEGEND;
+    for (const c of cells) html += panelHtml(c.key, r, orderedKeys(c.key), { lead: 'cell', on: c.key === state.cell });
+    $('main').innerHTML = html;
+    wire($('main')); wireGo($('main'));
+  }
+
+  // ------------------------------------------------------------ the checkpoint drill: one checkpoint, every read
+  function ckptKeys(cell) { return orderedKeys(cell).slice().reverse(); }   // best first in the picker
+  function renderCkpt() {
+    const keys = ckptKeys(state.cell);
+    if (!keys.includes(state.ckpt)) state.ckpt = keys[0] || null;
+    const c = cellOf(state.cell), k = state.ckpt;
+    if (!k) { $('main').innerHTML = '<p class="sub">No control rows for ' + esc(c.name) + ' yet.</p>'; return; }
+    const control = (rowsOf(state.cell, CONTROL) || {})[k];
+    let html = '<h2>' + esc(ckptLabel(k)) + ' <span>' + esc(c.name) + ' · under every read · control ' + fmt(control.p, 1) + '% of ' + control.n + '</span></h2>';
+    html += '<p class="sub">Each dot is this checkpoint\'s perfect rate under one read, with its 95% Wilson interval; the white line is the control. Blue above the control, red below. Reads with no row yet are blank.</p>';
+    // dot plot
+    const rs = reads.filter(r => r.key !== CONTROL), w = Math.max(520, Math.floor(mainWidth() / 2) - 12), rowH = 22, pl = 130, pr = 16, pt = 22, pb = 30, h = pt + pb + rowH * rs.length;
+    // The axis starts just under the lowest interval among the reads measured so far, so a 90-97 spread
+    // is readable; a read at zero pulls it back to 0.
+    const lows = rs.map(r => ((rowsOf(state.cell, r.key) || {})[k] || {}).lo).filter(isNum).concat([control.lo].filter(isNum));
+    const floor = Math.max(0, Math.min(80, Math.floor((Math.min(...lows, 100) - 5) / 10) * 10));
+    const x = (p) => pl + (Math.max(p, floor) - floor) / (100 - floor) * (w - pl - pr);
+    const ticks = floor >= 80 ? [floor, 85, 90, 95, 100] : floor >= 50 ? [floor, 70, 80, 90, 100] : [0, 25, 50, 75, 90, 100].filter(g => g >= floor);
+    let svg = '<svg viewBox="0 0 ' + w + ' ' + h + '" width="' + w + '" height="' + h + '">';
+    for (const g of ticks) svg += '<line class="grid" x1="' + x(g) + '" x2="' + x(g) + '" y1="' + pt + '" y2="' + (h - pb) + '"/><text x="' + x(g) + '" y="' + (h - pb + 12) + '" text-anchor="middle">' + g + '</text>';
+    svg += '<line x1="' + x(control.p) + '" x2="' + x(control.p) + '" y1="' + (pt - 6) + '" y2="' + (h - pb) + '" stroke="#ddd" stroke-width="1.5"/><text x="' + x(control.p) + '" y="' + (pt - 9) + '" text-anchor="middle" class="t">control ' + fmt(control.p, 1) + '%</text>';
+    rs.forEach((r, i) => {
+      const cy = pt + i * rowH + rowH / 2, row = (rowsOf(state.cell, r.key) || {})[k];
+      svg += '<text x="' + (pl - 8) + '" y="' + (cy + 3.5) + '" text-anchor="end" class="t" style="font-family:ui-monospace,Menlo,monospace">' + esc(r.variant) + '</text>';
+      if (i % 2 === 0) svg += '<rect x="' + pl + '" y="' + (cy - rowH / 2) + '" width="' + (w - pl - pr) + '" height="' + rowH + '" fill="rgba(255,255,255,.02)"/>';
+      if (!row) { svg += '<text x="' + (pl + 6) + '" y="' + (cy + 3.5) + '">not yet</text>'; return; }
+      const d = row.p - control.p, fill = Math.abs(d) < 1e-9 ? 'var(--ghost)' : d > 0 ? 'var(--blue)' : 'var(--red)';
+      if (isNum(row.lo)) svg += '<line x1="' + x(row.lo) + '" x2="' + x(row.hi) + '" y1="' + cy + '" y2="' + cy + '" stroke="' + fill + '" stroke-width="2" stroke-linecap="round"/>';
+      svg += '<circle class="hit" cx="' + x(row.p) + '" cy="' + cy + '" r="5" fill="' + fill + '" stroke="var(--panel)" stroke-width="2" data-tip="' + esc(r.variant + '\n' + rowTip(k, row, control, false)) + '"/>';
+      svg += '<circle class="hit" cx="' + x(row.p) + '" cy="' + cy + '" r="10" fill="transparent" data-tip="' + esc(r.variant + '\n' + rowTip(k, row, control, false)) + '"/>';
+    });
+    svg += '<text x="' + pl + '" y="' + (h - 4) + '">perfect rate, % of 1,000 episodes' + (floor ? ' · axis from ' + floor : '') + '</text></svg>';
+    // the table beside it
+    let table = '<table class="plain"><tr><th>read</th><th>perfect %</th><th>Δ pp</th><th>deaths</th><th>starves</th><th>mean score</th></tr>';
+    table += '<tr class="ctl"><td><code>mean:fixed</code></td><td>' + fmt(control.p, 1) + '</td><td>-</td><td>' + fmt(control.d, 0) + '</td><td>' + fmt(control.s, 0) + '</td><td>' + fmt(control.score, 2) + '</td></tr>';
+    for (const r of rs) {
+      const row = (rowsOf(state.cell, r.key) || {})[k];
+      if (!row) { table += '<tr><td><code>' + esc(r.variant) + '</code></td><td colspan="5" style="text-align:left;color:var(--dim)">not yet</td></tr>'; continue; }
+      const d = row.p - control.p;
+      table += '<tr><td><code>' + esc(r.variant) + '</code></td><td>' + fmt(row.p, 1) + '</td><td class="' + (d > 0 ? 'up' : d < 0 ? 'down' : '') + '">' + sgn(d, 1) + '</td><td>' + fmt(row.d, 0) + '</td><td>' + fmt(row.s, 0) + '</td><td>' + fmt(row.score, 2) + '</td></tr>';
+    }
+    table += '</table>';
+    html += '<div class="drill"><div>' + svg + '</div><div>' + table + '</div></div>';
+    html += '<h2 style="margin-top:1em">Where this checkpoint sits <span>the control\'s strip, this checkpoint outlined; click another bar to move</span></h2>' + stripSvg(state.cell, CONTROL, orderedKeys(state.cell), mainWidth());
+    $('main').innerHTML = html;
+    wire($('main'));
+  }
+
+  // ------------------------------------------------------------ the table
+  function renderTable() {
+    let html = '<h2>The numbers</h2><p class="sub">The same table <code>tools/read_compare.py</code> prints, per algorithm. Δ is against <code>mean:fixed</code> on the same checkpoints; the interval is a bootstrap over checkpoints.</p>';
+    for (const c of cells) {
+      html += '<h3 style="margin-top:.8em">' + esc(c.name) + '</h3><table class="plain"><tr><th>read</th><th>ckpts</th><th>perfect %</th><th>Δ pp</th><th>95% CI</th><th>better / worse / level</th><th>deaths %</th><th>Δ</th><th>starves %</th><th>Δ</th><th>mean score</th></tr>';
+      for (const r of reads) {
+        const s = summaryOf(c.key, r.key);
+        if (!s) { html += '<tr><td><code>' + esc(r.variant) + '</code></td><td colspan="10" style="text-align:left;color:var(--dim)">not yet measured</td></tr>'; continue; }
+        const ctl = r.key === CONTROL;
+        html += '<tr' + (ctl ? ' class="ctl"' : '') + '><td><code>' + esc(r.variant) + '</code></td><td>' + s.ckpts + '</td><td>' + fmt(s.perfect, 2) + '</td><td class="' + (ctl ? '' : s.delta > 0 ? 'up' : s.delta < 0 ? 'down' : '') + '">' + (ctl ? '-' : sgn(s.delta, 2)) + '</td><td>' + (ctl || !s.ci ? '-' : '[' + sgn(s.ci[0], 2) + ', ' + sgn(s.ci[1], 2) + ']') + '</td><td>' + (ctl ? '-' : s.wins + ' / ' + s.losses + ' / ' + s.level) + '</td><td>' + fmt(s.death, 2) + '</td><td>' + (ctl ? '-' : sgn(s.ddeath, 2)) + '</td><td>' + fmt(s.starve, 2) + '</td><td>' + (ctl ? '-' : sgn(s.dstarve, 2)) + '</td><td>' + fmt(s.score, 1) + '</td></tr>';
+      }
+      html += '</table>';
+    }
+    $('main').innerHTML = html;
+  }
+
+  // ------------------------------------------------------------ chrome
+  function setView(v) { state.view = v; render(); }
+  function fillCkptPicker() {
+    const sel = $('ckpt'); sel.innerHTML = '';
+    const control = rowsOf(state.cell, CONTROL) || {};
+    for (const k of ckptKeys(state.cell)) { const o = document.createElement('option'); o.value = k; o.textContent = ckptLabel(k) + ' · ' + fmt(control[k].p, 1) + '%'; sel.appendChild(o); }
+    if (state.ckpt) sel.value = state.ckpt;
+  }
+  function render() {
+    writeUrl();
+    document.querySelectorAll('header button[data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === state.view));
+    const v = state.view;
+    $('cell-l').style.display = (v === 'algo' || v === 'ckpt') ? '' : 'none';
+    $('read-l').style.display = v === 'read' ? '' : 'none';
+    $('ckpt-l').style.display = v === 'ckpt' ? '' : 'none';
+    $('order-l').style.display = (v === 'algo' || v === 'read' || v === 'ckpt') ? '' : 'none';
+    $('metric-l').style.display = v === 'matrix' ? '' : 'none';
+    $('cell').value = state.cell; $('metric').value = state.metric; $('order').value = state.order; $('read').value = state.read;
+    const measured = cells.reduce((n, c) => n + Object.keys(D.rows[c.key] || {}).length, 0);
+    $('summary').textContent = 'b45 · ' + measured + ' of ' + (cells.length * reads.length) + ' cell-reads in · built ' + D.built;
+    if (v === 'matrix') renderMatrix(); else if (v === 'algo') renderAlgo(); else if (v === 'read') renderRead(); else if (v === 'ckpt') { renderCkpt(); fillCkptPicker(); } else renderTable();
+    if (v !== 'algo') window.scrollTo(0, 0);
+  }
+  cells.forEach(c => { const o = document.createElement('option'); o.value = c.key; o.textContent = c.name; $('cell').appendChild(o); });
+  reads.filter(r => r.key !== CONTROL).forEach(r => { const o = document.createElement('option'); o.value = r.key; o.textContent = r.variant; $('read').appendChild(o); });
+  $('cell').addEventListener('change', () => { state.cell = $('cell').value; state.ckpt = null; render(); });
+  $('read').addEventListener('change', () => { state.read = $('read').value; render(); });
+  $('ckpt').addEventListener('change', () => { state.ckpt = $('ckpt').value; render(); });
+  $('metric').addEventListener('change', () => { state.metric = $('metric').value; render(); });
+  $('order').addEventListener('change', () => { state.order = $('order').value; render(); });
+  document.querySelectorAll('header button[data-view]').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'SELECT' || e.metaKey || e.ctrlKey || e.altKey) return;
+    const i = cells.findIndex(c => c.key === state.cell);
+    const order = reads.filter(r => r.key !== CONTROL).map(r => r.key);
+    if (e.key === 'm') setView('matrix');
+    else if (e.key === 'a') setView('algo');
+    else if (e.key === 'r') setView('read');
+    else if (e.key === 'c') setView('ckpt');
+    else if (e.key === 't') setView('table');
+    else if (e.key === 'ArrowLeft' && i > 0) { state.cell = cells[i - 1].key; state.ckpt = null; render(); }
+    else if (e.key === 'ArrowRight' && i < cells.length - 1) { state.cell = cells[i + 1].key; state.ckpt = null; render(); }
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (state.view === 'ckpt') {
+        e.preventDefault();
+        const keys = ckptKeys(state.cell), j = keys.indexOf(state.ckpt);
+        state.ckpt = keys[e.key === 'ArrowDown' ? Math.min(keys.length - 1, j + 1) : Math.max(0, j - 1)]; render();
+      } else if (state.view === 'algo' || state.view === 'read') {
+        e.preventDefault();
+        let j = order.indexOf(state.read);
+        j = e.key === 'ArrowDown' ? Math.min(order.length - 1, j + 1) : Math.max(0, j - 1);
+        state.read = order[j];
+        if (state.view === 'read') { render(); return; }
+        writeUrl();
+        $('main').querySelectorAll('.panel').forEach(p => p.classList.toggle('on', p.dataset.read === state.read));
+        const el = $('main').querySelector('.panel[data-read="' + state.read + '"]');
+        if (el) scrollUnderPinned(el, 'smooth');
+      }
+    }
+  });
+  let resizeTimer = null;
+  window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (state.view !== 'matrix' && state.view !== 'table') render(); }, 150); });
+  readUrl();
+  render();
+})();
+</script>
+</body>
+</html>
