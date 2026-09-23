@@ -91,7 +91,7 @@ Falsifying that is the point.
 | | choice | why |
 |---|---|---|
 | checkpoints | **top 25 per arm by stage-A `perfect_percent`, ties by `trailing_avg_score` then later step**, 100 per cell. New selector `topa:<n>` (§5) | "top 100 per cell" taken as 25 per arm so one seed cannot supply all 100; the alternative is 100 per cell via per-arm `steps:` files, a spec per arm. **User's call**, §6 |
-| depth | 1,000 episodes, every read, **including `mean`** | stage B is 500 and the hof passes 5,000 / 30,000, so no existing row is the control. Same episodes, same seed 0, same box, same pass |
+| depth | 1,000 episodes, every read, **including `mean`**; **the IQN cell's fifteen non-control reads at 500** (cut 2026-09-22, §4c) | stage B is 500 and the hof passes 5,000 / 30,000, so no existing row is the control. Same episodes, same seed 0, same box, same pass. The IQN control stays at 1,000, so its paired Δ carries the 500-episode row's noise (SE ~1.0 pp a row, ~0.25 pp over 100 checkpoints) |
 | pairing | every read runs on the same 100 checkpoints of a cell; the comparison is each read's perfect rate minus `mean`'s on the same checkpoint, averaged over the 100, with a bootstrap CI over checkpoints | top-N selection guarantees regression to the mean; a paired control at the same depth absorbs it. Episodes are seeded through the game, so the first food sequence is shared but the trajectories diverge, hence pairing at the checkpoint level and not the episode level |
 | noise floor | at p ≈ 0.95 one 1,000-episode row has SE 0.7 pp; the paired mean over 100 checkpoints has SE under 0.2 pp | a read has to move the cell by about 0.5 pp to be read as real. The `mix`/`leastneg` predictions are several pp |
 | what is reported per read per cell | perfect %, death %, starve %, mean score, mean episode length, Δ perfect vs `mean` with CI | death vs starve is inferred from a row's `rewards − scores` (terminal −5 against −0.5; the 0.001 distance shaping is noise at that scale). Adding `died`/`starved` counts to the engine row is the cleaner fix and a bigger change; inference first |
@@ -108,6 +108,23 @@ stage B: 21 to 28 episodes/s per shard). Call it 20 episodes/s per shard and 16 
 | reads 0 to 6 and 11, four cells | 400 × 8 × 1,000 | 3.2M | ~2.8 h |
 | all sixteen reads (cvar and abovemean as two each, leastneg as four), four cells | 400 × 16 × 1,000 | 6.4M | ~5.6 h |
 | **the decided design**: sixteen reads, five cells with C51 | 500 × 16 × 1,000 | 8.0M | ~7 h |
+
+## 4c. What the desktop measured (2026-09-22, the first three specs)
+
+| cell | one spec (4 arms × 25 checkpoints × 1,000 episodes, claim to publish) | per arm |
+|---|---|---|
+| C51 (`b37a`-`d`) | 4.3 min | ~40 s |
+| FQF (`b39a`-`d`) | 9 min | 1.3 to 2.3 min |
+| IQN (`b38a`-`d`) | ~38 min | 8 to 10 min |
+
+The §4 estimate of ~7 h assumed every head ran at the QR-DQN rate; C51 runs faster than that and IQN
+about eight times slower (the cosine embedding is evaluated for every one of the 32 fixed fractions on
+every forward pass), so the sixteen IQN specs alone were ~10 h of a ~16 h batch. **Decision (the user,
+2026-09-22): the fifteen unclaimed IQN read specs drop to 500 episodes; every other spec, and the IQN
+`mean:fixed` control already measured, stay at 1,000.** Saves about 4.5 h and leaves the four fast
+cells at full precision; the IQN reads' noise floor is about 0.25 pp paired instead of 0.2. The
+remaining batch is about 11 h from 17:50, clearing about 05:00 on 2026-09-23. The QR-DQN cells were
+not yet measured when this was written; they are assumed to run near C51's rate.
 
 ## 4b. What the pilot said (2026-09-22, two b40e checkpoints, 200 episodes a read, laptop)
 
@@ -162,7 +179,7 @@ the user said; the reads are the interesting part and pruning them saves little.
 | 4 | **pilot on the laptop**: two b40e checkpoints, every read, 200 episodes, `PYTHONPATH=. python -m tools.closeout b40e-mqrdqnlocal-seed5 --selector steps:… --episodes 200 --policy-variant X --label pilot-X --shards 4`. Checks: each read's actions differ from `mean`'s on some states (a read that never disagrees is a bug or a no-op and is dropped), the result files sit beside each other, and a per-episode timing for the QR head; one b39a checkpoint the same way for the FQF timing | the `laptop-run` skill; smoke output, deleted after |
 | 5 | **deploy** to the desktop (`desktop-deploy`), confirm the new parser is live before any spec is pushed | the deploy rule; the memory `deploy-before-queueing-specs-that-need-new-knobs` |
 | 6 | **rsync** b40e-h to the desktop: the selected 25 checkpoints per arm plus `arch.json`, and `runs/b40[e-h]-…_evals.json` into `desktop/runs/` so `topa` can resolve there. b37, b38 and b39 are already on the desktop (2,000 to 3,000 checkpoints per arm) | `hof-remeasure` step 2; the memory `desktop-eval-of-laptop-policy` |
-| 7 | **the specs**: one `eval` spec per cell per read, `policies` the cell's four arms, `selector: "topa:25"`, `episodes: 1000`, `eval_shards: 16`, `eval_args: ["--policy-variant", "<variant>", "--label", "reads-<slug>"]`, `box: "desktop"`, id `b45-reads-<cell>-<slug>` (the slug drops `:` and `.`: `mix07`, `leastneg-2`), the five `mean:fixed` controls at priority 90 and the rest at 100. 16 reads × 5 cells = 80 specs | **pushing to `ops` is the code rule**: queued only on the user's go for this job |
+| 7 | **the specs**: one `eval` spec per cell per read, `policies` the cell's four arms, `selector: "topa:25"`, `episodes: 1000` (500 on the fifteen IQN reads, §4c), `eval_shards: 16`, `eval_args: ["--policy-variant", "<variant>", "--label", "reads-<slug>"]`, `box: "desktop"`, id `b45-reads-<cell>-<slug>` (the slug drops `:` and `.`: `mix07`, `leastneg-2`), the five `mean:fixed` controls at priority 90 and the rest at 100. 16 reads × 5 cells = 80 specs | **pushing to `ops` is the code rule**: queued only on the user's go for this job |
 | 8 | **read-out**: `tools/read_compare.py` per cell, the table into `docs/results.md`, the finding (or its absence) into `docs/findings.md`, this plan's §2 predictions marked held or falsified | docs, standing authorization |
 
 Two things this deliberately does not touch: stage A stays the `mean` read (it drives the epsilon
