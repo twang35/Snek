@@ -1,0 +1,14 @@
+{
+ "arms": [
+  "b38a-iqnlocal-seed1",
+  "b38b-iqnlocal-seed2",
+  "b38c-iqnlocal-seed3",
+  "b38d-iqnlocal-seed4"
+ ],
+ "batch": "b45",
+ "box": "desktop",
+ "claimed_iso": "2026-09-22T22:30:06",
+ "claimed_ts": 1790141406.8946989,
+ "id": "b45-reads-iqnlocal-cvar05",
+ "kind": "eval"
+}
