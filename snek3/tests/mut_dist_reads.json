@@ -1,0 +1,135 @@
+{
+ "tests": [
+  "tests/test_dist_reads.py",
+  "tests/test_dist_net.py",
+  "tests/test_step_selectors.py"
+ ],
+ "mutations": [
+  {
+   "desc": "conditional mean does not divide by the set's mass",
+   "file": "algos/dist/reads.py",
+   "from": "    return torch.where(empty, torch.zeros_like(partial), partial / torch.where(empty, torch.ones_like(mass), mass))",
+   "to": "    return torch.where(empty, torch.zeros_like(partial), partial)"
+  },
+  {
+   "desc": "an empty set is not zero",
+   "file": "algos/dist/reads.py",
+   "from": "    empty = mass < MIN_MASS",
+   "to": "    empty = mass < 0.0"
+  },
+  {
+   "desc": "mix weights swapped",
+   "file": "algos/dist/reads.py",
+   "from": "        return (argument * conditional_mean(values, masses, negative)\n                + (1.0 - argument) * conditional_mean(values, masses, positive)), None",
+   "to": "        return ((1.0 - argument) * conditional_mean(values, masses, negative)\n                + argument * conditional_mean(values, masses, positive)), None"
+  },
+  {
+   "desc": "mixmass uses conditional means",
+   "file": "algos/dist/reads.py",
+   "from": "        return (argument * partial_expectation(values, masses, negative)\n                + (1.0 - argument) * partial_expectation(values, masses, positive)), None",
+   "to": "        return (argument * conditional_mean(values, masses, negative)\n                + (1.0 - argument) * conditional_mean(values, masses, positive)), None"
+  },
+  {
+   "desc": "leastneg ignores its threshold",
+   "file": "algos/dist/reads.py",
+   "from": "        below = (values < argument).to(values.dtype)\n        return partial_expectation(values, masses, below), partial_expectation(values, masses, positive)",
+   "to": "        below = negative\n        return partial_expectation(values, masses, below), partial_expectation(values, masses, positive)"
+  },
+  {
+   "desc": "leastneg has no tie-break",
+   "file": "algos/dist/reads.py",
+   "from": "        return partial_expectation(values, masses, below), partial_expectation(values, masses, positive)",
+   "to": "        return partial_expectation(values, masses, below), None"
+  },
+  {
+   "desc": "above uses the conditional mean",
+   "file": "algos/dist/reads.py",
+   "from": "    if kind == 'above':\n        score = partial_expectation(values, masses, tail)",
+   "to": "    if kind == 'above':\n        score = conditional_mean(values, masses, tail)"
+  },
+  {
+   "desc": "the threshold fallback never fires",
+   "file": "algos/dist/reads.py",
+   "from": "    return torch.where(silent, mean(values, masses), score), None",
+   "to": "    return score, None"
+  },
+  {
+   "desc": "the fallback fires per action, not per state",
+   "file": "algos/dist/reads.py",
+   "from": "    silent = (set_mass(masses, tail) < MIN_MASS).all(dim=1, keepdim=True)",
+   "to": "    silent = (set_mass(masses, tail) < MIN_MASS)"
+  },
+  {
+   "desc": "the tie-break is ignored",
+   "file": "algos/dist/reads.py",
+   "from": "    ranked = torch.where(tied, tie_break, torch.full_like(tie_break, float('-inf')))\n    return ranked.argmax(dim=1).to(torch.int64)",
+   "to": "    return score.argmax(dim=1).to(torch.int64)"
+  },
+  {
+   "desc": "the tie-break decides even when not tied",
+   "file": "algos/dist/reads.py",
+   "from": "    tied = score >= best - EPS",
+   "to": "    tied = score >= best - 1e9"
+  },
+  {
+   "desc": "IQN's distribution samples its fractions",
+   "file": "algos/dist/net.py",
+   "from": "            tau_hats = _midpoint_fractions(self.k, features.device).unsqueeze(0).expand(features.shape[0], -1)",
+   "to": "            tau_hats = self.sample_taus(features.shape[0], self.k)"
+  },
+  {
+   "desc": "FQF's masses are uniform",
+   "file": "algos/dist/net.py",
+   "from": "            widths = taus_full[:, 1:] - taus_full[:, :-1]                # (m, n)",
+   "to": "            widths = torch.full_like(tau_hats, 1.0 / self.n)                # (m, n)"
+  },
+  {
+   "desc": "the quantile distribution's masses do not sum to one",
+   "file": "algos/dist/net.py",
+   "from": "        return quantiles, torch.full_like(quantiles, 1.0 / self.n)",
+   "to": "        return quantiles, torch.full_like(quantiles, 1.0)"
+  },
+  {
+   "desc": "a non-cvar variant is read as the mean",
+   "file": "algos/dist/net.py",
+   "from": "                values, masses = net.distribution(batch)\n                chosen = reads.actions(values, masses, parsed)",
+   "to": "                chosen = net.q_values(batch).argmax(dim=1).to(torch.int64)"
+  },
+  {
+   "desc": "topa ignores the tie-break on trailing score",
+   "file": "tools/step_selectors.py",
+   "from": "                                 -float(eval_.get('trailing_avg_score') or 0.0),\n",
+   "to": ""
+  },
+  {
+   "desc": "topa prefers the earlier step",
+   "file": "tools/step_selectors.py",
+   "from": "                                 -int(eval_['step'])))",
+   "to": "                                 int(eval_['step'])))"
+  },
+  {
+   "desc": "topa ranks absent checkpoints too",
+   "file": "tools/step_selectors.py",
+   "from": "            if eval_.get('perfect_percent') is not None and int(eval_['step']) in present]",
+   "to": "            if eval_.get('perfect_percent') is not None]"
+  },
+  {
+   "desc": "leastneg uses the conditional mean",
+   "file": "algos/dist/reads.py",
+   "from": "        return partial_expectation(values, masses, below), partial_expectation(values, masses, positive)",
+   "to": "        return conditional_mean(values, masses, below), partial_expectation(values, masses, positive)"
+  },
+  {
+   "desc": "leastnegmean uses the partial expectation",
+   "file": "algos/dist/reads.py",
+   "from": "        return conditional_mean(values, masses, below), conditional_mean(values, masses, positive)",
+   "to": "        return partial_expectation(values, masses, below), conditional_mean(values, masses, positive)"
+  },
+  {
+   "desc": "leastnegmean ignores its threshold",
+   "file": "algos/dist/reads.py",
+   "from": "    if kind == 'leastnegmean':\n        below = (values < argument).to(values.dtype)",
+   "to": "    if kind == 'leastnegmean':\n        below = negative"
+  }
+ ]
+}

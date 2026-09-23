@@ -11,6 +11,7 @@ so a selector chooses *which* checkpoints and never *how deeply*.
 | `screen:<n>` | every checkpoint whose stage-A eval was ≥ n perfect. **The protocol's default**, n=97 | `runs/<name>_evals.json` |
 | `above:<n>[:<label>]` | every checkpoint above n in a *prior stage-B* pass — the record re-measure | `runs/<name>_checkpoint_evals[_<label>].json` |
 | `steps:<path>` | an explicit list, one step per line | that file |
+| `topa:<n>` | the n checkpoints **present** with the highest stage-A eval, ties by `trailing_avg_score` then the later step. For a re-measure of an arm's best under a different read (`plans/quantile-reads.md`); it ranks only what is on disk, so a pruned arm or a partial rsync selects among what it has | `runs/<name>_evals.json` |
 | `all` | every checkpoint present | the policy directory |
 
 `screen` is the one that matters and `all` is the one to be careful with: a 3M-step arm has ~3,000
@@ -74,8 +75,16 @@ def parse(token):
         if not rest:
             raise SelectorError('steps: needs a path, e.g. steps:runs/ab.txt')
         return 'steps', rest
+    if kind == 'topa':
+        try:
+            count = int(rest)
+        except (TypeError, ValueError):
+            raise SelectorError('topa: needs a count, e.g. topa:25')
+        if count < 1:
+            raise SelectorError('topa: count must be positive, got {0}'.format(rest))
+        return 'topa', count
     raise SelectorError(
-        'unknown selector {0!r}. Known: screen:<n>, above:<n>[:<label>], steps:<path>, all'.format(
+        'unknown selector {0!r}. Known: screen:<n>, above:<n>[:<label>], steps:<path>, topa:<n>, all'.format(
             token))
 
 
@@ -114,6 +123,22 @@ def _screened(policy, threshold):
             and float(eval_['perfect_percent']) >= threshold]
 
 
+def _top_stage_a(policy, count, available):
+    """The `count` best stage-A rows among the checkpoints present: highest `perfect_percent`, then
+    highest `trailing_avg_score`, then the later step."""
+    payload = results.read(results.stage_a_path(policy))
+    if payload is None:
+        raise SelectorError('no stage-A file at {0}; `topa:` ranks the trainer\'s own evals'.format(
+            results.stage_a_path(policy)))
+    present = set(available)
+    rows = [eval_ for eval_ in payload.get('evals', ())
+            if eval_.get('perfect_percent') is not None and int(eval_['step']) in present]
+    rows.sort(key=lambda eval_: (-float(eval_['perfect_percent']),
+                                 -float(eval_.get('trailing_avg_score') or 0.0),
+                                 -int(eval_['step'])))
+    return [int(eval_['step']) for eval_ in rows[:count]]
+
+
 def _above(policy, threshold, label):
     path = results.stage_b_path(policy, label)
     payload = results.read(path)
@@ -145,6 +170,9 @@ def resolve(policy_dir, token, policy=None):
         threshold, label = value
         wanted = _above(policy, threshold, label)
         description = 'stage-B perfect >= {0:g} in {1}'.format(threshold, label or 'the main pass')
+    elif kind == 'topa':
+        wanted = _top_stage_a(policy, value, available)
+        description = 'the {0} best stage-A evals among the checkpoints present'.format(len(wanted))
     else:
         wanted = _read_steps_file(value)
         description = 'the {0} steps listed in {1}'.format(len(wanted), value)

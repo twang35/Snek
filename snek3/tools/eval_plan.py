@@ -90,6 +90,10 @@ def build_row(step, held, stage_a_percent=None):
         'min_score': round(float(np.min(scores)), 1),
         'max_score': round(float(np.max(scores)), 1),
         'avg_reward': round(float(np.mean(held['rewards'])), 2),
+        # How the non-perfect episodes ended, from the env's own flags (2026-09-22). Absent on rows
+        # measured before the engine recorded them.
+        **({'deaths': int(sum(held['deaths'])), 'starves': int(sum(held['starves']))}
+           if held.get('deaths') is not None and held.get('starves') is not None else {}),
         # Wall clock per checkpoint, so a progress readout gives an ETA from this run's own
         # throughput. Strong policies play longer episodes and measure slower, so a fixed estimate
         # is wrong in both directions.

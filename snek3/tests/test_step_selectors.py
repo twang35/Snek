@@ -32,6 +32,13 @@ def test_the_known_selectors_parse():
     assert selectors.parse('above:98') == ('above', (98.0, None))
     assert selectors.parse('above:98:hof') == ('above', (98.0, 'hof'))
     assert selectors.parse('steps:runs/x.txt') == ('steps', 'runs/x.txt')
+    assert selectors.parse('topa:25') == ('topa', 25)
+
+
+def test_topa_needs_a_positive_count():
+    for token in ('topa', 'topa:', 'topa:0', 'topa:x'):
+        with pytest.raises(selectors.SelectorError):
+            selectors.parse(token)
 
 
 def test_the_default_screen_is_the_protocol_threshold():
@@ -116,6 +123,49 @@ def test_screen_says_what_to_use_instead_when_there_is_no_stage_a_file(tmp_path)
     with pytest.raises(selectors.SelectorError) as raised:
         selectors.resolve(directory, 'screen', policy='nothing-trained-here')
     assert 'steps:' in str(raised.value)
+
+
+def stage_a_file(monkeypatch, tmp_path, policy, rows):
+    from env import constants
+    from tools import results
+    monkeypatch.setattr(constants, 'RUNS_DIR', str(tmp_path / 'runs'))
+    os.makedirs(constants.RUNS_DIR, exist_ok=True)
+    results.write(results.stage_a_path(policy),
+                  {'evals': [{'step': step, 'perfect_percent': perfect, 'trailing_avg_score': trailing}
+                             for step, perfect, trailing in rows]})
+
+
+def test_topa_ranks_by_perfect_then_trailing_score_then_the_later_step(monkeypatch, tmp_path):
+    directory = a_policy(tmp_path, [1000, 2000, 3000, 4000, 5000])
+    stage_a_file(monkeypatch, tmp_path, 'arm', [
+        (1000, 90.0, 80.0), (2000, 95.0, 70.0), (3000, 95.0, 75.0), (4000, 95.0, 75.0), (5000, 60.0, 90.0)])
+    steps, description = selectors.resolve(directory, 'topa:3', policy='arm')
+    # 95s first; among them trailing 75 beats 70; among the 75s the later step (4000) beats 3000.
+    assert steps == [2000, 3000, 4000]
+    assert selectors.resolve(directory, 'topa:1', policy='arm')[0] == [4000]
+    assert selectors.resolve(directory, 'topa:2', policy='arm')[0] == [3000, 4000]
+    assert '3 best stage-A' in description
+    # The trailing score outranks the step: an earlier checkpoint with the better trailing score wins.
+    stage_a_file(monkeypatch, tmp_path, 'arm', [
+        (1000, 95.0, 80.0), (2000, 95.0, 70.0), (3000, 95.0, 75.0), (4000, 95.0, 70.0), (5000, 60.0, 90.0)])
+    assert selectors.resolve(directory, 'topa:1', policy='arm')[0] == [1000]
+    assert selectors.resolve(directory, 'topa:2', policy='arm')[0] == [1000, 3000]
+
+
+def test_topa_ranks_only_the_checkpoints_present(monkeypatch, tmp_path):
+    # A pruned arm or a partial rsync: the best stage-A row has no checkpoint, so the next one is taken
+    # rather than raising -- this selector is defined over what is on disk.
+    directory = a_policy(tmp_path, [1000, 3000])
+    stage_a_file(monkeypatch, tmp_path, 'arm', [(1000, 90.0, 80.0), (2000, 99.0, 90.0), (3000, 95.0, 70.0)])
+    assert selectors.resolve(directory, 'topa:1', policy='arm')[0] == [3000]
+    assert selectors.resolve(directory, 'topa:5', policy='arm')[0] == [1000, 3000]
+
+
+def test_topa_without_a_stage_a_file_says_so(tmp_path):
+    directory = a_policy(tmp_path, [1000])
+    with pytest.raises(selectors.SelectorError) as raised:
+        selectors.resolve(directory, 'topa:5', policy='never-trained-here')
+    assert 'stage-A' in str(raised.value)
 
 
 # ---------------------------------------------------------------------- sharding

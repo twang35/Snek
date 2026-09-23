@@ -85,8 +85,8 @@ def default_max_live(width, episodes):
 class _Job:
     """One checkpoint being measured: its policy, its quota, and its accumulating sample."""
 
-    __slots__ = ('key', 'policy_fn', 'episodes', 'started', 'scores', 'perfect', 'rewards',
-                 'started_at', 'live', 'banked', 'failures', 'stop_target', 'needed')
+    __slots__ = ('key', 'policy_fn', 'episodes', 'started', 'scores', 'perfect', 'rewards', 'deaths',
+                 'starves', 'started_at', 'live', 'banked', 'failures', 'stop_target', 'needed')
 
     def __init__(self, key, policy_fn, episodes, stop_target=None):
         self.key = key
@@ -104,6 +104,11 @@ class _Job:
         self.scores = [None] * episodes
         self.perfect = [None] * episodes
         self.rewards = [None] * episodes
+        # How each non-perfect episode ended (2026-09-22, `plans/quantile-reads.md` §3): the env's own
+        # `died` / `starved` flags, so a row can say whether a read trades deaths for starves. Never
+        # inferred from the reward, which is a sum of terms.
+        self.deaths = [None] * episodes
+        self.starves = [None] * episodes
         self.started_at = time.time()
         self.live = 0                    # lanes currently playing an episode for this job
         self.banked = 0
@@ -112,8 +117,8 @@ class _Job:
     def done(self):
         return self.banked
 
-    def record(self, slot, score, reward):
-        """Bank one finished episode at the slot it was *started* in.
+    def record(self, slot, score, reward, died=False, starved=False):
+        """Bank one finished episode at the slot it was *started* in, with how it ended.
 
         **Start order, not completion order, and this is a correctness requirement rather than
         tidiness.** Every reader of `episode_scores` is entitled to treat a prefix as a fair sample
@@ -137,6 +142,8 @@ class _Job:
         # the arms were filling boards.
         self.perfect[slot] = int(score == C.MAX_POSSIBLE_SCORE)
         self.rewards[slot] = float(reward)
+        self.deaths[slot] = int(bool(died))
+        self.starves[slot] = int(bool(starved))
         self.banked += 1
         self.failures += 1 - self.perfect[slot]
 
@@ -177,6 +184,7 @@ class _Job:
                         self.key, self.banked, len(kept)))
             return {'scores': [self.scores[i] for i in kept], 'perfect': [self.perfect[i] for i in kept],
                     'rewards': [self.rewards[i] for i in kept],
+                    'deaths': [self.deaths[i] for i in kept], 'starves': [self.starves[i] for i in kept],
                     'seconds': time.time() - self.started_at, 'abandoned': True,
                     'episodes_planned': self.episodes, 'stop_target': self.stop_target}
         if self.banked != self.episodes:
@@ -184,6 +192,7 @@ class _Job:
                 'checkpoint {0} handed out a sample with {1} of {2} episodes banked -- a gap would '
                 'reach the result file as a null'.format(self.key, self.banked, self.episodes))
         return {'scores': self.scores, 'perfect': self.perfect, 'rewards': self.rewards,
+                'deaths': self.deaths, 'starves': self.starves,
                 'seconds': time.time() - self.started_at, 'abandoned': False,
                 'episodes_planned': self.episodes, 'stop_target': self.stop_target}
 
@@ -311,7 +320,7 @@ def measure_stream(next_job, on_complete, episodes, width=None, max_live=None, s
         # `observe=False` plus one explicit `observe()` below, rather than letting `step` build the
         # observation and rebuilding it after the resets. The observation is 95% of the cost of a
         # step, so computing it twice on every step where a lane finished nearly doubled the bill.
-        _, reward, done, _ = vec.step(actions, autoreset=False, observe=False)
+        _, reward, done, info = vec.step(actions, autoreset=False, observe=False)
         running[active] += reward[active]
 
         hits = np.flatnonzero(done & active)
@@ -327,7 +336,8 @@ def measure_stream(next_job, on_complete, episodes, width=None, max_live=None, s
                     raise RuntimeError(
                         'checkpoint {0} banked more than its {1} episodes — a lane was restarted '
                         'past its quota'.format(job.key, job.episodes))
-                job.record(int(slot[row]), int(vec.score[row]), running[row])
+                job.record(int(slot[row]), int(vec.score[row]), running[row],
+                           died=bool(info['died'][row]), starved=bool(info['starved'][row]))
                 job.live -= 1
                 owner[row] = -1
                 slot[row] = -1

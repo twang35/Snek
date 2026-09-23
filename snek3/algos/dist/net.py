@@ -13,9 +13,11 @@ output. `arch['head']` (see `tools/arch.py`'s `OPTIONAL_FIELDS`) says which head
 
 **One interface for the agent and the policy**: `q_values(obs)` is the mean of the distribution per
 action, `(m, actions)`, and `cvar_values(obs, alpha)` is the mean of its lower `alpha` tail, which is
-what the risk-sensitive read (`a-return-tail.md` §5) acts on. The greedy `policy_fn` is the argmax of
-either, in the `(m, obs_len) float32 -> (m,) int64` shape the engine takes; a `variant` string
-(`cvar:0.25`) selects the tail read and is the only way anything but the mean is measured.
+what the risk-sensitive read (`a-return-tail.md` §5) acts on. `distribution(obs)` is the whole thing
+as `(values, masses)`, both `(m, actions, n)`, which the reads in `reads.py` score. The greedy
+`policy_fn` is the argmax of one of those, in the `(m, obs_len) float32 -> (m,) int64` shape the engine
+takes; a `variant` string (`cvar:0.25`, `mix:0.7`, ...; `reads.parse_variant`) selects the read and is
+the only way anything but the mean is measured.
 """
 
 import math
@@ -25,6 +27,7 @@ import torch
 from torch import nn
 
 from algos.dqn import net as qnet
+from algos.dist import reads
 
 HEAD_TYPES = ('c51', 'quantile', 'iqn', 'fqf')
 
@@ -85,6 +88,11 @@ class CategoricalNet(nn.Module):
     def q_values(self, observations):
         return (self.probs(observations) * self.support).sum(dim=2)
 
+    def distribution(self, observations):
+        """`(values, masses)`: the support broadcast to `(m, actions, atoms)`, and the probabilities."""
+        probs = self.probs(observations)
+        return self.support.expand_as(probs), probs
+
     def cvar_values(self, observations, alpha):
         """Mean of the lower `alpha` of the mass, per action: the CVaR_alpha of the categorical."""
         probs = self.probs(observations)
@@ -123,6 +131,11 @@ class QuantileNet(nn.Module):
 
     def q_values(self, observations):
         return self.quantiles(observations).mean(dim=2)
+
+    def distribution(self, observations):
+        """`(values, masses)`: the quantiles, each carrying 1/n."""
+        quantiles = self.quantiles(observations)
+        return quantiles, torch.full_like(quantiles, 1.0 / self.n)
 
     def cvar_values(self, observations, alpha):
         """Mean of the lowest `ceil(alpha * n)` quantiles, sorted, per action."""
@@ -244,6 +257,21 @@ class ImplicitNet(nn.Module):
     def cvar_values(self, observations, alpha):
         return self.q_values(observations, alpha=alpha)
 
+    def distribution(self, observations):
+        """`(values, masses)`, `(m, actions, k)`, at **fixed** fractions: FQF's proposed midpoints with
+        the bin widths as masses, IQN's `k` midpoint fractions `(2i - 1) / 2k` at 1/k each -- not the
+        draws `q_values` uses, so a read's sets (`v < 0`, `v > t`) are the same on every call
+        (`plans/quantile-reads.md` §3)."""
+        features = self.features(observations)
+        if self.head_type == 'fqf':
+            taus_full, tau_hats, _ = self.propose(features)
+            widths = taus_full[:, 1:] - taus_full[:, :-1]                # (m, n)
+        else:
+            tau_hats = _midpoint_fractions(self.k, features.device).unsqueeze(0).expand(features.shape[0], -1)
+            widths = torch.full_like(tau_hats, 1.0 / self.k)
+        values = self.quantiles_at(features, tau_hats).transpose(1, 2)   # (m, actions, k)
+        return values, widths.unsqueeze(1).expand_as(values)
+
     def forward(self, observations):
         return self.q_values(observations)
 
@@ -262,26 +290,17 @@ def build(arch, device='cpu', seed=None):
     return net.to(device)
 
 
-def parse_variant(variant):
-    """`None` -> the mean; `'cvar:0.25'` -> `('cvar', 0.25)`. Anything else names itself in the error."""
-    if variant is None or variant == '' or variant == 'mean':
-        return None
-    kind, _, value = str(variant).partition(':')
-    if kind != 'cvar':
-        raise ValueError('unknown policy variant {0!r}; this head knows cvar:<alpha>'.format(variant))
-    alpha = float(value)
-    if not 0.0 < alpha <= 1.0:
-        raise ValueError('cvar alpha must be in (0, 1], got {0}'.format(value))
-    return kind, alpha
+parse_variant = reads.parse_variant
 
 
 def greedy_policy_fn(net, device='cpu', variant=None):
-    """`(m, obs_len) float32 -> (m,) int64`: argmax over the mean, or over the CVaR tail for a variant.
+    """`(m, obs_len) float32 -> (m,) int64`: argmax over the mean, over the CVaR tail for `cvar:<a>`,
+    or over one of `reads.py`'s scores of `net.distribution()` for any other variant.
 
     Eval mode and no autograd, as `algos/dqn/net.greedy_policy_fn`. IQN's mean read draws `k` fractions
     per call from torch's global generator; the measurement engine's episodes are seeded through the
     game, not the policy, so a run is repeatable to the game and not to the draw -- as the paper's
-    agent is. A seed for the draw is a later knob if a byte-exact replay is wanted.
+    agent is. Every other read goes through `distribution()`, which is at fixed fractions.
     """
     net.eval()
     parsed = parse_variant(variant)
@@ -289,8 +308,14 @@ def greedy_policy_fn(net, device='cpu', variant=None):
     def policy_fn(observations):
         with torch.no_grad():
             batch = torch.as_tensor(observations, dtype=torch.float32, device=device)
-            values = net.q_values(batch) if parsed is None else net.cvar_values(batch, parsed[1])
-            return values.argmax(dim=1).to(torch.int64).cpu().numpy()
+            if parsed is None:
+                chosen = net.q_values(batch).argmax(dim=1).to(torch.int64)
+            elif parsed[0] == 'cvar':
+                chosen = net.cvar_values(batch, parsed[1]).argmax(dim=1).to(torch.int64)
+            else:
+                values, masses = net.distribution(batch)
+                chosen = reads.actions(values, masses, parsed)
+            return chosen.cpu().numpy()
 
     return policy_fn
 

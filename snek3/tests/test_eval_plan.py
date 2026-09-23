@@ -179,3 +179,15 @@ def test_the_averages_the_dropped_rewards_supported_are_still_there():
     # `avg_reward` is the only reward figure anything reads, and it is computed before the drop.
     row = eval_plan.build_row(3000, held([95, 40], rewards=[100.5, 33.25]))
     assert row['avg_reward'] == pytest.approx(66.88, abs=0.01)
+
+
+def test_build_row_carries_how_the_episodes_ended_when_the_engine_recorded_it():
+    from tools import eval_plan
+    held = {'scores': [95, 40, 60, 95], 'perfect': [1, 0, 0, 1], 'rewards': [190.0, 35.0, 59.5, 190.0],
+            'deaths': [0, 1, 0, 0], 'starves': [0, 0, 1, 0], 'seconds': 1.0}
+    row = eval_plan.build_row(1000, held)
+    assert row['deaths'] == 1 and row['starves'] == 1 and row['perfect_games'] == 2
+    # A held sample from before the flags existed builds a row without them, not a row with zeros.
+    old = {k: v for k, v in held.items() if k not in ('deaths', 'starves')}
+    row = eval_plan.build_row(1000, old)
+    assert 'deaths' not in row and 'starves' not in row

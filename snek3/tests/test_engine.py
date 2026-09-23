@@ -358,3 +358,25 @@ def test_a_prefix_of_a_row_is_a_fair_sample_of_it():
         'first half of each row means {0:.1f} and the second half {1:.1f} over a spread of {2} — the '
         'episodes are sorted by length, so a prefix of this row is not a fair sample of '
         'it'.format(mean_first, mean_second, spread))
+
+
+def test_a_measured_row_says_how_every_non_perfect_episode_ended():
+    # Under a policy that walks into the wall every game ends in a death; the flags come from the
+    # env, so deaths + starves + perfect games is the episode count and here it is all deaths.
+    from vectorized import engine as engine_module
+    from tools import eval_plan
+    banked = {}
+    jobs = iter([('wall', lambda obs: np.zeros(len(obs), dtype=np.int64), 6)])
+    def next_job():
+        try:
+            return next(jobs)
+        except StopIteration:
+            return None
+    engine_module.measure_stream(next_job, lambda key, held: banked.__setitem__(key, held),
+                                 episodes=6, width=3, seed=0)
+    held = banked['wall']
+    assert len(held['deaths']) == 6 and len(held['starves']) == 6
+    assert sum(held['deaths']) + sum(held['starves']) + sum(held['perfect']) == 6
+    row = eval_plan.build_row(1, held)
+    assert row['deaths'] + row['starves'] + row['perfect_games'] == 6
+    assert row['deaths'] >= 1
