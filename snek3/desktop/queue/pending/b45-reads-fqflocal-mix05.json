@@ -1,0 +1,24 @@
+{
+  "project": "snek3",
+  "id": "b45-reads-fqflocal-mix05",
+  "type": "eval",
+  "policies": [
+    "b39a-fqflocal-seed1",
+    "b39b-fqflocal-seed2",
+    "b39c-fqflocal-seed3",
+    "b39d-fqflocal-seed4"
+  ],
+  "selector": "topa:25",
+  "episodes": 1000,
+  "eval_shards": 16,
+  "eval_args": [
+    "--policy-variant",
+    "mix:0.5",
+    "--label",
+    "reads-mix05"
+  ],
+  "box": "desktop",
+  "priority": 100,
+  "label": "b45 reads fqflocal mix:0.5",
+  "notes": "plans/quantile-reads.md: variant 3: 0.5 / 0.5 mix of the two conditional means (two at -1 and eight at 10 score 4.5). Top 25 checkpoints per arm by stage-A perfect rate, 1,000 episodes, no stop rule; paired against reads-meanfixed by tools/read_compare.py."
+}

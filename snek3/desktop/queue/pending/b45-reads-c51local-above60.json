@@ -1,0 +1,24 @@
+{
+  "project": "snek3",
+  "id": "b45-reads-c51local-above60",
+  "type": "eval",
+  "policies": [
+    "b37a-c51local-seed1",
+    "b37b-c51local-seed2",
+    "b37c-c51local-seed3",
+    "b37d-c51local-seed4"
+  ],
+  "selector": "topa:25",
+  "episodes": 1000,
+  "eval_shards": 16,
+  "eval_args": [
+    "--policy-variant",
+    "above:60",
+    "--label",
+    "reads-above60"
+  ],
+  "box": "desktop",
+  "priority": 100,
+  "label": "b45 reads c51local above:60",
+  "notes": "plans/quantile-reads.md: variant 5: partial expectation of the quantiles over 60, mean where no action has any. Top 25 checkpoints per arm by stage-A perfect rate, 1,000 episodes, no stop rule; paired against reads-meanfixed by tools/read_compare.py."
+}

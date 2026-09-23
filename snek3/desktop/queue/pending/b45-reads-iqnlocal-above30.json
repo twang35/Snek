@@ -1,0 +1,24 @@
+{
+  "project": "snek3",
+  "id": "b45-reads-iqnlocal-above30",
+  "type": "eval",
+  "policies": [
+    "b38a-iqnlocal-seed1",
+    "b38b-iqnlocal-seed2",
+    "b38c-iqnlocal-seed3",
+    "b38d-iqnlocal-seed4"
+  ],
+  "selector": "topa:25",
+  "episodes": 1000,
+  "eval_shards": 16,
+  "eval_args": [
+    "--policy-variant",
+    "above:30",
+    "--label",
+    "reads-above30"
+  ],
+  "box": "desktop",
+  "priority": 100,
+  "label": "b45 reads iqnlocal above:30",
+  "notes": "plans/quantile-reads.md: variant 4: partial expectation of the quantiles over 30, mean where no action has any. Top 25 checkpoints per arm by stage-A perfect rate, 1,000 episodes, no stop rule; paired against reads-meanfixed by tools/read_compare.py."
+}

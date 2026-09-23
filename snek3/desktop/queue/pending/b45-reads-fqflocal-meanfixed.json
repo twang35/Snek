@@ -1,0 +1,24 @@
+{
+  "project": "snek3",
+  "id": "b45-reads-fqflocal-meanfixed",
+  "type": "eval",
+  "policies": [
+    "b39a-fqflocal-seed1",
+    "b39b-fqflocal-seed2",
+    "b39c-fqflocal-seed3",
+    "b39d-fqflocal-seed4"
+  ],
+  "selector": "topa:25",
+  "episodes": 1000,
+  "eval_shards": 16,
+  "eval_args": [
+    "--policy-variant",
+    "mean:fixed",
+    "--label",
+    "reads-meanfixed"
+  ],
+  "box": "desktop",
+  "priority": 90,
+  "label": "b45 reads fqflocal mean:fixed",
+  "notes": "plans/quantile-reads.md: the control: the mean read at 1,000 episodes on the same checkpoints, IQN at fixed fractions. Top 25 checkpoints per arm by stage-A perfect rate, 1,000 episodes, no stop rule; paired against reads-meanfixed by tools/read_compare.py."
+}

@@ -1,0 +1,24 @@
+{
+  "project": "snek3",
+  "id": "b45-reads-mqrdqnlocal-mix03",
+  "type": "eval",
+  "policies": [
+    "b40e-mqrdqnlocal-seed5",
+    "b40f-mqrdqnlocal-seed6",
+    "b40g-mqrdqnlocal-seed7",
+    "b40h-mqrdqnlocal-seed8"
+  ],
+  "selector": "topa:25",
+  "episodes": 1000,
+  "eval_shards": 16,
+  "eval_args": [
+    "--policy-variant",
+    "mix:0.3",
+    "--label",
+    "reads-mix03"
+  ],
+  "box": "desktop",
+  "priority": 100,
+  "label": "b45 reads mqrdqnlocal mix:0.3",
+  "notes": "plans/quantile-reads.md: the risk-seeking mirror of variant 2; the pilot says it walks into untrained upper tails. Top 25 checkpoints per arm by stage-A perfect rate, 1,000 episodes, no stop rule; paired against reads-meanfixed by tools/read_compare.py."
+}

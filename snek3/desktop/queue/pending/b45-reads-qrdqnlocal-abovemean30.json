@@ -1,0 +1,24 @@
+{
+  "project": "snek3",
+  "id": "b45-reads-qrdqnlocal-abovemean30",
+  "type": "eval",
+  "policies": [
+    "b37e-qrdqnlocal-seed5",
+    "b37f-qrdqnlocal-seed6",
+    "b37g-qrdqnlocal-seed7",
+    "b37h-qrdqnlocal-seed8"
+  ],
+  "selector": "topa:25",
+  "episodes": 1000,
+  "eval_shards": 16,
+  "eval_args": [
+    "--policy-variant",
+    "abovemean:30",
+    "--label",
+    "reads-abovemean30"
+  ],
+  "box": "desktop",
+  "priority": 100,
+  "label": "b45 reads qrdqnlocal abovemean:30",
+  "notes": "plans/quantile-reads.md: the mass-blind flavour of variant 4 (conditional mean over 30); expected to do poorly. Top 25 checkpoints per arm by stage-A perfect rate, 1,000 episodes, no stop rule; paired against reads-meanfixed by tools/read_compare.py."
+}
