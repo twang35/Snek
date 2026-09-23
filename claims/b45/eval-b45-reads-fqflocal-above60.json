@@ -1,0 +1,14 @@
+{
+ "arms": [
+  "b39a-fqflocal-seed1",
+  "b39b-fqflocal-seed2",
+  "b39c-fqflocal-seed3",
+  "b39d-fqflocal-seed4"
+ ],
+ "batch": "b45",
+ "box": "desktop",
+ "claimed_iso": "2026-09-22T19:29:00",
+ "claimed_ts": 1790130540.606594,
+ "id": "b45-reads-fqflocal-above60",
+ "kind": "eval"
+}
