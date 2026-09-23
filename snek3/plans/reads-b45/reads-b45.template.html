@@ -90,7 +90,7 @@
   <span id="summary"></span>
 </header>
 <main id="main"></main>
-<p class="help"><kbd>m</kbd> matrix · <kbd>a</kbd> algorithm · <kbd>r</kbd> read · <kbd>c</kbd> checkpoint · <kbd>t</kbd> table · <kbd>←</kbd> <kbd>→</kbd> algorithm · <kbd>↑</kbd> <kbd>↓</kbd> next read · click a matrix cell to open that algorithm at that read, a column header for the algorithm, a row name for the read across algorithms · click a checkpoint's bar in a strip to open its drill · hover any mark for its numbers. Every read is one <code>--policy-variant</code> over the same frozen weights, 1,000 episodes a checkpoint, the top 25 stage-A checkpoints of each of the cell's four arms; the control is <code>mean:fixed</code>, the argmax of the mean. Design and predictions: <code>snek3/plans/quantile-reads.md</code>; the batch entry: <code>docs/runs.md</code> b45. Data inlined by a one-off reducer; the URL carries the view.</p>
+<p class="help"><kbd>m</kbd> matrix · <kbd>a</kbd> algorithm · <kbd>r</kbd> read · <kbd>c</kbd> checkpoint · <kbd>t</kbd> table · <kbd>j</kbd> <kbd>k</kbd> or <kbd>←</kbd> <kbd>→</kbd> algorithm · <kbd>n</kbd> <kbd>p</kbd> or <kbd>↓</kbd> <kbd>↑</kbd> next / previous read (checkpoint, in the drill) · click a matrix cell to open that algorithm at that read, a column header for the algorithm, a row name for the read across algorithms · click a checkpoint's bar in a strip to open its drill · hover any mark for its numbers. Every read is one <code>--policy-variant</code> over the same frozen weights, 1,000 episodes a checkpoint, the top 25 stage-A checkpoints of each of the cell's four arms; the control is <code>mean:fixed</code>, the argmax of the mean. Design and predictions: <code>snek3/plans/quantile-reads.md</code>; the batch entry: <code>docs/runs.md</code> b45. Data inlined by a one-off reducer; the URL carries the view.</p>
 <div id="tip"></div>
 <script>
 const DATA = /*DATA*/;
@@ -485,24 +485,27 @@ const DATA = /*DATA*/;
   document.querySelectorAll('header button[data-view]').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
   document.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'SELECT' || e.metaKey || e.ctrlKey || e.altKey) return;
+    // As the chart viewer: j / k are left / right (the algorithm), n / p next / previous (the read, or
+    // the checkpoint in the drill).
+    const key = { j: 'ArrowLeft', k: 'ArrowRight', n: 'ArrowDown', p: 'ArrowUp' }[e.key] || e.key;
     const i = cells.findIndex(c => c.key === state.cell);
     const order = reads.filter(r => r.key !== CONTROL).map(r => r.key);
-    if (e.key === 'm') setView('matrix');
-    else if (e.key === 'a') setView('algo');
-    else if (e.key === 'r') setView('read');
-    else if (e.key === 'c') setView('ckpt');
-    else if (e.key === 't') setView('table');
-    else if (e.key === 'ArrowLeft' && i > 0) { state.cell = cells[i - 1].key; state.ckpt = null; render(); }
-    else if (e.key === 'ArrowRight' && i < cells.length - 1) { state.cell = cells[i + 1].key; state.ckpt = null; render(); }
-    else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    if (key === 'm') setView('matrix');
+    else if (key === 'a') setView('algo');
+    else if (key === 'r') setView('read');
+    else if (key === 'c') setView('ckpt');
+    else if (key === 't') setView('table');
+    else if (key === 'ArrowLeft' && i > 0) { state.cell = cells[i - 1].key; state.ckpt = null; render(); }
+    else if (key === 'ArrowRight' && i < cells.length - 1) { state.cell = cells[i + 1].key; state.ckpt = null; render(); }
+    else if (key === 'ArrowDown' || key === 'ArrowUp') {
       if (state.view === 'ckpt') {
         e.preventDefault();
         const keys = ckptKeys(state.cell), j = keys.indexOf(state.ckpt);
-        state.ckpt = keys[e.key === 'ArrowDown' ? Math.min(keys.length - 1, j + 1) : Math.max(0, j - 1)]; render();
+        state.ckpt = keys[key === 'ArrowDown' ? Math.min(keys.length - 1, j + 1) : Math.max(0, j - 1)]; render();
       } else if (state.view === 'algo' || state.view === 'read') {
         e.preventDefault();
         let j = order.indexOf(state.read);
-        j = e.key === 'ArrowDown' ? Math.min(order.length - 1, j + 1) : Math.max(0, j - 1);
+        j = key === 'ArrowDown' ? Math.min(order.length - 1, j + 1) : Math.max(0, j - 1);
         state.read = order[j];
         if (state.view === 'read') { render(); return; }
         writeUrl();
