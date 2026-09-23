@@ -1,0 +1,14 @@
+{
+ "arms": [
+  "b37e-qrdqnlocal-seed5",
+  "b37f-qrdqnlocal-seed6",
+  "b37g-qrdqnlocal-seed7",
+  "b37h-qrdqnlocal-seed8"
+ ],
+ "batch": "b45",
+ "box": "desktop",
+ "claimed_iso": "2026-09-23T02:02:59",
+ "claimed_ts": 1790154179.6712759,
+ "id": "b45-reads-qrdqnlocal-abovemean30",
+ "kind": "eval"
+}
