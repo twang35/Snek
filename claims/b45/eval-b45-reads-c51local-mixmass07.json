@@ -1,0 +1,14 @@
+{
+ "arms": [
+  "b37a-c51local-seed1",
+  "b37b-c51local-seed2",
+  "b37c-c51local-seed3",
+  "b37d-c51local-seed4"
+ ],
+ "batch": "b45",
+ "box": "desktop",
+ "claimed_iso": "2026-09-22T19:14:11",
+ "claimed_ts": 1790129651.530158,
+ "id": "b45-reads-c51local-mixmass07",
+ "kind": "eval"
+}
