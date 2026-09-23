@@ -82,6 +82,7 @@
     <option value="delta">Δ perfect rate (pp)</option>
     <option value="ddeath">Δ deaths (pp of episodes)</option>
     <option value="dstarve">Δ starves (pp of episodes)</option>
+    <option value="dbest">Δ best checkpoint (pp)</option>
   </select></label>
   <label id="order-l">order checkpoints by <select id="order">
     <option value="control">control's perfect rate</option>
@@ -170,8 +171,9 @@ const DATA = /*DATA*/;
     delta:   { span: 5, up: true,  label: 'Δ perfect rate against the control, percentage points, mean over the paired checkpoints', unit: 'pp' },
     ddeath:  { span: 5, up: false, label: 'Δ deaths against the control, as a share of all episodes', unit: 'pp' },
     dstarve: { span: 5, up: false, label: 'Δ starves against the control, as a share of all episodes', unit: 'pp' },
+    dbest:   { span: 2, up: true,  label: "the read's highest single-checkpoint perfect rate against the control's highest", unit: 'pp' },
   };
-  const metricValue = (s, metric) => !s ? null : metric === 'delta' ? s.delta : metric === 'ddeath' ? s.ddeath : s.dstarve;
+  const metricValue = (s, metric) => !s ? null : metric === 'delta' ? s.delta : metric === 'ddeath' ? s.ddeath : metric === 'dstarve' ? s.dstarve : s.dbest;
   function tipFor(c, r, s) {
     const ctl = r.key === CONTROL;
     return [c.name + ' · ' + r.variant, r.desc, '',
@@ -180,7 +182,8 @@ const DATA = /*DATA*/;
       ctl ? null : 'better on ' + s.wins + ', worse on ' + s.losses + ', level on ' + s.level,
       'deaths ' + fmt(s.death, 2) + '% of episodes' + (ctl || !isNum(s.ddeath) ? '' : ' (' + sgn(s.ddeath, 2) + ')'),
       'starves ' + fmt(s.starve, 2) + '% of episodes' + (ctl || !isNum(s.dstarve) ? '' : ' (' + sgn(s.dstarve, 2) + ')'),
-      'mean score ' + fmt(s.score, 2)].filter(l => l !== null).join('\n');
+      'mean score ' + fmt(s.score, 2),
+      isNum(s.best) ? 'best checkpoint ' + fmt(s.best, 1) + '%' + (ctl || !isNum(s.dbest) ? '' : ' (' + sgn(s.dbest, 1) + " vs the control's best)") + (s.best_ckpt ? ' · ' + ckptLabel(s.best_ckpt) : '') : null].filter(l => l !== null).join('\n');
   }
   function renderMatrix() {
     const m = METRIC[state.metric];
@@ -200,11 +203,11 @@ const DATA = /*DATA*/;
           const s = summaryOf(c.key, r.key);
           if (!s) { html += '<td class="none">not yet</td>'; continue; }
           if (r.key === CONTROL) {
-            html += '<td class="none" style="color:var(--fg);cursor:pointer" data-cell="' + c.key + '" data-read="' + r.key + '" data-tip="' + esc(tipFor(c, r, s)) + '">' + fmt(s.perfect, 1) + '%<span class="ci">' + s.ckpts + ' ckpts · ' + fmt(s.death, 1) + '% die · ' + fmt(s.starve, 1) + '% starve</span></td>';
+            html += '<td class="none" style="color:var(--fg);cursor:pointer" data-cell="' + c.key + '" data-read="' + r.key + '" data-tip="' + esc(tipFor(c, r, s)) + '">' + fmt(s.perfect, 1) + '%<span class="ci">' + s.ckpts + ' ckpts · best ' + fmt(s.best, 1) + ' · ' + fmt(s.death, 1) + '% die · ' + fmt(s.starve, 1) + '% starve</span></td>';
             continue;
           }
           const v = metricValue(s, state.metric);
-          const ci = state.metric === 'delta' && s.ci ? '[' + sgn(s.ci[0], 1) + ', ' + sgn(s.ci[1], 1) + ']' : (fmt(s.perfect, 1) + '%');
+          const ci = state.metric === 'delta' && s.ci ? '[' + sgn(s.ci[0], 1) + ', ' + sgn(s.ci[1], 1) + ']' : state.metric === 'dbest' ? 'best ' + fmt(s.best, 1) + '%' : (fmt(s.perfect, 1) + '%');
           html += '<td style="background:' + diverge(v, m.span, m.up) + '" data-cell="' + c.key + '" data-read="' + r.key + '" data-tip="' + esc(tipFor(c, r, s)) + '">' + sgn(v, 2) + '<span class="ci">' + ci + '</span></td>';
         }
         html += '</tr>';
@@ -339,6 +342,7 @@ const DATA = /*DATA*/;
     head += '<span class="num">perfect <b>' + fmt(s.perfect, 2) + '%</b>' + (isControl ? '' : ' Δ <b>' + sgn(s.delta, 2) + '</b> pp' + (s.ci ? ' [' + sgn(s.ci[0], 2) + ', ' + sgn(s.ci[1], 2) + ']' : '')) + '</span>';
     if (!isControl) head += '<span class="num">better on <b>' + s.wins + '</b> · worse on <b>' + s.losses + '</b> · level on <b>' + s.level + '</b> of ' + s.paired + '</span>';
     head += '<span class="num">deaths <b>' + fmt(s.death, 2) + '%</b>' + (isControl || !isNum(s.ddeath) ? '' : ' (' + sgn(s.ddeath, 2) + ')') + ' · starves <b>' + fmt(s.starve, 2) + '%</b>' + (isControl || !isNum(s.dstarve) ? '' : ' (' + sgn(s.dstarve, 2) + ')') + ' · mean score <b>' + fmt(s.score, 1) + '</b></span>';
+    if (isNum(s.best)) head += '<span class="num">best checkpoint <b>' + fmt(s.best, 1) + '%</b>' + (isControl || !isNum(s.dbest) ? '' : ' (' + sgn(s.dbest, 1) + ')') + (s.best_ckpt ? ' <span class="desc" data-ckpt="' + s.best_ckpt + '" data-cellkey="' + cell + '" style="cursor:pointer" title="open this checkpoint">' + esc(ckptLabel(s.best_ckpt)) + '</span>' : '') + '</span>';
     if (opts.lead === 'cell') head += '<span class="go" data-go-cell="' + cell + '">algorithm view →</span>';
     else if (!isControl) head += '<span class="go" data-go-read="' + r.key + '">across algorithms →</span>';
     head += '</div>';
@@ -440,12 +444,12 @@ const DATA = /*DATA*/;
   function renderTable() {
     let html = '<h2>The numbers</h2><p class="sub">The same table <code>tools/read_compare.py</code> prints, per algorithm. Δ is against <code>mean:fixed</code> on the same checkpoints; the interval is a bootstrap over checkpoints.</p>';
     for (const c of cells) {
-      html += '<h3 style="margin-top:.8em">' + esc(c.name) + '</h3><table class="plain"><tr><th>read</th><th>ckpts</th><th>perfect %</th><th>Δ pp</th><th>95% CI</th><th>better / worse / level</th><th>deaths %</th><th>Δ</th><th>starves %</th><th>Δ</th><th>mean score</th></tr>';
+      html += '<h3 style="margin-top:.8em">' + esc(c.name) + '</h3><table class="plain"><tr><th>read</th><th>ckpts</th><th>perfect %</th><th>Δ pp</th><th>95% CI</th><th>better / worse / level</th><th>deaths %</th><th>Δ</th><th>starves %</th><th>Δ</th><th>mean score</th><th>best ckpt %</th><th>Δ</th></tr>';
       for (const r of reads) {
         const s = summaryOf(c.key, r.key);
-        if (!s) { html += '<tr><td><code>' + esc(r.variant) + '</code></td><td colspan="10" style="text-align:left;color:var(--dim)">not yet measured</td></tr>'; continue; }
+        if (!s) { html += '<tr><td><code>' + esc(r.variant) + '</code></td><td colspan="12" style="text-align:left;color:var(--dim)">not yet measured</td></tr>'; continue; }
         const ctl = r.key === CONTROL;
-        html += '<tr' + (ctl ? ' class="ctl"' : '') + '><td><code>' + esc(r.variant) + '</code></td><td>' + s.ckpts + '</td><td>' + fmt(s.perfect, 2) + '</td><td class="' + (ctl ? '' : s.delta > 0 ? 'up' : s.delta < 0 ? 'down' : '') + '">' + (ctl ? '-' : sgn(s.delta, 2)) + '</td><td>' + (ctl || !s.ci ? '-' : '[' + sgn(s.ci[0], 2) + ', ' + sgn(s.ci[1], 2) + ']') + '</td><td>' + (ctl ? '-' : s.wins + ' / ' + s.losses + ' / ' + s.level) + '</td><td>' + fmt(s.death, 2) + '</td><td>' + (ctl ? '-' : sgn(s.ddeath, 2)) + '</td><td>' + fmt(s.starve, 2) + '</td><td>' + (ctl ? '-' : sgn(s.dstarve, 2)) + '</td><td>' + fmt(s.score, 1) + '</td></tr>';
+        html += '<tr' + (ctl ? ' class="ctl"' : '') + '><td><code>' + esc(r.variant) + '</code></td><td>' + s.ckpts + '</td><td>' + fmt(s.perfect, 2) + '</td><td class="' + (ctl ? '' : s.delta > 0 ? 'up' : s.delta < 0 ? 'down' : '') + '">' + (ctl ? '-' : sgn(s.delta, 2)) + '</td><td>' + (ctl || !s.ci ? '-' : '[' + sgn(s.ci[0], 2) + ', ' + sgn(s.ci[1], 2) + ']') + '</td><td>' + (ctl ? '-' : s.wins + ' / ' + s.losses + ' / ' + s.level) + '</td><td>' + fmt(s.death, 2) + '</td><td>' + (ctl ? '-' : sgn(s.ddeath, 2)) + '</td><td>' + fmt(s.starve, 2) + '</td><td>' + (ctl ? '-' : sgn(s.dstarve, 2)) + '</td><td>' + fmt(s.score, 1) + '</td><td>' + fmt(s.best, 1) + '</td><td class="' + (ctl ? '' : s.dbest > 0 ? 'up' : s.dbest < 0 ? 'down' : '') + '">' + (ctl ? '-' : sgn(s.dbest, 1)) + '</td></tr>';
       }
       html += '</table>';
     }

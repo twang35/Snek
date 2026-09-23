@@ -78,7 +78,11 @@ def summarise(control, rows):
     starve = 100.0 * sum(rows[k]['s'] for k in have_counts) / eps if eps else None
     cdeath = 100.0 * sum(control[k]['d'] for k in keys if control[k]['d'] is not None) / ceps if ceps else None
     cstarve = 100.0 * sum(control[k]['s'] for k in keys if control[k]['d'] is not None) / ceps if ceps else None
+    best_key = max(rows, key=lambda k: (rows[k]['p'], k)) if rows else None
+    cbest = max((control[k]['p'] for k in control), default=None)
     return {
+        'best': rows[best_key]['p'] if best_key else None, 'best_ckpt': best_key,
+        'dbest': None if best_key is None or cbest is None else round(rows[best_key]['p'] - cbest, 2),
         'ckpts': len(rows), 'paired': len(keys),
         'perfect': round(statistics.fmean(r['p'] for r in rows.values()), 2) if rows else None,
         'delta': round(statistics.fmean(diffs), 2) if diffs else None,
