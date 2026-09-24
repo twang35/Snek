@@ -10,6 +10,20 @@ policy and value prior; it is the row in the whole series most likely to beat th
 ask what it costs to *learn* the model instead of having it, and whether the model helps the update
 even without search at play time.
 
+## 0. Paper-cell fidelity review (2026-09-23)
+
+The paper cell follows the paper **wherever the game allows** (`README.md`, the paper-fidelity row, widened
+2026-09-23); the local cell carries every codebase choice. This group was audited against that rule the
+same day. Each item is fixed **before the row's paper cell is queued**; *to confirm* means the plan's
+citation does not settle it and the paper or its code must be read first. An empty status is *open*.
+
+| item | paper | here | fix | status |
+|---|---|---|---|---|
+| batch size | each paper's own (e.g. G4's 96 x 30 sequences; AlphaZero's schedule assumes 4096) | "batch 256 for all four" | each paper's batch, or a README row scaling batch with actor count | |
+| EZ V2 value-prefix LSTM | 512 | 128 | 512 | |
+| importance weights (MuZero, EZ) | max-normalised | `dqn/replay.py`'s mean if reused | `batch_max` | |
+| temperature schedule and replay length | the papers' numbers | scaled to the game ("300 of ~1,500 moves", replays "scaled to the cap") | README translation rows, or the papers' numbers | |
+
 ## 1. The seam change this group needs, designed once
 
 A search needs the **board**, not the 26-value observation the policy seam hands over: it has to

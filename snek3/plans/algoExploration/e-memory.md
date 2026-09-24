@@ -10,6 +10,22 @@ can carry an arbitrarily long history without widening the observation. E1 is re
 the incumbent, read against PPO; E2 is recurrence on a value agent with R2D2's stored-state and burn-in
 machinery, read against E1 and C1 so the gain can be attributed to the memory or to the agent.
 
+## 0. Paper-cell fidelity review (2026-09-23)
+
+The paper cell follows the paper **wherever the game allows** (`README.md`, the paper-fidelity row, widened
+2026-09-23); the local cell carries every codebase choice. This group was audited against that rule the
+same day. Each item is fixed **before the row's paper cell is queued**; *to confirm* means the plan's
+citation does not settle it and the paper or its code must be read first. An empty status is *open*.
+
+| item | paper | here | fix | status |
+|---|---|---|---|---|
+| E1 paper cell | baselines `ppo2` Atari: 128 steps x 8 envs, 4 minibatches, 4 epochs, lr 2.5e-4 and clip 0.1 both annealed to 0, entropy 0.01, value 0.5, grad norm 0.5, Adam eps 1e-5 | the plan's paper cell is b27's config (rollout 256, 128 lanes) | those values in the paper cell and b27 as the local cell, or E1 declared local-only | *to confirm* the values against the `ppo2` defaults |
+| E2 dueling streams | R2D2: dueling over the LSTM with 512-wide streams | "dueling scalar (D1's module)", no width; the module is C1's | 512-wide streams (`SNEK_RAINBOW_STREAM_WIDTH` analogue) | |
+| E2 importance weights | max-normalised | `dqn/replay.py`'s mean | `normalization='batch_max'` in the paper cell | |
+| E2 prefill | actors fill the replay on their own epsilon ladder | epsilon 1, off the clock | a prefill on the ladder | |
+| E2 loss and clip | *to confirm*: squared TD under the value rescaling, gradient-norm clip 40 (Ape-X) | unstated; `dqn/agent.py`'s Huber would be inherited | the paper's, stated in §2b | |
+| LSTM width | 512 | the paper's (README widened 2026-09-23) | none | matches the new rule |
+
 ## 1. The seam change this group needs, designed once
 
 `policy_fn` is `(m, obs_len) -> (m,)` and stateless. The engine (`vectorized/engine.py`) calls it once

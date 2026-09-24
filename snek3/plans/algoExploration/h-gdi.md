@@ -16,6 +16,18 @@ It is the least reproduced result in the series -- one group, no maintained refe
 beyond the authors' -- which is why the row is a **reproduction first and an experiment second**. The
 mean is interesting; whether it can be made to exist on this box is the first question.
 
+## 0. Paper-cell fidelity review (2026-09-23)
+
+The paper cell follows the paper **wherever the game allows** (`README.md`, the paper-fidelity row, widened
+2026-09-23); the local cell carries every codebase choice. This group was audited against that rule the
+same day. Each item is fixed **before the row's paper cell is queued**; *to confirm* means the plan's
+citation does not settle it and the paper or its code must be read first. An empty status is *open*.
+
+| item | paper | here | fix | status |
+|---|---|---|---|---|
+| replay priority and weights | *to confirm*: GDI's replay scheme | unstated; the R2D2 buffer would bring PER with mean weights | the paper's, stated in §2b; `batch_max` if PER | |
+| lanes | 160 environments | 32 lanes, already stated | none | stated |
+
 ## 1. The reproduction gate
 
 Before any Snake code is written, the row has to show that the method as published can be

@@ -11,6 +11,22 @@ measure one thing the null does not settle -- whether an intrinsic term **hurts*
 shortest route is already the right one, and whether Agent57's meta-controller learns to switch it
 off. The expected result is written down first so a null is a finding and not a disappointment.
 
+## 0. Paper-cell fidelity review (2026-09-23)
+
+The paper cell follows the paper **wherever the game allows** (`README.md`, the paper-fidelity row, widened
+2026-09-23); the local cell carries every codebase choice. This group was audited against that rule the
+same day. Each item is fixed **before the row's paper cell is queued**; *to confirm* means the plan's
+citation does not settle it and the paper or its code must be read first. An empty status is *open*.
+
+| item | paper | here | fix | status |
+|---|---|---|---|---|
+| NGU optimiser and target | *to confirm*: Adam eps 1e-4 and target period 1,500, where R2D2 has 1e-3 and 2,500 | "here: E2's paper cell", so R2D2's values | per-row defaults | |
+| replay size | 5e6 observations (about 1.25e5 sequences at overlap 40) | E2's 1e5 sequences | the paper's, converted | *to confirm* |
+| episodic kernel epsilon | Table 6: 1e-4 | "whichever the smoke shows is not degenerate" -- tuning inside the paper cell | 1e-4 in the paper cell, the tuned value in the local cell | |
+| prefill | actors on their own epsilon ladder | epsilon 1, off the clock | as E2 | |
+| NGU inputs | the beta one-hot and the intrinsic reward enter the LSTM's input | appended to the observation | stated as a translation, or fed to the core as the paper does | |
+| importance weights | max-normalised | `dqn/replay.py`'s mean if the R2D2 buffer is reused | `batch_max` | |
+
 ## 1. What the group shares
 
 Both rows are R2D2 (E2) with an intrinsic reward and a policy conditioned on how much of it to want.

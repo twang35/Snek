@@ -22,6 +22,21 @@ distribution itself (C51), then dropping the fixed support (QR-DQN), then sampli
 is the one thing a scalar critic cannot do, and it is the most direct test of the diagnosis in
 `docs/findings.md` that the failures are rare fatal moves, not noisy returns.
 
+## 0. Paper-cell fidelity review (2026-09-23)
+
+The paper cell follows the paper **wherever the game allows** (`README.md`, the paper-fidelity row, widened
+2026-09-23); the local cell carries every codebase choice. This group was audited against that rule the
+same day. Each item is fixed **before the row's paper cell is queued**; *to confirm* means the plan's
+citation does not settle it and the paper or its code must be read first. An empty status is *open*.
+
+| item | paper | here | fix | status |
+|---|---|---|---|---|
+| dense width after the encoder (A1, A2) | Nature DQN / C51: a 512 dense layer after the convolutions | `fc 320` alone | paper cell `SNEK_FC_LAYERS=320,512`: 320 as the conv analogue, then the paper's 512 | **ran as 320**: b35 (DQN) and b36 (C51) are 320-only; a doc note, no rerun |
+| IQN / FQF hidden layer after the embedding product (A4, A5) | a 512 dense layer between the Hadamard product and the output | the product feeds the output (`dist/net.py`) | a post-embedding hidden-layer knob, 512 in the paper cell | |
+| quantile loss reduction (A3-A6) | sum over the online quantiles, mean over the targets | mean over both (`dist/losses.py`), `1/N` of the paper's | a knob on `DistAgent` with the paper's form, as `algos/rainbow/agent.py` has it | paper cells not run |
+| Munchausen quantile target (A6 M-IQN) | actions averaged inside each target sample | the mixture over `A x M` samples (§2 A6 note) | the same knob as above | M-IQN paper cell not run; b40 `mqrdqnlocal` ran the mixture |
+| PER and priorities | the A papers use uniform replay | the paper cells run uniform (`SNEK_PRIORITY_EXPONENT=0`) | none | matches |
+
 ## 1. What the group shares
 
 All six rows are value-based agents on replay. They reuse `algos/dqn/` for everything that is not the

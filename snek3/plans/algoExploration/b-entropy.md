@@ -23,6 +23,20 @@ temperature, off-policy, from replay -- so it separates "entropy regularisation"
 clipped policy gradient". B2 is the set of fixes that made discrete SAC competitive on Atari, run to
 tell whether B1's result was the idea or the implementation.
 
+## 0. Paper-cell fidelity review (2026-09-23)
+
+The paper cell follows the paper **wherever the game allows** (`README.md`, the paper-fidelity row, widened
+2026-09-23); the local cell carries every codebase choice. This group was audited against that rule the
+same day. Each item is fixed **before the row's paper cell is queued**; *to confirm* means the plan's
+citation does not settle it and the paper or its code must be read first. An empty status is *open*.
+
+| item | paper | here | fix | status |
+|---|---|---|---|---|
+| network width (B1, B2) | B2 (Zhou et al.): two 512 layers; B1 (Christodoulou): Nature's 512 dense after the encoder | §2b's network row says `fc 320` with 2x512 as a local departure -- stale: b42's paper cell ran 2x512 | §2b rewritten: B2 2x512 (as run), B1 `320,512` | |
+| lanes | one environment | `SNEK_COLLECT_ENVS` defaults to 16 (`sac/algo.py`) | 1 lane in the paper cell, or a README translation row if 16 is forced by time | *to confirm* against the 8-hour budget |
+| prefill policy (B1) | uniform random steps before learning | the prefill samples pi (`step(0.0)`) | a prefill-policy knob, uniform in the paper cell | |
+| B1 target period | "8000", unit unstated | read as agent steps | *to confirm* against Christodoulou's code | |
+
 ## 1. What the group shares
 
 | shared piece | decision |

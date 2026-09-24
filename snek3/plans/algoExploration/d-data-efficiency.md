@@ -17,6 +17,19 @@ shrink-and-perturb resets are a late-plasticity mechanism, and late drift is the
 collapses, so the row is now that probe. The budget rule is replaced by what A produced: **value rows queue at
 3M steps with hold-if-rising.**
 
+## 0. Paper-cell fidelity review (2026-09-23)
+
+The paper cell follows the paper **wherever the game allows** (`README.md`, the paper-fidelity row, widened
+2026-09-23); the local cell carries every codebase choice. This group was audited against that rule the
+same day. Each item is fixed **before the row's paper cell is queued**; *to confirm* means the plan's
+citation does not settle it and the paper or its code must be read first. An empty status is *open*.
+
+| item | paper | here | fix | status |
+|---|---|---|---|---|
+| SPR transition width (BBF) | the transition model works at the latent's width (2048 in BBF) | 256 | 2048, or a stated compute translation in README | |
+| the rule statement | -- | §1 calls D "the one group that departs from a paper cell as written" | reworded now that §7's `bbfpaper` exists | |
+| replay, weights, priority | BBF's own sequential PER, batch-max weights, `sqrt(CE)` priority | `algos/bbf/replay.py` already does these | none | matches |
+
 ## 1. The row
 
 ### D1 -- BBF-style resets on A6's best cell (Schwarzer et al. 2023, "Bigger, Better, Faster", §4)
