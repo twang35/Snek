@@ -1,0 +1,14 @@
+{
+ "arms": [
+  "b47a-btrpaper-seed1",
+  "b47b-btrpaper-seed2",
+  "b47c-btrpaper-seed3",
+  "b47d-btrpaper-seed4"
+ ],
+ "batch": "b47",
+ "box": "desktop",
+ "claimed_iso": "2026-09-24T16:25:11",
+ "claimed_ts": 1790292311.3909814,
+ "kind": "wave",
+ "wave": 1
+}
