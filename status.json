@@ -1,0 +1,24 @@
+{
+  "iso": "2026-09-24T04:25:11",
+  "ts": 1790249111.005831,
+  "box": "laptop",
+  "project": "snek3",
+  "pid": 86169,
+  "at_a_glance": {
+    "running": [],
+    "queued": [],
+    "attention": [
+      "** draining: /Users/tony_wang/Projects/Snek/snek3/runs/.live/.drain exists; what is held finishes, nothing new is claimed"
+    ],
+    "remaining": null,
+    "pool": [
+      "b47 training | 8/8 arms | pinned desktop | Beyond the Rainbow (row C2), hist8 at 1M counted steps, eval every 1,000 -- paper cell (64 lanes, 64M mo...",
+      "b49 training | 8/8 arms | pinned desktop | BTR paper cell ablations (C2 ablation) -- plain fc 320 trunk / residual trunk without spectral norm, his...",
+      "desktop holds b46-w3 (4 arms)"
+    ]
+  },
+  "running": [],
+  "queued_ids": [],
+  "panels": [],
+  "window_pid": 87004
+}
