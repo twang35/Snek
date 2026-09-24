@@ -175,7 +175,7 @@ changes behind it. They are cheap because they are flag flips on arms that have 
 
 | gate | C1 Rainbow | C1 ablation | C2 BTR | C2 ablation |
 |---|---|---|---|---|
-| 1 smoke, checkpoint, restore (both names) | **passed 2026-09-20** (`rainbow-smoke`, 3,000 steps, 6 checkpoints, `tools.restore` loads the last) | -- | **passed 2026-09-20** (`btr-smoke`, 64 lanes, 41 st/s on the laptop, 6 checkpoints, restored) | -- |
+| 1 smoke, checkpoint, restore (both names) | **passed 2026-09-20** (`rainbow-smoke`, 3,000 steps, 6 checkpoints, `tools.restore` loads the last); **passed again 2026-09-23 after the rework** (5,000 steps, 1,250 updates = 5,000 x 0.25, β's resolved length; resumed to 6,000; KL priorities, finite weights) | -- | **passed 2026-09-20** (`btr-smoke`, 64 lanes, 41 st/s on the laptop, 6 checkpoints, restored); **passed again 2026-09-23** with IQN (37 st/s) and with the local cell's QR-DQN N 32 head (84 st/s): 3,000 steps, 2,999 updates, ε 0.98428 at step 500 = the geometric formula, 0 from move 96,000, block norms 1.00-1.01 in online and target | -- |
 | 2 `btr` equals `rainbow` at Rainbow's flags | -- | -- | **passed** (`test_btr_at_rainbows_flags_is_rainbow_weight_for_weight`) | -- |
 | 3 mutation spec kills every mutant | **passed**, 14/14 (`tests/mut_rainbow.json`); **28/28** after the 2026-09-23 rework | -- | same spec | -- |
 | 4 predecessor closed; tuning wave done | A2 closed 2026-09-18; A6 closed 2026-09-20 (b40); **B2 not yet queued**; tuning wave not run | C1 not closed | C1 not closed | C2 not closed |
