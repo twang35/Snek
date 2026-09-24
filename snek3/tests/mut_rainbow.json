@@ -36,8 +36,8 @@
   {
    "desc": "spectral norm applied to the head streams",
    "file": "algos/rainbow/net.py",
-   "from": "    linear = nn.Linear(in_features, out_features)\n    _head_init(linear, generator)\n    return linear",
-   "to": "    linear = nn.Linear(in_features, out_features)\n    _head_init(linear, generator)\n    return parametrizations.spectral_norm(linear)"
+   "from": "    linear = nn.Linear(in_features, out_features)\n    init(linear, generator)\n    return linear",
+   "to": "    linear = nn.Linear(in_features, out_features)\n    init(linear, generator)\n    return parametrizations.spectral_norm(linear)"
   },
   {
    "desc": "the agent acts with the noise off",
@@ -86,6 +86,90 @@
    "file": "algos/rainbow/algo.py",
    "from": "    paper = PAPER[name]",
    "to": "    paper = PAPER['rainbow']"
+  },
+  {
+   "desc": "spectral estimates not converged at build (the 2026-09-20 overwrite)",
+   "file": "algos/rainbow/net.py",
+   "from": "        torch.manual_seed(int(torch.randint(0, 2 ** 62, (1,), generator=generator)))\n        return parametrizations.spectral_norm(linear)",
+   "to": "        torch.manual_seed(int(torch.randint(0, 2 ** 62, (1,), generator=generator)))\n        out = parametrizations.spectral_norm(linear)\n        norm = out.parametrizations.weight[0]\n        with torch.no_grad():\n            norm._u.copy_(nn.functional.normalize(torch.randn(norm._u.shape), dim=0))\n            norm._v.copy_(nn.functional.normalize(torch.randn(norm._v.shape), dim=0))\n        return out"
+  },
+  {
+   "desc": "the stream's hidden layer dropped",
+   "file": "algos/rainbow/net.py",
+   "from": "    if not hidden:\n        return _stream_layer(",
+   "to": "    if True:\n        return _stream_layer("
+  },
+  {
+   "desc": "the stream's hidden layer never noisy",
+   "file": "algos/rainbow/net.py",
+   "from": "    return nn.Sequential(_stream_layer(in_features, hidden, noisy, sigma, generator, _he_init), nn.ReLU(),",
+   "to": "    return nn.Sequential(_stream_layer(in_features, hidden, False, sigma, generator, _he_init), nn.ReLU(),"
+  },
+  {
+   "desc": "the plain trunk keeps its last width with stream hidden layers on",
+   "file": "algos/rainbow/net.py",
+   "from": "        shared = widths[:-1] if self.stream_hidden and not trunk['residual'] else widths",
+   "to": "        shared = widths"
+  },
+  {
+   "desc": "the Munchausen quantile target as the mixture (Group A's form)",
+   "file": "algos/rainbow/agent.py",
+   "from": "        soft = (pi_next.unsqueeze(2) * (target_quantiles - log_pi_next.unsqueeze(2))).sum(dim=1)  # (B, M)",
+   "to": "        soft = (target_quantiles - log_pi_next.unsqueeze(2)).reshape(batch, actions * m)"
+  },
+  {
+   "desc": "the soft policy read off the acting read, not these samples",
+   "file": "algos/rainbow/agent.py",
+   "from": "        pi_next, log_pi_next = self._soft_policy(target_quantiles.mean(dim=2))          # (B, A)",
+   "to": "        pi_next, log_pi_next = self._soft_policy(target_quantiles.amax(dim=2))          # (B, A)"
+  },
+  {
+   "desc": "the quantile loss averaged over the online quantiles",
+   "file": "algos/rainbow/agent.py",
+   "from": "    loss = losses.quantile_huber(online, taus, target, kappa=kappa) * online.shape[1]",
+   "to": "    loss = losses.quantile_huber(online, taus, target, kappa=kappa)"
+  },
+  {
+   "desc": "the quantile priority averaged over online",
+   "file": "algos/rainbow/agent.py",
+   "from": "    priority = (target.unsqueeze(1) - online.unsqueeze(2)).detach().abs().sum(dim=1).mean(dim=1)",
+   "to": "    priority = (target.unsqueeze(1) - online.unsqueeze(2)).detach().abs().mean(dim=1).mean(dim=1)"
+  },
+  {
+   "desc": "the c51 priority is the cross-entropy",
+   "file": "algos/rainbow/agent.py",
+   "from": "    return (torch.xlogy(target, target) - target * log_probs).sum(dim=1).clamp_min(0.0)",
+   "to": "    return (- target * log_probs).sum(dim=1).clamp_min(0.0)"
+  },
+  {
+   "desc": "update feeds the loss back as the priority",
+   "file": "algos/rainbow/agent.py",
+   "from": "        priority = priority.detach()\n",
+   "to": "        priority = per_sample.detach()\n"
+  },
+  {
+   "desc": "the log-policy source ignored",
+   "file": "algos/rainbow/agent.py",
+   "from": "        source = self.net if self.munchausen_logpi == 'online' else self.target",
+   "to": "        source = self.target"
+  },
+  {
+   "desc": "geometric epsilon off by one move",
+   "file": "algos/rainbow/algo.py",
+   "from": "    return float(final + (initial - final) * math.exp(moves * math.log1p(-1.0 / steps)))",
+   "to": "    return float(final + (initial - final) * math.exp((moves + 1) * math.log1p(-1.0 / steps)))"
+  },
+  {
+   "desc": "the decay knob ignored",
+   "file": "algos/rainbow/algo.py",
+   "from": "        if self.config['rainbow_epsilon_decay'] == 'geometric':\n            return geometric_epsilon(",
+   "to": "        if False:\n            return geometric_epsilon("
+  },
+  {
+   "desc": "beta's cap counted in moves, not updates",
+   "file": "algos/rainbow/algo.py",
+   "from": "                int(config.get('max_steps', 0)) * lanes * float(config['replay_ratio']))))",
+   "to": "                int(config.get('max_steps', 0)) * lanes)))"
   }
  ]
 }

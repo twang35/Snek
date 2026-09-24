@@ -117,8 +117,6 @@ def test_the_quantile_and_iqn_heads_read_in_the_dist_agents_shapes():
 def test_spectral_norm_bounds_the_residual_linears_at_one_and_leaves_the_head_alone():
     net = network.build(an_arch(IQN, trunk(residual=True, blocks=2)), seed=3)
     net.train()
-    for _ in range(30):                                                    # the power iteration converges
-        net.q_values(observations(8))
     for block in net.trunk.blocks:
         for linear in (block.first, block.second):
             assert torch.linalg.matrix_norm(linear.weight, ord=2).item() == pytest.approx(1.0, abs=0.02)
@@ -127,6 +125,48 @@ def test_spectral_norm_bounds_the_residual_linears_at_one_and_leaves_the_head_al
     plain = network.build(an_arch(IQN, trunk(residual=True, noisy=False)), seed=3)
     assert isinstance(plain.advantage, nn.Linear) and not hasattr(plain.advantage, 'parametrizations')
     assert not hasattr(plain.value, 'parametrizations')
+
+
+def test_the_spectral_estimates_are_converged_at_build_and_in_a_fresh_target(monkeypatch):
+    """The target stays in eval mode until its first hard copy, so the estimates it is built from are the
+    ones it uses: they must be converged before any training forward (they were 5 to 60 until 2026-09-23)."""
+    for seed in (0, 1, 2):
+        net = network.build(an_arch(IQN, trunk(residual=True, blocks=3)), seed=seed)
+        net.eval()
+        for block in net.trunk.blocks:
+            for linear in (block.first, block.second):
+                assert torch.linalg.matrix_norm(linear.weight.detach(), ord=2).item() == pytest.approx(1.0, abs=0.05)
+    algo, config, arch = build(monkeypatch, 'btr', FC_LAYERS=32, COLLECT_ENVS=2)
+    for block in algo.agent.target.trunk.blocks:
+        for linear in (block.first, block.second):
+            assert torch.linalg.matrix_norm(linear.weight, ord=2).item() == pytest.approx(1.0, abs=0.05)
+
+
+def test_stream_hidden_gives_each_stream_its_own_noisy_hidden_layer():
+    net = network.build(an_arch(C51, trunk(stream_hidden=True), widths=(24, 32)), seed=3)
+    assert [layer.out_features for layer in net.trunk.hidden] == [24]      # the last width moved out
+    for stream in (net.advantage, net.value):
+        assert isinstance(stream[0], NoisyLinear) and isinstance(stream[2], NoisyLinear)
+        assert (stream[0].in_features, stream[0].out_features) == (24, 32)
+    assert net.advantage[0].weight_mu.data_ptr() != net.value[0].weight_mu.data_ptr()
+    assert net.log_probs(observations()).shape == (3, constants.NUM_ACTIONS, 5)
+    residual = network.build(an_arch(IQN, trunk(residual=True, stream_hidden=True)), seed=3)
+    assert residual.trunk.width == 32 and residual.advantage[0].in_features == 32
+    from algos.dqn import resets
+    trunk_names, head_names = resets.partition(net)
+    assert not any(name.startswith(('advantage', 'value')) for name in trunk_names)
+
+
+def test_a_single_stream_net_with_stream_hidden_is_qnet_weight_for_weight():
+    from algos.dqn import net as qnet
+    net = network.build(an_arch(C51, trunk(dueling=False, noisy=False, stream_hidden=True)), seed=3)
+    reference = qnet.QNet(constants.OBS_LEN, [32], 1, seed=3)
+    assert torch.equal(net.advantage[0].weight, reference.hidden[0].weight)
+
+
+def test_a_trunk_without_the_field_is_the_one_linear_layout():
+    net = network.build(an_arch(C51, trunk(noisy=False)), seed=3)
+    assert isinstance(net.advantage, nn.Linear) and isinstance(net.value, nn.Linear)
 
 
 def test_a_residual_block_is_the_identity_at_a_zero_final_layer():
@@ -200,7 +240,7 @@ def test_the_agent_acts_with_the_noise_on_and_measures_with_it_off(monkeypatch):
 def test_with_noisy_off_the_agent_acts_quietly(monkeypatch):
     algo, config, arch = build(monkeypatch, 'rainbow', RAINBOW_NOISY=0, MIN_EPSILON=0.01)
     assert not algo.agent.net.noisy_layers
-    assert isinstance(algo.agent.net.advantage, nn.Linear)
+    assert all(isinstance(layer, (nn.Linear, nn.ReLU)) for layer in algo.agent.net.advantage)
 
 
 def test_without_double_q_the_target_action_is_the_target_nets_argmax(monkeypatch):
@@ -279,6 +319,8 @@ def test_rainbows_defaults_are_the_papers(monkeypatch):
     assert config['fork'].branches == 1 and config['collect_envs'] == 1 and config['discount'] == 0.99
     assert config['rainbow_head'] == 'c51' and config['rainbow_double'] and not config['btr_residual']
     assert config['munchausen_alpha'] == 0.0 and config['replay_buffer_max_length'] == 1000000
+    assert config['beta_anneal_steps'] == 0 and config['rainbow_stream_hidden']
+    assert config['rainbow_epsilon_decay'] == 'linear' and config['rainbow_munchausen_logpi'] == 'target'
 
 
 def test_btrs_defaults_are_the_papers(monkeypatch):
@@ -286,7 +328,10 @@ def test_btrs_defaults_are_the_papers(monkeypatch):
     config = train.build_config()
     assert (config['learning_rate'], config['adam_epsilon'], config['batch_size']) == (1e-4, 0.005 / 256, 256)
     assert (config['collect_envs'], config['replay_ratio'], config['target_update_period']) == (64, 1.0 / 64.0, 500)
-    assert (config['priority_exponent'], config['is_beta'], config['is_beta_final']) == (0.2, 0.45, 0.45)
+    # The released code's importance exponent: `PER.py` uses alpha (0.2), not the declared beta 0.45.
+    assert (config['priority_exponent'], config['is_beta'], config['is_beta_final']) == (0.2, 0.2, 0.2)
+    assert config['rainbow_epsilon_decay'] == 'geometric' and config['rainbow_munchausen_logpi'] == 'online'
+    assert config['rainbow_stream_hidden']
     assert (config['initial_epsilon'], config['min_epsilon'], config['epsilon_anneal_steps']) == (1.0, 0.01, 2000000)
     assert config['rainbow_epsilon_zero_at'] == 0.5 and config['discount'] == 0.997
     assert config['rainbow_head'] == 'iqn' and not config['rainbow_double'] and config['btr_residual']
@@ -310,7 +355,7 @@ def test_btr_at_rainbows_flags_is_rainbow_weight_for_weight(monkeypatch):
 
 def test_the_sidecar_carries_the_trunk_and_it_is_in_the_signature(monkeypatch):
     algo, config, arch = build(monkeypatch, 'btr')
-    assert set(arch['trunk']) == set(network.TRUNK_FIELDS)
+    assert set(arch['trunk']) == set(network.TRUNK_FIELDS + network.OPTIONAL_TRUNK_FIELDS)
     other = dict(arch)
     other['trunk'] = dict(arch['trunk'], residual=False)
     assert arch_tools.signature(other) != arch_tools.signature(arch)
@@ -360,3 +405,114 @@ def test_an_unknown_head_is_refused_by_name(monkeypatch):
     monkeypatch.setenv('SNEK_RAINBOW_HEAD', 'fqf')
     with pytest.raises(ValueError, match='SNEK_RAINBOW_HEAD'):
         train.build_config()
+
+
+# ---------------------------------------------------------------- the update's objective (2026-09-23)
+
+from algos.dist import losses as dist_losses
+from algos.rainbow import agent as rainbow_agent
+
+
+def test_munchausen_quantile_target_averages_actions_inside_each_sample(monkeypatch):
+    """M-IQN / BTR: `sum_a' pi(a') (Z_j(a') - tau log pi(a'))` per sample j -- M targets, not A x M."""
+    algo, config, arch = build(monkeypatch, 'btr', RAINBOW_HEAD='quantile', RAINBOW_NOISY=0, MIN_EPSILON=0.01)
+    agent = algo.agent
+    obs, action = observations(1), torch.tensor([1])
+    reward, discount = torch.tensor([0.5]), torch.tensor([0.9])
+    z = torch.tensor([[[1.0, 3.0], [2.0, 2.5], [0.0, 4.0]]])                 # (B 1, A 3, M 2)
+    target = agent._quantile_target(obs, action, reward, discount, obs, z)
+    assert target.shape == (1, 2)
+    tau = agent.munchausen_tau
+    q = z.mean(dim=2)
+    pi, log_pi = torch.softmax(q / tau, dim=1), tau * torch.log_softmax(q / tau, dim=1)
+    soft = (pi.unsqueeze(2) * (z - log_pi.unsqueeze(2))).sum(dim=1)
+    expected = reward + agent._munchausen_reward(obs, action) + discount * soft
+    assert torch.allclose(target, expected)
+
+
+def test_the_quantile_loss_sums_online_and_averages_targets_and_prioritises_by_pairwise_td():
+    online, taus = torch.tensor([[0.0, 1.0]]), torch.tensor([[0.25, 0.75]])
+    target = torch.tensor([[2.0, 4.0, 6.0]])
+    loss, priority = rainbow_agent.quantile_loss(online, taus, target, kappa=1.0)
+    assert torch.allclose(loss, 2 * dist_losses.quantile_huber(online, taus, target, kappa=1.0))
+    # |u| pairs: online 0 -> 2, 4, 6; online 1 -> 1, 3, 5. Summed over online, averaged over targets.
+    assert priority.item() == pytest.approx((2 + 4 + 6 + 1 + 3 + 5) / 3.0)
+
+
+def test_the_c51_priority_is_the_kl_not_the_cross_entropy():
+    matched = torch.full((1, 5), 0.2)
+    assert rainbow_agent.categorical_kl(matched.log(), matched).item() == pytest.approx(0.0, abs=1e-6)
+    assert dist_losses.categorical_cross_entropy(matched.log(), matched).item() == pytest.approx(np.log(5.0))
+    sharp = torch.tensor([[0.0, 1.0, 0.0, 0.0, 0.0]])
+    assert rainbow_agent.categorical_kl(matched.log(), sharp).item() == pytest.approx(np.log(5.0))
+
+
+def test_update_feeds_the_priority_back_not_the_loss(monkeypatch):
+    algo, config, arch = build(monkeypatch, 'rainbow', RAINBOW_NOISY=0, MIN_EPSILON=0.01)
+    agent = algo.agent
+    seen = {}
+
+    def categorical(obs, action, reward, discount, next_obs):
+        loss = agent.net.q_values(obs).sum(dim=1) * 0.0 + 7.0
+        seen['priority'] = torch.arange(obs.shape[0], dtype=torch.float32)
+        return loss, seen['priority']
+
+    monkeypatch.setattr(agent, '_categorical', categorical)
+    batch = {'obs': observations(4).numpy(), 'next_obs': observations(4, seed=1).numpy(),
+             'action': np.zeros(4, dtype=np.int64), 'reward': np.zeros(4, dtype=np.float32),
+             'discount': np.full(4, 0.9, dtype=np.float32)}
+    priorities, metrics = agent.update(batch)
+    assert np.array_equal(priorities, seen['priority'].numpy()) and metrics['loss'] == pytest.approx(7.0)
+
+
+@pytest.mark.parametrize('source', ['online', 'target'])
+def test_the_munchausen_log_policy_is_read_off_the_named_net(source, monkeypatch):
+    algo, config, arch = build(monkeypatch, 'btr', RAINBOW_HEAD='quantile', RAINBOW_NOISY=0, MIN_EPSILON=0.01,
+                               RAINBOW_MUNCHAUSEN_LOGPI=source)
+    agent = algo.agent
+    agent.target.load_state_dict(network.build(arch, seed=11).state_dict())
+    obs, action = observations(16), torch.zeros(16, dtype=torch.long)
+    agent.net.eval()                                   # no power-iteration step between the two reads
+    net, other = (agent.net, agent.target) if source == 'online' else (agent.target, agent.net)
+    with torch.no_grad():
+        _, other_log_pi = agent._soft_policy(other.q_values(obs))
+        assert not torch.allclose(agent._munchausen_reward(obs, action),
+                                  torch.clamp(other_log_pi[:, 0], min=agent.munchausen_l0, max=0.0) * agent.munchausen_alpha)
+        _, log_pi = agent._soft_policy(net.q_values(obs))
+        expected = torch.clamp(log_pi[:, 0], min=agent.munchausen_l0, max=0.0) * agent.munchausen_alpha
+        assert torch.allclose(agent._munchausen_reward(obs, action), expected)
+
+
+def test_an_unknown_log_policy_source_is_refused(monkeypatch):
+    monkeypatch.setenv('SNEK_ALGO', 'btr')
+    monkeypatch.setenv('SNEK_RAINBOW_MUNCHAUSEN_LOGPI', 'both')
+    with pytest.raises(ValueError, match='SNEK_RAINBOW_MUNCHAUSEN_LOGPI'):
+        train.build_config()
+
+
+# ---------------------------------------------------------------- the clocks (2026-09-23)
+
+def test_geometric_epsilon_is_btrs_recurrence():
+    eps, steps = 1.0, 10
+    for moves in range(1, 40):
+        eps = max(eps - (eps - 0.01) / steps, 0.01)
+        assert rainbow_algo.geometric_epsilon(moves, 1.0, 0.01, steps) == pytest.approx(eps)
+    assert rainbow_algo.geometric_epsilon(2000000, 1.0, 0.01, 2000000) == pytest.approx(0.01 + 0.99 / np.e, abs=1e-6)
+
+
+def test_btr_anneals_geometrically_and_rainbow_linearly(monkeypatch):
+    btr, _, _ = build(monkeypatch, 'btr', COLLECT_ENVS=2, MAX_STEPS=10 ** 6, EPSILON_ANNEAL_STEPS=1000)
+    btr.moves = 1000
+    assert btr._linear_epsilon() == pytest.approx(0.01 + 0.99 * (1 - 1 / 1000) ** 1000)
+    linear, _, _ = build(monkeypatch, 'btr', COLLECT_ENVS=2, MAX_STEPS=10 ** 6, EPSILON_ANNEAL_STEPS=1000,
+                         RAINBOW_EPSILON_DECAY='linear')
+    linear.moves = 1000
+    assert linear._linear_epsilon() == pytest.approx(0.01)
+
+
+def test_rainbows_beta_anneals_over_the_runs_cap(monkeypatch):
+    algo, config, arch = build(monkeypatch, 'rainbow', MAX_STEPS=1000)
+    assert algo.buffer.beta_anneal_steps == 250 == config['beta_anneal_steps']   # 1000 moves x 0.25
+    assert algo.buffer.beta_for(250) == pytest.approx(1.0) and algo.buffer.beta_for(125) == pytest.approx(0.7)
+    pinned, _, _ = build(monkeypatch, 'rainbow', MAX_STEPS=1000, BETA_ANNEAL_STEPS=77)
+    assert pinned.buffer.beta_anneal_steps == 77

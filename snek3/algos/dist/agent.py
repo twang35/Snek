@@ -13,10 +13,16 @@ untouched; only `update` differs, and it differs by head:
 The double-Q action is the argmax of the **online** mean at the next state, as `DdqnAgent` takes it,
 so every rung differs from A1 only in the head. With Munchausen on (`alpha > 0`) the next-state target
 is the target net's soft policy's **mixture** over actions, each action's distribution shifted by
-`-tau log pi(a'|s')`, and the reward carries the clipped log-policy of the taken action -- the M-IQN
-form of Vieillard et al. 2020, App. B, applied to every head through the mixture.
+`-tau log pi(a'|s')`, and the reward carries the clipped log-policy of the taken action. **This is not
+M-IQN's form** (found 2026-09-23): Vieillard et al. 2020 App. B and BTR average the actions *inside*
+each target sample, `sum_a' pi(a') (Z_j - tau log pi)`, giving `M` targets where the mixture gives
+`A x M`, and the quantile loss is nonlinear, so the two differ. A6 (b40) ran the mixture; the paper's
+form is `algos/rainbow/agent.py`'s. For c51 the projected mixture is the natural target.
 
-Priorities are the per-sample loss, as Rainbow feeds its KL back; `PrioritizedReplay` takes the
+Priorities are the per-sample loss -- for c51 the cross-entropy, which is Rainbow's KL plus the target's
+entropy, and for the quantile heads the quantile Huber, where BTR uses the pairwise |TD|. The quantile
+Huber here averages over the online quantiles where the papers sum them, so it is `1/N` of theirs.
+`algos/rainbow/agent.py` has the papers' forms of all three; `PrioritizedReplay` takes the
 absolute value.
 """
 

@@ -5,13 +5,13 @@ One `RainbowNet` assembled from two sidecar fields (`tools/arch.py`, `OPTIONAL_F
 | field | what it decides |
 |---|---|
 | `arch['head']` | the distribution read off the streams, in Group A's formats: `c51` (`atoms`, `v_min`, `v_max`), `quantile` (`n`), `iqn` (`embedding`, `n_tau`, `k`) |
-| `arch['trunk']` | `dueling`, `noisy`, `noisy_sigma`, `residual`, `blocks`, `spectral_norm`, `layer_norm` |
+| `arch['trunk']` | `dueling`, `noisy`, `noisy_sigma`, `residual`, `blocks`, `spectral_norm`, `layer_norm`, and optionally `stream_hidden` |
 
 **Separate from `algos/dist/net.py` on purpose** (decided 2026-09-20): Group A's heads build their own
 `QNet` and read features by walking it, so dueling streams and a residual trunk cannot be composed onto
-them from outside, and Group A's code is not edited. The losses are still Group A's -- the agent
-(`agent.py`) is `DistAgent` with this network under it -- so this module offers the same reads the dist
-agent calls: `log_probs`/`probs`/`support`/`atoms` for c51, `quantiles`/`fractions`/`n` for the quantile
+them from outside, and Group A's code is not edited. The agent (`agent.py`) is `DistAgent`'s plumbing
+with its own update (the papers' Munchausen target, loss reduction and priorities), and it and the
+inherited helpers call this module through the same reads as the dist agent: `log_probs`/`probs`/`support`/`atoms` for c51, `quantiles`/`fractions`/`n` for the quantile
 head, `features`/`sample_taus`/`quantiles_at` for IQN, and `q_values` for every acting read.
 
 The trunk with `residual` off is `QNet`'s hidden stack to the initialiser, so a `rainbow` arm with
@@ -21,10 +21,17 @@ then `blocks` residual blocks of two linears with ReLUs, spectral normalisation 
 only (the paper's placement -- the residual path, never the stem or the head) and an optional layer norm
 at each block's input (the paper's post-submission variant, off in the paper cell).
 
-The streams are one linear each -- `value: width -> outputs`, `advantage: width -> actions * outputs` --
-combined as `V + A - mean_a(A)` per atom, quantile or tau. `NoisyLinear` when `noisy`, else `QNet`'s
-head initialiser. For IQN the streams read the feature-embedding product one tau at a time, as A4's head
-does, so the dueling combine is per tau.
+The streams are combined as `V + A - mean_a(A)` per atom, quantile or tau. With `stream_hidden` off they
+are one linear each (`value: width -> outputs`, `advantage: width -> actions * outputs`) -- BBF's layout
+and every checkpoint written before 2026-09-23. With it on (`rainbow` and `btr` since then) each stream
+is a hidden linear, a ReLU and the output linear, the dueling paper's split of Nature DQN's 512-unit layer
+into one per stream, which Rainbow (Table 4) and BTR (Table D6; `networks.py`'s `fc1V`/`fc1A`) both keep.
+The MLP analogue: the last width of `fc_layer_params` moves out of the shared stack into each stream, so
+a plain single-stream net is still `QNet` weight for weight; the residual trunk keeps its width and each
+stream adds a hidden layer of that width, as BTR's streams follow its IMPALA stack. `NoisyLinear` for
+**both** layers of each stream when `noisy`, as both papers have it; otherwise the hidden layer takes
+`QNet`'s hidden initialiser and the output its head initialiser. For IQN the streams read the
+feature-embedding product one tau at a time, as A4's head does, so the dueling combine is per tau.
 """
 
 import math
@@ -37,6 +44,8 @@ from algos.rainbow.noisy import NoisyLinear, noisy_layers, set_noise
 
 HEAD_TYPES = ('c51', 'quantile', 'iqn')
 TRUNK_FIELDS = ('dueling', 'noisy', 'noisy_sigma', 'residual', 'blocks', 'spectral_norm', 'layer_norm')
+# Optional in the sidecar, off when absent: a trunk written before the field existed is the one-linear layout.
+OPTIONAL_TRUNK_FIELDS = ('stream_hidden',)
 
 # snek2's He-normal with Keras' truncation correction, as `algos/dqn/net.QNet.reset_parameters`.
 _TRUNC_CORRECTION = 0.87962566103423978
@@ -71,12 +80,35 @@ def _head_init(linear, generator):
     nn.init.zeros_(linear.bias)
 
 
-def _stream(in_features, out_features, noisy, sigma, generator):
+def _stream_layer(in_features, out_features, noisy, sigma, generator, init):
     if noisy:
         return NoisyLinear(in_features, out_features, sigma_zero=sigma, generator=generator)
     linear = nn.Linear(in_features, out_features)
-    _head_init(linear, generator)
+    init(linear, generator)
     return linear
+
+
+def _stream(in_features, hidden, out_features, noisy, sigma, generator):
+    """One stream: the output linear alone (`hidden` 0), or `hidden linear -> ReLU -> output`. A
+    `Sequential` so its parameters are `advantage.0.*`, never `hidden.*`: `resets.partition` reads
+    `hidden.` as the trunk, and a stream is head-side."""
+    if not hidden:
+        return _stream_layer(in_features, out_features, noisy, sigma, generator, _head_init)
+    return nn.Sequential(_stream_layer(in_features, hidden, noisy, sigma, generator, _he_init), nn.ReLU(),
+                         _stream_layer(hidden, out_features, noisy, sigma, generator, _head_init))
+
+
+def _spectral_norm(linear, generator):
+    """`parametrizations.spectral_norm`, whose constructor draws `_u`/`_v` from the global RNG and runs
+    15 power iterations on them. Seeded from the arm's generator by forking the global RNG, so a seed
+    pins the state dict **and** the estimates are converged at build: overwriting `_u`/`_v` after
+    construction (this module until 2026-09-23) left norms of 5 to 60 in an eval-mode target until its
+    first hard copy, and the early TD errors raised `max_priority` for the whole run."""
+    if generator is None:
+        return parametrizations.spectral_norm(linear)
+    with torch.random.fork_rng(devices=[]):
+        torch.manual_seed(int(torch.randint(0, 2 ** 62, (1,), generator=generator)))
+        return parametrizations.spectral_norm(linear)
 
 
 # ---------------------------------------------------------------- the trunk
@@ -93,15 +125,8 @@ class ResidualBlock(nn.Module):
         _he_init(self.first, generator)
         _he_init(self.second, generator)
         if spectral_norm:
-            self.first = parametrizations.spectral_norm(self.first)
-            self.second = parametrizations.spectral_norm(self.second)
-            # torch seeds the power iteration's vectors from the global RNG; drawing them from the
-            # arm's generator keeps "same seed, same state dict" true for the residual trunk too.
-            for linear in (self.first, self.second):
-                norm = linear.parametrizations.weight[0]
-                with torch.no_grad():
-                    norm._u.copy_(nn.functional.normalize(torch.randn(norm._u.shape, generator=generator), dim=0))
-                    norm._v.copy_(nn.functional.normalize(torch.randn(norm._v.shape, generator=generator), dim=0))
+            self.first = _spectral_norm(self.first, generator)
+            self.second = _spectral_norm(self.second, generator)
 
     def forward(self, inputs):
         hidden = inputs if self.norm is None else self.norm(inputs)
@@ -155,6 +180,7 @@ class RainbowNet(nn.Module):
         self.num_actions = int(arch['num_actions'])
         self.dueling = bool(trunk['dueling'])
         self.noisy = bool(trunk['noisy'])
+        self.stream_hidden = bool(trunk.get('stream_hidden', False))
         if self.head_type == 'c51':
             self.atoms = int(head['atoms'])
             self.v_min, self.v_max = float(head['v_min']), float(head['v_max'])
@@ -174,7 +200,12 @@ class RainbowNet(nn.Module):
             if self.embedding < 1:
                 raise ValueError('iqn needs embedding >= 1, got {0}'.format(head))
             self.outputs = 1
-        self.trunk = Trunk(arch['obs_len'], arch['fc_layer_params'], trunk, generator)
+        widths = [int(width) for width in arch['fc_layer_params']]
+        # With stream hidden layers the plain trunk hands its last width to the streams; the residual
+        # trunk keeps it and the streams repeat it.
+        shared = widths[:-1] if self.stream_hidden and not trunk['residual'] else widths
+        stream_width = widths[-1] if self.stream_hidden else 0
+        self.trunk = Trunk(arch['obs_len'], shared, trunk, generator)
         width = self.trunk.width
         if self.head_type == 'iqn':
             self.tau_embed = nn.Linear(self.embedding, width)
@@ -183,8 +214,8 @@ class RainbowNet(nn.Module):
             nn.init.zeros_(self.tau_embed.bias)
             self.register_buffer('harmonics', math.pi * torch.arange(1, self.embedding + 1, dtype=torch.float32))
         sigma = float(trunk['noisy_sigma'])
-        self.advantage = _stream(width, self.num_actions * self.outputs, self.noisy, sigma, generator)
-        self.value = _stream(width, self.outputs, self.noisy, sigma, generator) if self.dueling else None
+        self.advantage = _stream(width, stream_width, self.num_actions * self.outputs, self.noisy, sigma, generator)
+        self.value = _stream(width, stream_width, self.outputs, self.noisy, sigma, generator) if self.dueling else None
 
     @property
     def noisy_layers(self):

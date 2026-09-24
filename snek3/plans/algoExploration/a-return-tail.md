@@ -172,6 +172,16 @@ softmax, the midpoint index off by one.
 
 ### A6 -- Munchausen (Vieillard, Pietquin & Geist 2020)
 
+**What A6 ran is not M-IQN's target, found 2026-09-23** (a review of Group C against the BTR code): for the
+quantile heads `algos/dist/agent.py` builds the soft policy's **mixture**, all `A x M` shifted samples
+weighted `pi(a') / M`, where Vieillard et al. App. B average the actions inside each target sample,
+`sum_a' pi(a') (Z_j - tau log pi)`, `M` targets. The quantile loss is nonlinear, so the two differ. Two
+more departures from the papers apply to every quantile rung: the loss averages the online quantiles
+where the papers sum them (`1/N` of theirs, which matters through the gradient clip and Adam's
+epsilon), and the priority is the loss rather than the pairwise |TD| (c51: the cross-entropy rather
+than Rainbow's KL). b40's `mqrdqnlocal` is therefore M-QR-DQN-mixture. Group A's code is left as it ran;
+the papers' forms are `algos/rainbow/agent.py`'s (`c-value-stack.md`, decided 2026-09-23).
+
 Not a new head: a log-policy term added to the reward and a soft (log-sum-exp) target, applied to any
 of A1-A5. So it is **two knobs on `algos/dqn/` and `algos/dist/`, not a package**: `SNEK_MUNCHAUSEN_ALPHA`
 (0 = off, 0.9 in the paper), `SNEK_MUNCHAUSEN_TAU` (the entropy temperature, 0.03), and the log-policy

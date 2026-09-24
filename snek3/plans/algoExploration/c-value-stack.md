@@ -1,7 +1,7 @@
 # Group C: the value stack -- Rainbow, Beyond the Rainbow
 
-**Status: built 2026-09-20, nothing queued** (`algos/rainbow/`: `noisy.py`, `net.py`, `agent.py`, `algo.py`, the names `rainbow` and `btr` in
-`train.ALGOS` and `tools/restore.py`; `tests/test_rainbow.py`, mutants `tests/mut_rainbow.json`, 14 of 14 killed). Gates 1, 2, 3 and 5 passed the same day
+**Status: built 2026-09-20, reworked 2026-09-23 after an external review (the table below), nothing queued** (`algos/rainbow/`: `noisy.py`, `net.py`, `agent.py`, `algo.py`, the names `rainbow` and `btr` in
+`train.ALGOS` and `tools/restore.py`; `tests/test_rainbow.py`, mutants `tests/mut_rainbow.json`, 28 of 28 killed after the 2026-09-23 rework). Gates 1, 2, 3 and 5 passed the same day
 (§4); **C1 is not queued until B2 has been queued** (decided 2026-09-20) and its tuning wave has run -- **B2 was queued as b42 later the same
 day** (`docs/runs.md`), so under the queue-what-does-not-depend rule C1 is now queueable and is the next batch to write. Originally: planned 2026-09-16, nothing built. **Where each piece and each row stands is the `status` column of §1 and §3 and the gate table of §4** (added 2026-09-20, on the same rule as `a-return-tail.md`: a cell is filled in the pass that does the work, and an empty cell means *not done*, not *passed*). Group C of [`algorithm-series.md`](algorithm-series.md);
 conventions in [`README.md`](README.md). Phase 4 of the running order, after Group B (SAC); waits for Group A to close -- as of 2026-09-20 A1-A5 are closed (b39 closed today: FQF climbs where IQN flattened but never holds, stage B empty) and A6 (b40) is live on the laptop.
@@ -26,6 +26,19 @@ conventions in [`README.md`](README.md). Phase 4 of the running order, after Gro
 | **`SNEK_RAINBOW_EPSILON_ZERO_AT` is a fraction of the run's moves** | `max_steps` x lanes; 0.5 for `btr`, 0 (never) for `rainbow`. With the eval-driven schedule it does nothing |
 | **the knob-naming test covers every registered algorithm** | it read `train.py` and `algos/dqn/algo.py` only, so the dist and SAC knobs were never checked; now parametrised over `train.ALGOS` and reading every module under `algos/` |
 
+**Decided 2026-09-23, after an external review of the build against both papers and the BTR code** (`github.com/VIPTankz/BTR`, read the same day). Nothing had been queued on either name, so every change below is to the cells before they run; `mut_rainbow.json` is 28 / 28:
+
+| finding | what it changes |
+|---|---|
+| **spectral norm started unconverged** | `ResidualBlock` overwrote PyTorch's power-iteration vectors with fresh random ones and never iterated, so norms were 5 to 60 at build; the eval-mode target kept them until its first hard copy (500 updates in the paper cell), and the early TD errors raised `max_priority` for the whole run. Now PyTorch's own 15 iterations run on a seed forked from the arm's generator. The old test hid it by running 30 training forwards first |
+| **the streams had no hidden layer** | Rainbow Table 4 and BTR (`fc1V`/`fc1A`, noisy, 512) give each dueling stream a hidden layer, both noisy. `SNEK_RAINBOW_STREAM_HIDDEN=1` (the default for both names): the plain trunk's last width moves into each stream, so a single-stream net is still `QNet` weight for weight; the residual trunk keeps its width and each stream adds one of it. BBF keeps the one-linear layout |
+| **Munchausen's quantile target was Group A's mixture** | `algos/dist/` builds all `A x M` shifted samples weighted `pi / M`; M-IQN and BTR average actions inside each sample, `M` targets. `RainbowAgent` now has **its own update** with the paper's form, `pi` read off the same target samples as BTR's code does. Group A is untouched, so A6 stays reproducible -- and A6 ran the mixture (`a-return-tail.md` §2, A6) |
+| **the quantile loss averaged the online quantiles** | the papers and BTR sum them (mean over the targets), `N` times Group A's; it matters through the gradient clip at 10 and Adam's epsilon. The rainbow update sums |
+| **priorities were the loss** | Rainbow's is the KL, `CE - H(target)` (a matched distribution scored `ln 5` as CE); BTR's is the pairwise \|TD\| summed over online, averaged over target. Both now |
+| **BTR's paper and code disagree on three settings** | **rule: `btr` follows the released code where the two disagree**, since the code produced the published numbers; `rainbow` follows the paper. So PER's importance exponent is **0.2** (`PER.py` uses `alpha` for it, "an accident but actually performed better"), not the declared 0.45; epsilon decays **geometrically**, `eps -= (eps - 0.01) / 2M` per move (about 0.37 at 2M, not 0.01; `SNEK_RAINBOW_EPSILON_DECAY`); Munchausen's `tau log pi(a|s)` is read off the **online** net (`SNEK_RAINBOW_MUNCHAUSEN_LOGPI`; Vieillard et al. use the target) |
+| **Rainbow's beta was tied to a 50M-move run** | at the default 10M cap it ended at 0.52. `SNEK_BETA_ANNEAL_STEPS=0` (Rainbow's default) now means the run's cap, `max_steps` x lanes x replay ratio updates |
+| **kept, and stated** | importance weights **mean-normalised** (`algos/dqn/replay.py`, measured in snek2) rather than max; both papers normalise by the max (BTR per batch). The warmup is fully random and off the epsilon clock, where BTR acts under the schedule from move 0 (about 0.9 by 200k); a 10% shift of a 2M time constant. An n-step row, not a move, advances the gradient clock, which matches BTR's one update per vector step on average |
+
 The question: does the strongest single-box stack of value-learning tricks beat the PPO incumbent on
 this game? C is read against A. If C2 beats C1 by about what IQN plus Munchausen beat C51 by in Group A,
 the stack adds nothing beyond its parts. If it beats it by more, the trunk or the collection is doing
@@ -39,8 +52,8 @@ composition and the one ingredient nothing earlier builds: **noisy nets**. Dueli
 | shared piece | status | decision |
 |---|---|---|
 | package | **built 2026-09-20** | `algos/rainbow/`, one `algo.py` with two names, `rainbow` and `btr` (each a thin module, as the registry maps `module.NAME`), over a `net.py` that assembles the trunk from flags. Not two packages: BTR is Rainbow with different flags and a different head, and the flags are the experiment |
-| the head | **exists** (A, built 2026-09-17) | Group A's `algos/dist/heads.py` -- `Categorical` for Rainbow, `Implicit` for BTR. Nothing distributional is written here |
-| the loss | **exists** (A; Munchausen knobs built with A6, batch b40 queued 2026-09-19) | Group A's losses, with Munchausen's knobs from A6 available to both rows (on for BTR, off for Rainbow, as the papers have them). **BTR drops double-Q**: with Munchausen's soft target there is no separate argmax to decouple, and the paper's Table 1 lists it as removed; `SNEK_RAINBOW_DOUBLE` (1 for `rainbow`, 0 for `btr`) |
+| the head | **built** (in `algos/rainbow/net.py`, in Group A's formats) | c51 for Rainbow, IQN for BTR, read in the shapes `DistAgent` calls |
+| the loss | **built 2026-09-23** (`RainbowAgent.update`) | Group A's projection and quantile Huber, with the papers' Munchausen target, loss reduction and priorities rather than Group A's (§ decided 2026-09-23, above); Munchausen's knobs from A6 (on for BTR, off for Rainbow, as the papers have them). **BTR drops double-Q**: with Munchausen's soft target there is no separate argmax to decouple, and the paper's Table 1 lists it as removed; `SNEK_RAINBOW_DOUBLE` (1 for `rainbow`, 0 for `btr`) |
 | replay, collection, schedules | **exists** | `algos/dqn/`'s, including n-step (already `SNEK_N_STEP_UPDATE`) and PER (already on). `algos/dqn/` does not change |
 | the sidecar | **built** (`tools/arch.py` `OPTIONAL_FIELDS`, in the signature) | `head` from Group A plus `trunk`: `{"dueling": true, "noisy": true, "residual": false}` for Rainbow or `{"dueling": true, "noisy": true, "residual": true, "blocks": 3, "spectral": true, "layer_norm": false}` for BTR. In the signature |
 | restore | **built** | two entries; both greedy over the head's mean, noise off |
@@ -57,10 +70,10 @@ codebase four of the six are on already, so the row is dueling and noisy nets co
 | piece | here |
 |---|---|
 | double Q | `algos/dqn/agent.py`'s, unchanged |
-| PER | `algos/dqn/replay.py`, `SNEK_PRIORITY_EXPONENT` 0.5, β 0.4 → 1.0 linearly over the whole run (`SNEK_BETA_ANNEAL_STEPS` = the cap), the KL loss as the priority |
+| PER | `algos/dqn/replay.py`, `SNEK_PRIORITY_EXPONENT` 0.5, β 0.4 → 1.0 linearly over the whole run (`SNEK_BETA_ANNEAL_STEPS=0`, resolved to the cap's updates), the KL as the priority |
 | n-step | `SNEK_N_STEP_UPDATE=3`, already implemented in `collect.py`'s windows, and already correct across episode boundaries (the bug `collect.py` records snek2 shipping) |
 | C51 head | `algos/dist/heads.Categorical` at the support A2 settled on |
-| **dueling** | `algos/rainbow/net.py::DuelingTrunk`: shared hidden stack from `QNet`, then a value stream `(atoms,)` and an advantage stream `(actions, atoms)`, combined as V + A − mean_a(A) per atom. **Built here** (decided 2026-09-20): C1 owns it and D1 (`d-data-efficiency.md`) imports the scalar form; C1 adds the atom axis |
+| **dueling** | `algos/rainbow/net.py::RainbowNet`: shared hidden stack from `QNet` less its last layer, then a value stream `(atoms,)` and an advantage stream `(actions, atoms)`, each a hidden layer of that last width and an output, combined as V + A − mean_a(A) per atom. **Built here** (decided 2026-09-20): C1 owns it and D1 (`d-data-efficiency.md`) imports the scalar form; C1 adds the atom axis |
 | **noisy nets** | `algos/rainbow/noisy.py::NoisyLinear`, factorised Gaussian noise (Fortunato et al. 2018), σ_0 = 0.5, resampled per forward in training, **zeroed for the greedy `policy_fn`**. New. Replaces the epsilon schedule and the shield: `SNEK_RAINBOW_NOISY=1` sets `initial_epsilon = min_epsilon = 0` and `guided_fraction = 0` and lifts the ε hard floor (§1); the knobs are still accepted so the rung can be run with ε-greedy for the ablation in §4 |
 
 `build_config` is DQN's plus C51's plus `SNEK_RAINBOW_NOISY`, `SNEK_RAINBOW_NOISY_SIGMA`,
@@ -97,17 +110,18 @@ it for this observation; the paper's post-submission layer-norm result (positive
 |---|---|
 | head | `algos/dist/heads.Implicit` (A4), **N = N′ = K = 8** (the paper's "IQN taus 8"; the code uses one 8-sample pass for online, target and acting), 64 cosines, κ 1 |
 | Munchausen | A6's knobs, α 0.9, τ 0.03, l₀ −1; `SNEK_RAINBOW_DOUBLE=0` |
-| dueling, noisy | C1's `DuelingTrunk` and `NoisyLinear` over the residual trunk, both on |
-| trunk | `algos/rainbow/net.py::ResidualTrunk`, `SNEK_BTR_BLOCKS` 3, `SNEK_BTR_SPECTRAL_NORM` 1 (inside the blocks), `SNEK_BTR_LAYER_NORM` 0. New |
+| dueling, noisy | C1's streams (a hidden layer and an output each, both `NoisyLinear`) over the residual trunk, both on |
+| trunk | `algos/rainbow/net.py::Trunk` with `residual`, `SNEK_BTR_BLOCKS` 3, `SNEK_BTR_SPECTRAL_NORM` 1 (inside the blocks), `SNEK_BTR_LAYER_NORM` 0. New |
 | collection | `SNEK_COLLECT_ENVS=64`, `SNEK_BATCH_SIZE=256`, `SNEK_N_STEP_UPDATE=3`, **one gradient step per vectorised step** (`SNEK_REPLAY_RATIO` for 256 / 64 = 4 replayed samples per transition, half Rainbow's 8), replay 2²⁰ transitions, 200k transitions before the first update |
 | optimiser | Adam lr 1e-4, ε 0.005 / 256 = 1.95e-5, gradient norm clipped at 10 |
 | target | hard copy every 500 gradient steps (= 32k moves at 64 envs) |
-| PER | α 0.2; β 0.45 held (the authors' code does not anneal it) |
-| exploration | noisy nets **and** ε linear 1.0 → 0.01 over the first 2M agent steps (`SNEK_EPSILON_SCHEDULE=linear`, A's knob), then ε 0 for the second half of the run (`SNEK_EPSILON_ZERO_AT`, a fraction of the cap, 0.5); the fork off (`SNEK_FORK_BRANCHES=1`), since BTR's collection is wide rather than forked, and this is the one place C2's step changes: one counted step is `collect_envs` moves, and `advance()` reports it |
+| PER | α 0.2; importance exponent **0.2** held -- the code's (`PER.py` raises to `-alpha`); the paper declares 0.45 (decided 2026-09-23) |
+| exploration | noisy nets **and** ε 1.0 → 0.01 **geometric** with time constant 2M agent steps, as the code (`SNEK_RAINBOW_EPSILON_DECAY=geometric`; about 0.37 at 2M) (`SNEK_EPSILON_SCHEDULE=linear`, A's knob), then ε 0 for the second half of the run (`SNEK_EPSILON_ZERO_AT`, a fraction of the cap, 0.5); the fork off (`SNEK_FORK_BRANCHES=1`), since BTR's collection is wide rather than forked, and this is the one place C2's step changes: one counted step is `collect_envs` moves, and `advance()` reports it |
 | discount | **0.997**, the paper's (`README.md`, "Translating") |
 
-Tests: spectral norm bounds the largest singular value at 1 ± tolerance after the power iteration
-converges; the residual block is the identity at zero-initialised final layers; with every flag at
+Tests: spectral norm bounds the largest singular value at 1 ± tolerance **at build and in a fresh target**,
+before any training forward (the first version of this test ran 30 forwards first and hid an unconverged
+start); the residual block is the identity at zero-initialised final layers; with every flag at
 Rainbow's values the `btr` net equals the `rainbow` net weight for weight (the ablation in §4 depends on
 it); with `SNEK_RAINBOW_DOUBLE=0` the target's action is the target net's own argmax. Mutants: the
 residual add dropped, spectral norm applied to the head, the wrong τ count on the target, ε not zeroed
@@ -121,16 +135,16 @@ at the fraction.
 | batch, replay | 32; 1M; 20k steps before learning | 256; 2²⁰; 200k transitions before learning | the paper's, per row |
 | update frequency | one update per 4 agent steps: 8 samples per transition | one update per 64-env step: 4 samples per transition | `SNEK_REPLAY_RATIO` 0.25 at batch 32 (Rainbow) and 1/64 ≈ 0.0156 at batch 256 (BTR); the knob is gradient steps per transition |
 | target period | 8,000 agent steps = 2,000 gradient updates (32k frames) | 500 gradient steps | `SNEK_TARGET_UPDATE_PERIOD` 2,000 / 500 -- the knob counts gradient updates |
-| PER | α 0.5, β 0.4 → 1 | α 0.2, β 0.45 held | the paper's |
+| PER | α 0.5, β 0.4 → 1 | α 0.2; β declared 0.45, the code uses 0.2 (α) with batch-max weights | Rainbow the paper's; BTR the code's 0.2; mean-normalised weights for both |
 | n-step | 3 | 3 | 3 |
 | distribution | C51, 51 atoms, [−10, 10] | IQN, 8 taus | A2's stable support; IQN 8 / 8 / 8 |
 | double-Q | on | off | per row |
-| noisy nets | on, σ₀ 0.5, ε 0 | on, σ₀ 0.5, plus ε 1 → 0.01 over 2M steps, 0 after half the run | per row |
+| noisy nets | on, σ₀ 0.5, ε 0 | on, σ₀ 0.5, plus ε 1 → 0.01 geometric over 2M steps (the code), 0 after half the run | per row |
 | dueling | on | on | on |
-| Munchausen | -- | α 0.9, τ 0.03, l₀ −1 | per row |
+| Munchausen | -- | α 0.9, τ 0.03, l₀ −1; actions averaged inside each target quantile; log π(a\|s) from the online net (the code) | per row |
 | gradient clipping | none stated (the dueling paper: norm 10) | norm 10 | per row |
 | discount | 0.99 | 0.997 | the paper's, per row |
-| trunk | Nature CNN → 512 | IMPALA ×2, spectral norm on residual convs, adaptive maxpool 6×6, linear 512, no layer norm | `fc 320` for Rainbow; the residual MLP above for BTR |
+| trunk | Nature CNN, then a 512 hidden layer in each dueling stream | IMPALA ×2, spectral norm on residual convs, adaptive maxpool 6×6, then a noisy 512 hidden layer in each stream, no layer norm | `fc 320` for Rainbow, moved into each stream; the residual MLP above for BTR, with a 320 hidden layer per stream |
 | environments | 1 | 64 vectorised | 1 (`collect_envs` 1, no fork) for Rainbow; 64 for BTR |
 | frames | 200M | 200M | 50M moves a cell, raised if still rising |
 | reward | clipped [−1, 1] | clipped [−1, 1] | not clipped; supports from the return range |
@@ -163,7 +177,7 @@ changes behind it. They are cheap because they are flag flips on arms that have 
 |---|---|---|---|---|
 | 1 smoke, checkpoint, restore (both names) | **passed 2026-09-20** (`rainbow-smoke`, 3,000 steps, 6 checkpoints, `tools.restore` loads the last) | -- | **passed 2026-09-20** (`btr-smoke`, 64 lanes, 41 st/s on the laptop, 6 checkpoints, restored) | -- |
 | 2 `btr` equals `rainbow` at Rainbow's flags | -- | -- | **passed** (`test_btr_at_rainbows_flags_is_rainbow_weight_for_weight`) | -- |
-| 3 mutation spec kills every mutant | **passed**, 14/14 (`tests/mut_rainbow.json`) | -- | same spec | -- |
+| 3 mutation spec kills every mutant | **passed**, 14/14 (`tests/mut_rainbow.json`); **28/28** after the 2026-09-23 rework | -- | same spec | -- |
 | 4 predecessor closed; tuning wave done | A2 closed 2026-09-18; A6 closed 2026-09-20 (b40); **B2 not yet queued**; tuning wave not run | C1 not closed | C1 not closed | C2 not closed |
 | 5 `SNEK_MIN_EPSILON=0` refused with noisy off, accepted with noisy on | **passed** (`test_min_epsilon_zero_is_refused_with_noisy_off_and_accepted_with_it_on`) | -- | same test | -- |
 
