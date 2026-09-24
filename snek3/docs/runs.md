@@ -202,7 +202,7 @@ the stream layers, M-IQN's target, the loss reduction and priorities, batch-max 
 | varies | **rainbowpaper** (`b46a`-`d`) against the same algorithm and network on the fork/shield plumbing (fork 4, shield 0.8, PER 0.6 mean-normalised, target every 8 updates, lr 1e-5, eval-driven ε, γ 0.99, shaping 0.1 gate 75) **at the paper cell's update budget**, batch 32: **rainbowfork25** (`b46i`-`l`, replay ratio 0.25: the paper's 8 samples a move, 32 a counted step) and **rainbowfork0625** (`b46m`-`p`, ratio 0.0625: the paper's 8 samples a counted step, 2 a move). `b46e`-`h` (**rainbowlocal**, the true local cell at ratio 1, batch 128) were stopped 12 minutes in (below) |
 | cells × seeds | 3 × 4, seeds 1-4 and 9-16 pinned to the letter |
 | cap | 3M counted steps for every cell, eval every 1,000: 3M moves in the paper cell, 12M in the fork cells |
-| control | b36 (C51 paper, 10M moves) for the paper cell; the fork cells read against b46a-d, not b37 -- they are no longer the local setup |
+| control | b36a-b (C51 paper, 51 atoms, 10M moves) for the paper cell; the fork cells read against b46a-d, not b37 -- they are no longer the local setup |
 | predicted | registered 2026-09-23 by the agent: the paper cell learns faster per move than b36's C51 paper cell (n-step 3 and PER) but is under 50% perfect at 3M moves, with no stage-B row; the local cell reaches b37a-d's onset (1.1-1.8M) and plateau within 5 pp, noisy nets adding nothing measurable over the shield |
 
 **Why.** Row C1: does Rainbow's composition add anything over its C51 head on this game. Gates re-passed 2026-09-23 on the reworked

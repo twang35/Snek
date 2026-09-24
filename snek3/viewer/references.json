@@ -447,11 +447,9 @@
  "b46": {
   "arms": [
    "b36a-c51a51-seed1",
-   "b36b-c51a51-seed2",
-   "b36c-c51a51-seed3",
-   "b36d-c51a51-seed4"
+   "b36b-c51a51-seed2"
   ],
-  "label": "reference: b36's C51 paper cell (b36a-d, 10M moves) -- Rainbow's head as its paper ran it; b46a-d adds dueling, noisy streams, PER, n-step 3 and double Q, b46i-p runs the same on the fork/shield plumbing at the paper's update budget",
+  "label": "reference: b36's 51-atom C51 paper cell (b36a-b, 10M moves) -- Rainbow's head as its paper ran it; b46a-d adds dueling, noisy streams, PER, n-step 3 and double Q, b46i-p runs the same on the fork/shield plumbing at the paper's update budget",
   "after": "rainbowfork0625",
   "value": "c51paper",
   "knob": "name"
