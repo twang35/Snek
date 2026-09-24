@@ -1,0 +1,14 @@
+{
+ "arms": [
+  "b46m-rainbowfork0625-seed13",
+  "b46n-rainbowfork0625-seed14",
+  "b46o-rainbowfork0625-seed15",
+  "b46p-rainbowfork0625-seed16"
+ ],
+ "batch": "b46",
+ "box": "laptop",
+ "claimed_iso": "2026-09-24T01:27:27",
+ "claimed_ts": 1790238447.374996,
+ "kind": "wave",
+ "wave": 4
+}
