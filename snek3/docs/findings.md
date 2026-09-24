@@ -17,6 +17,25 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### Rainbow's paper cell holds 89-95% perfect at 3M moves with its noisy nets and 78-86 average score without them
+
+b46a-d and b48 (the paper cell's wave closed 2026-09-24, b48 closed 2026-09-24; `docs/results.md`). Rainbow as its paper has it -- C51
+51 atoms with double Q, 512-wide noisy dueling streams, PER, n-step 3, 1 lane, ε 0 -- reaches 92-93 average by 0.38M moves and holds
+89-95% perfect to the 3M cap: best30 96.9-98.1, 2,200 stage-B rows, 3 `hof5000` candidates, where b36's C51 paper cell had best30 ~31
+after 10M. The same cell with the noise off and the paper's ε 1 → 0.01 over 62.5k moves plateaus at 78-86 average on all four seeds,
+best30 9.0-21.4, no stage-B row. Both are measured noise-off and ε-free, so the gap is learned. Not settled: whether the noise matters
+as exploration or the 1% ε floor is what hurts, on a board where one random move near the end loses the game.
+
+### Acting on the return distribution's lower tail trades deaths for starves: `cvar:0.5` gains 0.5-2.8 pp on three quantile cells and moves none
+
+b45 (closed 2026-09-24, `plans/quantile-reads.md`, `tools/read_compare.py`). Sixteen acting rules over the same 100 top checkpoints of
+each of five Group A cells, 1,000 episodes each (IQN 500), paired against the mean read. `cvar:0.5` is the best read on QR-DQN (+1.32 pp,
+95% CI 0.72-1.94), IQN (+2.84) and M-QR-DQN (+0.55, 0.28-0.84), and on each it cuts deaths 5-10x (M-QR-DQN 1.65% → 0.26%) while starves
+rise (4.2% → 5.1%): with death gone, what the best value cell loses is the ~5% of games it starves. Every read that can be drawn by an
+upper tail (`above:*`, `abovemean:*`, `mix:0.5`, `mix:0.3`) is 10-94 pp below the mean on every cell, because the untrained action's
+quantiles own that tail. The family is head-specific: C51 loses 11.6 pp under `leastneg` and 93 under `leastnegmean`, FQF 43-58 under
+`cvar`. No read is worth a `hof5000` pass.
+
 ### Discrete SAC with Zhou et al.'s fixes holds where nothing in the value family has: the paper cell at 93-96% to the cap with no drawdown, and the fixes stop b41's drift on the local cell
 
 b42 (closed 2026-09-22, `docs/results.md`). `sac2paper` -- lr 1e-5, α fixed 0.05, batch 64, uniform 1e5 replay, 0.1 updates a move, Polyak

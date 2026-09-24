@@ -22,6 +22,70 @@ whose published artifacts are history, and the daemon's ledger, whose keys are t
 waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
 
 
+## Batch b45 — quantile reads, 5 cells × 16 reads × 100 checkpoints, closed 2026-09-24
+
+No training: each cell's top 25 stage-A checkpoints per arm, re-measured under every read at 1,000 episodes (IQN's reads 500), paired
+by checkpoint against `mean:fixed`. Perfect %, and Δ against the control in pp; per-read CIs, deaths and starves are
+`PYTHONPATH=. python -m tools.read_compare --prefix reads- --control meanfixed <the cell's four arms>`.
+
+| read | C51 (b37a-d) | QR-DQN (b37e-h) | IQN (b38a-d) | FQF (b39a-d) | M-QR-DQN (b40e-h) |
+|---|---:|---:|---:|---:|---:|
+| `mean:fixed` (control) | 92.70 | 92.81 | 63.53 | 82.76 | 94.11 |
+| `cvar:0.5` | −4.31 | **+1.32** | **+2.84** | −43.06 | **+0.55** |
+| `cvar:0.25` | −7.20 | +0.70 | +2.19 | −57.88 | −0.03 |
+| `mixmass:0.7` | +0.27 | +0.37 | +0.73 | +0.39 | −0.03 |
+| `leastneg` | −11.57 | +0.97 | +0.12 | +0.37 | +0.19 |
+| `leastneg:-2` | −16.90 | +0.81 | +0.34 | +0.33 | +0.01 |
+| `leastnegmean` | −92.62 | +0.94 | −2.05 | +0.21 | +0.01 |
+| `leastnegmean:-2` | −87.27 | +0.67 | −1.76 | −27.51 | −0.22 |
+| `mix:0.7` | −45.88 | −22.19 | −24.90 | −70.59 | −0.83 |
+| `mix:0.5` | −59.20 | −58.40 | −39.08 | −76.86 | −37.80 |
+| `mix:0.3` | −69.77 | −69.90 | −49.30 | −80.08 | −47.82 |
+| `above:60` | −3.48 | −67.39 | −10.73 | −59.29 | −55.82 |
+| `above:30` | −9.09 | −81.84 | −18.59 | −75.31 | −90.87 |
+| `above:10` | −11.06 | −92.74 | −55.49 | −77.43 | −91.11 |
+| `abovemean:30` | −67.67 | −81.80 | −39.06 | −77.33 | −91.47 |
+| `abovemean:10` | −91.69 | −92.81 | −63.35 | −82.76 | −94.11 |
+
+**Reading.** The registered split held: every upward read is below the control on every cell, the downward reads within a few pp.
+The bound did not, narrowly -- `cvar:0.5` clears the ~0.5 pp floor on QR-DQN and M-QR-DQN, and IQN's +2.84 is the largest gain in
+the pass. The gain is deaths: `cvar:0.5` takes M-QR-DQN's deaths from 1.65% to 0.26% and QR-DQN's from 2.75% to 0.31%, while starves
+rise by about a point, so the risk-averse read mostly converts one loss into the other. C51 (fixed atoms, mass below zero for every
+action) and FQF (proposed fractions) break the downward reads the quantile heads tolerate. Nothing here moves a cell toward 98, so no
+`hof5000` under a read; what remains on the best cell is the starve.
+
+<!-- progress_update: batch b48 -->
+## Batch b48 — the `knob` sweep, 1 values x 4 seeds, 3M, closed 2026-09-24
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b46a-rainbowpaper-seed1, b46b-rainbowpaper-seed2, b46c-rainbowpaper-seed3, b46d-rainbowpaper-seed4`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| knob | rows | ≥98%/500 | per-seed share | ≥99.2 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| rainbowepsgreedy | 0 | – | – – – – | 0 | – | 14.85 (9.0-21.4) | 0.0 | – | – | 0.0% |
+| **rainbowpaper** (reference) | 2,200 | 9.0% | 16.8 4.6 3.2 5.8 | 3 | 99.6 | 97.45 (96.9-98.1) | 61.6 | 0.0% | 4.44% | 10.4% |
+
+<!-- reading -->
+
+Read against b46a-d, the same cell with its noisy streams: the ε-greedy cell is a different result, not a noisier one. All four seeds
+climb to a 78-86 average score by 0.4-0.75M moves and sit there for the rest of the 3M, best30 9.0-21.4, no stage-A eval at 98 and no
+stage-B row, where the noisy cell was at 92-93 by 0.38M and held 89-95% perfect. Stage A acts noise-off and ε-free in both cells, so
+the gap is learned. The registered prediction (within noise, if anything earlier) is **falsified**. The traces look like the local
+DQN cells' plateau, not like b46a-d; which part of the swap does it -- 1% random moves held for the whole run, the 62.5k-move decay, or
+the noise itself -- the batch does not settle.
+
+<!-- /reading -->
+
+### Every arm
+
+| arm | knob | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b48a-rainbowepsgreedy-seed1` | rainbowepsgreedy | 0 | – | – | – | 9.1 @1.9M | 0.0 | – |
+| `b48b-rainbowepsgreedy-seed2` | rainbowepsgreedy | 0 | – | – | – | 19.9 @2.7M | 0.0 | – |
+| `b48c-rainbowepsgreedy-seed3` | rainbowepsgreedy | 0 | – | – | – | 21.4 @2.7M | 0.0 | – |
+| `b48d-rainbowepsgreedy-seed4` | rainbowepsgreedy | 0 | – | – | – | 9.0 @2.9M | 0.0 | – |
+
+<!-- /progress_update: batch b48 -->
+
 <!-- progress_update: batch b43 -->
 ## Batch b43 — the `knob` sweep, 2 values x 4 seeds, 3M, closed 2026-09-22
 

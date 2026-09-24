@@ -13,10 +13,12 @@ are in git history before 2026-09-10.
 
 ## Open
 
-- **b45, the quantile reads** (queued 2026-09-22): does any acting rule over the distribution beat the mean on Group A's best
-  checkpoints? The pilot says the upward-looking reads die on the untrained action's tail; the downward ones are within noise of the
-  mean and the pass says which side. If one wins, the follow-up is `hof5000` under that read; if the upward reads are worth another
-  look, it is an `above` read restricted to the moves the observation marks safe.
+- **Group C, the value stacks** (b46-b49, queued 2026-09-23): Rainbow's paper cell (b46a-d) held 89-95% perfect at 3M moves, the
+  first value-family paper cell to reach stage B, and b48 says noisy nets are most of that. Still live: b46's fork cells at the paper's
+  update budget, then BTR (b47) and its trunk ablations (b49) on the desktop. The question after them is whether a paper cell with
+  noise holds past 95 given the moves the local cells spend.
+- **The quantile reads** (b45, closed 2026-09-24): `cvar:0.5` turns most of a cell's deaths into starves for +0.5-2.8 pp, and the
+  starve (~5% of games on M-QR-DQN) is what is left. Not worth a `hof5000` pass; the starve is.
 - **Group A runs on the local plumbing** (decided 2026-09-17): b35 and b36 showed the papers' recipe does not reach
   competence in 10M moves on this game for DQN or C51, so rows A2-A4 are queued on b35's local cell (b37: C51 and QR-DQN;
   b38: IQN neutral and CVaR-trained). b37 closed 2026-09-18: the heads buy the hold, not the ceiling. b38 closed
@@ -75,10 +77,10 @@ are in git history before 2026-09-10.
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
 | [b49](#b49--btr-paper-cell-ablations-the-trunk-and-its-norm) | BTR's trunk: `SNEK_BTR_RESIDUAL=0` / `SNEK_BTR_SPECTRAL_NORM=0` | b47a-d's paper cell | 2 × 4 | 1M steps | registered | — |
-| [b48](#b48--rainbow-paper-cell-with-noisy-nets-off) | noisy nets off, ε 1 → 0.01 over 62.5k moves | b46a-d's paper cell | 1 × 4 | 3M steps | registered | — |
+| [b48](#b48--rainbow-paper-cell-with-noisy-nets-off) | noisy nets off, ε 1 → 0.01 over 62.5k moves | b46a-d's paper cell | 1 × 4 | 3M steps | **falsified** | best30 9.0-21.4 against the noisy cell's 96.9-98.1; no stage-B row. Noisy nets are most of this cell |
 | [b47](#b47--beyond-the-rainbow-paper-cell-beside-the-local-plumbing) | the algorithm: BTR as its code has it (IQN 8 + Munchausen, residual trunk with spectral norm, 512 noisy dueling streams, 64 lanes) / the same stack with QR-DQN N 32 on the local plumbing | none (paper) / b35's local cell | 2 × 4 | 1M steps (64M / 4M moves) | registered | — |
 | [b46](#b46--rainbow-paper-cell-beside-the-local-plumbing) | the algorithm: Rainbow as its paper has it (C51, double Q, 512 noisy dueling streams, PER, n-step 3, 1 lane) / the same on the fork/shield plumbing at the paper's update budget, batch 32, ratio 0.25 / 0.0625 | none (paper) / b46a-d | 3 × 4 | 3M steps | registered | — |
-| [b45](#b45--quantile-reads-acting-on-the-return-distribution-other-than-by-its-mean) | **the read, not the training**: sixteen acting rules over the same frozen weights (`--policy-variant`: `mean:fixed` control, `leastneg[:-2]` and `leastnegmean[:-2]`, `mix:0.7/0.5/0.3`, `mixmass:0.7`, `above:10/30/60`, `abovemean:10/30`, `cvar:0.25/0.5`) | the top 25 stage-A checkpoints of each arm of b37's C51 and QR-DQN cells, b38's IQN, b39's FQF and b40's M-QR-DQN | 5 cells × 16 reads × 100 checkpoints | 1,000 episodes a checkpoint (500 on the IQN reads), no stop rule | registered | — |
+| [b45](#b45--quantile-reads-acting-on-the-return-distribution-other-than-by-its-mean) | **the read, not the training**: sixteen acting rules over the same frozen weights (`--policy-variant`: `mean:fixed` control, `leastneg[:-2]` and `leastnegmean[:-2]`, `mix:0.7/0.5/0.3`, `mixmass:0.7`, `above:10/30/60`, `abovemean:10/30`, `cvar:0.25/0.5`) | the top 25 stage-A checkpoints of each arm of b37's C51 and QR-DQN cells, b38's IQN, b39's FQF and b40's M-QR-DQN | 5 cells × 16 reads × 100 checkpoints | 1,000 episodes a checkpoint (500 on the IQN reads), no stop rule | **held**, but for the noise floor | upward reads collapse everywhere; `cvar:0.5` the best read on three cells (+0.55 to +2.8 pp, deaths cut 5-10x, starves up), none moves a cell's standing |
 | [b44](#b44--bbf-the-papers-recipe-on-snake) | the algorithm: BBF as written (`SNEK_ALGO=bbf`: ×4 dueling C51 `fc 1280,2048`, replay ratio 8, batch 32, AdamW 1e-4 wd 0.1, EMA τ 0.005, SPR K 5 weight 5, resets every 40k gradient steps with n 10 → 3 and γ 0.97 → 0.997 over 10k, ε 1 → 0 over 2,001 moves, PER 0.5, 1M replay) | none: the paper cell alone; hist8, b2 reward, step penalty 0.01, shaping **off**, 1 lane | 1 × 4 | **100k moves** (= 100k steps at 1 lane, ~800k gradient steps) | registered | — |
 | [b43](#b43--bbf-style-resets-on-b40s-m-qr-dqn-cell) | BBF-style shrink-and-perturb resets, the reset alone (no replay ratio 8, wider net, AdamW, EMA target, SPR or within-cycle anneal) (`SNEK_RESET_INTERVAL` 600k / 2.4M gradient steps, `_ALPHA` 0.5, `_STOP_AFTER` 10.5M) | b40's M-QR-DQN cell (`b40e`-`h`) | 2 × 4 | 3M steps | falsified | the reset alone is harmful: 600k never above ~60% (0 stage-B rows), 2.4M at 30-70 with a climb only after the resets stop (`b43g` 90 at 2.94M, 2 rows); both far under `b40e`-`h`. "Worse everywhere", so the anneal wave runs before D1 closes; not a verdict on BBF |
 | [b42](#b42--revisiting-discrete-sac-paper-cell-beside-b41s-local-cell-with-the-fixes) | Zhou et al. 2022's fixes: per-state entropy-penalty 0.5, double average Q with Q-clip 0.5. Paper cell as written (lr 1e-5, α 0.05 fixed, batch 64, 1e5 uniform, 0.1 updates a move, Polyak 0.005, 3-step, 2 × 512, MSE) / b41's local cell plus the two fixes | PPO's reward, hist8, 16 lanes / `b41e`-`h` | 2 × 4 | 3.125M steps = 50M moves | paper cell falsified upward, local cell held | the paper cell is the best value-family hold yet: 93-96% from 0.3M to the cap on every seed, no eval below 80, 2,789 stage-B rows, best 98.8, entropy 0.05-0.07; the local cell holds at 82-90 where b41 drifted (206 rows, best 97.4). No `hof5000` candidate in either; 2.5% ≥98/500 against PPO's 95.4% |
@@ -174,7 +176,13 @@ no tuning wave for the ablation to wait on.
 | cells × seeds | 1 × 4, seeds 1-4, matching b46a-d |
 | cap | 3M counted steps (3M moves), eval every 1,000, as b46 |
 | control | b46a-d |
-| predicted | registered 2026-09-23 by the agent: within noise of b46a-d, if anything earlier; on three actions a 1% ε explores about as much as the noise |
+| predicted | registered 2026-09-23 by the agent: within noise of b46a-d, if anything earlier; on three actions a 1% ε explores about as much as the noise -- **falsified**: far below, not within noise |
+
+**Learned (closed 2026-09-24).** Noisy nets are most of what the paper cell has. With ε 1 → 0.01 in their place the four seeds reach
+a 78-86 average score by 0.4-0.75M moves and plateau there, best30 9.0-21.4 and no stage-B row, where b46a-d were at 92-93 by 0.38M and
+held 89-95% perfect. Stage A acts noise-off and ε-free in both cells, so the gap is in what was learned, not in how it is measured. What
+is not settled is why: 1% random moves on a long board, the schedule's 62.5k-move decay, or the noise itself. The plateau's shape is the
+local DQN cells', not the paper cell's.
 
 **Why.** `c-value-stack.md` §3's C1 ablation: whether noisy nets matter here, the one ingredient C1 adds that nothing earlier built.
 Pinned to the laptop, the smallest Group C batch, to finish overnight.
@@ -224,7 +232,14 @@ moves -- a comparison against the paper cell rather than the local setup. The ta
 | cells × seeds | 5 cells × 16 reads, each read one `eval` spec over the cell's four arms; 80 specs, the five controls first |
 | cap | 1,000 episodes a checkpoint, every read, seed 0, no early stop; paired against the control by checkpoint (`tools/read_compare.py`). **The IQN cell's fifteen reads run 500** (cut 2026-09-22 once the desktop showed an IQN spec at ~38 min against C51's ~4.5; `plans/quantile-reads.md` §4c); its `mean:fixed` control was already measured at 1,000 |
 | control | `mean:fixed` at the same depth on the same checkpoints. Stage B's 500-episode rows are not the comparison |
-| predicted | registered 2026-09-22 by the agent (`plans/quantile-reads.md` §2 and §4b, after a two-checkpoint pilot): the family splits by which tail it looks at. Reads that can be attracted by an upper tail (`above:*`, `abovemean:*`, `mix:0.3`, and `mix:0.5` part way) read near **zero** on every cell, because the untrained unsafe action owns the upper tail (quantiles to +60 and beyond where the safe moves sit at 11); reads that look down (`leastneg*`, `mixmass:0.7`, `cvar:*`, `mix:0.7`) sit within a few pp of the control, `mix:0.7` below it and `cvar:0.5` / `mixmass:0.7` the only candidates to sit above, by under 1 pp, through fewer deaths. No read beats the control by more than the paired noise floor (~0.5 pp) on b37 or b40 |
+| predicted | registered 2026-09-22 by the agent (`plans/quantile-reads.md` §2 and §4b, after a two-checkpoint pilot): the family splits by which tail it looks at. Reads that can be attracted by an upper tail (`above:*`, `abovemean:*`, `mix:0.3`, and `mix:0.5` part way) read near **zero** on every cell, because the untrained unsafe action owns the upper tail (quantiles to +60 and beyond where the safe moves sit at 11); reads that look down (`leastneg*`, `mixmass:0.7`, `cvar:*`, `mix:0.7`) sit within a few pp of the control, `mix:0.7` below it and `cvar:0.5` / `mixmass:0.7` the only candidates to sit above, by under 1 pp, through fewer deaths. No read beats the control by more than the paired noise floor (~0.5 pp) on b37 or b40 -- **held** on the split, every upward read below the control on all five cells and the downward ones within a few pp; **falsified** on the bound, narrowly: QR-DQN's `cvar:0.5` +1.32 pp [0.72, 1.94] and `leastneg` +0.97, M-QR-DQN's `cvar:0.5` +0.55 [0.28, 0.84] |
+
+**Learned (closed 2026-09-24).** The tail knows a little and it is about dying. `cvar:0.5` is the best read on QR-DQN (+1.32 pp),
+IQN (+2.84, at 500 episodes) and M-QR-DQN (+0.55), paired by checkpoint, and on each it cuts deaths 5-10x (M-QR-DQN 1.65% → 0.26%)
+while starves rise to take most of the gain back: what the best cell loses once it stops dying is the ~5% of games it starves. Every
+upward read collapses, as the pilot said. Two cells break the family: C51 loses 11.6 pp under `leastneg` and 93 under `leastnegmean`
+(its fixed atoms put mass below zero for every action), and FQF loses 43-58 under `cvar`. No read is worth a `hof5000` pass;
+the starve is the next thing to look at.
 
 **Why.** Every Group A number is the argmax of the mean of a distribution the head carries and nothing acts on. The user asked
 what the tail knows that the mean throws away, and the machinery for a second greedy read of the same weights already existed
