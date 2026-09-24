@@ -142,26 +142,26 @@ def test_the_spectral_estimates_are_converged_at_build_and_in_a_fresh_target(mon
             assert torch.linalg.matrix_norm(linear.weight, ord=2).item() == pytest.approx(1.0, abs=0.05)
 
 
-def test_stream_hidden_gives_each_stream_its_own_noisy_hidden_layer():
-    net = network.build(an_arch(C51, trunk(stream_hidden=True), widths=(24, 32)), seed=3)
-    assert [layer.out_features for layer in net.trunk.hidden] == [24]      # the last width moved out
+def test_a_stream_width_gives_each_stream_its_own_noisy_hidden_layer_over_the_whole_trunk():
+    net = network.build(an_arch(C51, trunk(stream_width=48), widths=(24, 32)), seed=3)
+    assert [layer.out_features for layer in net.trunk.hidden] == [24, 32]  # the trunk keeps every layer
     for stream in (net.advantage, net.value):
         assert isinstance(stream[0], NoisyLinear) and isinstance(stream[2], NoisyLinear)
-        assert (stream[0].in_features, stream[0].out_features) == (24, 32)
+        assert (stream[0].in_features, stream[0].out_features) == (32, 48) and stream[2].in_features == 48
     assert net.advantage[0].weight_mu.data_ptr() != net.value[0].weight_mu.data_ptr()
     assert net.log_probs(observations()).shape == (3, constants.NUM_ACTIONS, 5)
-    residual = network.build(an_arch(IQN, trunk(residual=True, stream_hidden=True)), seed=3)
+    residual = network.build(an_arch(IQN, trunk(residual=True, stream_width=48)), seed=3)
     assert residual.trunk.width == 32 and residual.advantage[0].in_features == 32
     from algos.dqn import resets
     trunk_names, head_names = resets.partition(net)
     assert not any(name.startswith(('advantage', 'value')) for name in trunk_names)
 
 
-def test_a_single_stream_net_with_stream_hidden_is_qnet_weight_for_weight():
-    from algos.dqn import net as qnet
-    net = network.build(an_arch(C51, trunk(dueling=False, noisy=False, stream_hidden=True)), seed=3)
-    reference = qnet.QNet(constants.OBS_LEN, [32], 1, seed=3)
-    assert torch.equal(net.advantage[0].weight, reference.hidden[0].weight)
+def test_the_papers_default_streams_are_512_wide(monkeypatch):
+    for name in rainbow_algo.NAMES:
+        algo, config, arch = build(monkeypatch, name)
+        assert arch['trunk']['stream_width'] == 512
+        assert algo.agent.net.advantage[0].out_features == 512 and algo.agent.net.value[0].out_features == 512
 
 
 def test_a_trunk_without_the_field_is_the_one_linear_layout():
@@ -319,7 +319,8 @@ def test_rainbows_defaults_are_the_papers(monkeypatch):
     assert config['fork'].branches == 1 and config['collect_envs'] == 1 and config['discount'] == 0.99
     assert config['rainbow_head'] == 'c51' and config['rainbow_double'] and not config['btr_residual']
     assert config['munchausen_alpha'] == 0.0 and config['replay_buffer_max_length'] == 1000000
-    assert config['beta_anneal_steps'] == 0 and config['rainbow_stream_hidden']
+    assert config['beta_anneal_steps'] == 0 and config['rainbow_stream_width'] == 512
+    assert config['is_normalization'] == 'batch_max' and config['rainbow_prefill_epsilon'] == 'random'
     assert config['rainbow_epsilon_decay'] == 'linear' and config['rainbow_munchausen_logpi'] == 'target'
 
 
@@ -331,7 +332,8 @@ def test_btrs_defaults_are_the_papers(monkeypatch):
     # The released code's importance exponent: `PER.py` uses alpha (0.2), not the declared beta 0.45.
     assert (config['priority_exponent'], config['is_beta'], config['is_beta_final']) == (0.2, 0.2, 0.2)
     assert config['rainbow_epsilon_decay'] == 'geometric' and config['rainbow_munchausen_logpi'] == 'online'
-    assert config['rainbow_stream_hidden']
+    assert config['rainbow_stream_width'] == 512 and config['is_normalization'] == 'batch_max'
+    assert config['rainbow_prefill_epsilon'] == 'schedule'
     assert (config['initial_epsilon'], config['min_epsilon'], config['epsilon_anneal_steps']) == (1.0, 0.01, 2000000)
     assert config['rainbow_epsilon_zero_at'] == 0.5 and config['discount'] == 0.997
     assert config['rainbow_head'] == 'iqn' and not config['rainbow_double'] and config['btr_residual']
@@ -516,3 +518,68 @@ def test_rainbows_beta_anneals_over_the_runs_cap(monkeypatch):
     assert algo.buffer.beta_for(250) == pytest.approx(1.0) and algo.buffer.beta_for(125) == pytest.approx(0.7)
     pinned, _, _ = build(monkeypatch, 'rainbow', MAX_STEPS=1000, BETA_ANNEAL_STEPS=77)
     assert pinned.buffer.beta_anneal_steps == 77
+
+
+# ---------------------------------------------------------------- the paper cell's replay and warmup (2026-09-23)
+
+def test_the_paper_cells_normalise_importance_weights_by_the_batch_max(monkeypatch):
+    for name in rainbow_algo.NAMES:
+        algo, config, arch = build(monkeypatch, name)
+        assert algo.buffer.normalization == 'batch_max'
+    local, _, _ = build(monkeypatch, 'btr', IS_NORMALIZATION='mean')
+    assert local.buffer.normalization == 'mean'
+    from algos.dqn.replay import normalize_is_weights
+    weights = np.array([1.0, 2.0, 4.0])
+    assert np.allclose(normalize_is_weights(weights, 'batch_max'), [0.25, 0.5, 1.0])
+    assert np.allclose(normalize_is_weights(weights, 'mean'), weights / weights.mean())
+
+
+def test_the_buffer_samples_under_its_normalisation(monkeypatch):
+    algo, config, arch = build(monkeypatch, 'rainbow', MAX_STEPS=100)
+    algo.prefill()
+    algo.buffer.update_priorities(np.arange(8), np.linspace(0.1, 5.0, 8))
+    _, _, weights = algo.buffer.sample(8, 0)
+    assert weights.max() == pytest.approx(1.0) and weights.mean() < 1.0
+
+
+def test_btrs_warmup_acts_under_the_schedule_and_counts_its_moves(monkeypatch):
+    algo, config, arch = build(monkeypatch, 'btr', COLLECT_ENVS=4, MAX_STEPS=10 ** 6, EPSILON_ANNEAL_STEPS=50)
+    seen = []
+    step = algo.collector.step
+
+    def recording(epsilon):
+        seen.append((epsilon, algo.moves))
+        return step(epsilon)
+
+    monkeypatch.setattr(algo.collector, 'step', recording)
+    banked = algo.prefill()
+    assert algo.moves == banked > 0 and len(seen) > 2
+    for epsilon, moves_before in seen:
+        assert epsilon == pytest.approx(rainbow_algo.geometric_epsilon(moves_before, 1.0, 0.01, 50))
+    assert seen[0][0] == pytest.approx(1.0) and seen[-1][0] < 1.0
+
+
+def test_rainbows_warmup_is_random_and_off_the_clock(monkeypatch):
+    algo, config, arch = build(monkeypatch, 'rainbow', MAX_STEPS=100)
+    seen = []
+    step = algo.collector.step
+    monkeypatch.setattr(algo.collector, 'step', lambda epsilon: (seen.append(epsilon), step(epsilon))[1])
+    algo.prefill()
+    assert set(seen) == {1.0} and algo.moves == 0
+
+
+# ---------------------------------------------------------------- resets are refused where they cannot run
+
+def test_resets_are_refused_before_training_on_the_residual_trunk(monkeypatch):
+    with pytest.raises(ValueError, match='SNEK_RESET_INTERVAL=.*residual trunk'):
+        build(monkeypatch, 'btr', RESET_INTERVAL=100)
+
+
+def test_resets_run_on_the_plain_trunk(monkeypatch):
+    algo, config, arch = build(monkeypatch, 'rainbow', RESET_INTERVAL=2, RAINBOW_NOISY=0, MIN_EPSILON=0.01)
+    batch = {'obs': observations(8).numpy(), 'next_obs': observations(8, seed=1).numpy(),
+             'action': np.zeros(8, dtype=np.int64), 'reward': np.zeros(8, dtype=np.float32),
+             'discount': np.full(8, 0.9, dtype=np.float32)}
+    for _ in range(3):
+        algo.agent.update(batch)
+    assert algo.agent.resets == 1

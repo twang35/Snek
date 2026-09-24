@@ -31,13 +31,14 @@ conventions in [`README.md`](README.md). Phase 4 of the running order, after Gro
 | finding | what it changes |
 |---|---|
 | **spectral norm started unconverged** | `ResidualBlock` overwrote PyTorch's power-iteration vectors with fresh random ones and never iterated, so norms were 5 to 60 at build; the eval-mode target kept them until its first hard copy (500 updates in the paper cell), and the early TD errors raised `max_priority` for the whole run. Now PyTorch's own 15 iterations run on a seed forked from the arm's generator. The old test hid it by running 30 training forwards first |
-| **the streams had no hidden layer** | Rainbow Table 4 and BTR (`fc1V`/`fc1A`, noisy, 512) give each dueling stream a hidden layer, both noisy. `SNEK_RAINBOW_STREAM_HIDDEN=1` (the default for both names): the plain trunk's last width moves into each stream, so a single-stream net is still `QNet` weight for weight; the residual trunk keeps its width and each stream adds one of it. BBF keeps the one-linear layout |
+| **the streams had no hidden layer** | Rainbow Table 4 and BTR (`fc1V`/`fc1A`, noisy, `linear_size` 512) give each dueling stream a hidden layer, both noisy. `SNEK_RAINBOW_STREAM_WIDTH=512` for both names (first built as `STREAM_HIDDEN`, the trunk's last width moved into the streams; replaced the same day by the paper's own width over the whole trunk, the trunk being the encoder's analogue). 0 is one linear per stream, BBF's layout |
 | **Munchausen's quantile target was Group A's mixture** | `algos/dist/` builds all `A x M` shifted samples weighted `pi / M`; M-IQN and BTR average actions inside each sample, `M` targets. `RainbowAgent` now has **its own update** with the paper's form, `pi` read off the same target samples as BTR's code does. Group A is untouched, so A6 stays reproducible -- and A6 ran the mixture (`a-return-tail.md` §2, A6) |
 | **the quantile loss averaged the online quantiles** | the papers and BTR sum them (mean over the targets), `N` times Group A's; it matters through the gradient clip at 10 and Adam's epsilon. The rainbow update sums |
 | **priorities were the loss** | Rainbow's is the KL, `CE - H(target)` (a matched distribution scored `ln 5` as CE); BTR's is the pairwise \|TD\| summed over online, averaged over target. Both now |
 | **BTR's paper and code disagree on three settings** | **rule: `btr` follows the released code where the two disagree**, since the code produced the published numbers; `rainbow` follows the paper. So PER's importance exponent is **0.2** (`PER.py` uses `alpha` for it, "an accident but actually performed better"), not the declared 0.45; epsilon decays **geometrically**, `eps -= (eps - 0.01) / 2M` per move (about 0.37 at 2M, not 0.01; `SNEK_RAINBOW_EPSILON_DECAY`); Munchausen's `tau log pi(a|s)` is read off the **online** net (`SNEK_RAINBOW_MUNCHAUSEN_LOGPI`; Vieillard et al. use the target) |
 | **Rainbow's beta was tied to a 50M-move run** | at the default 10M cap it ended at 0.52. `SNEK_BETA_ANNEAL_STEPS=0` (Rainbow's default) now means the run's cap, `max_steps` x lanes x replay ratio updates |
-| **kept, and stated** | importance weights **mean-normalised** (`algos/dqn/replay.py`, measured in snek2) rather than max; both papers normalise by the max (BTR per batch). The warmup is fully random and off the epsilon clock, where BTR acts under the schedule from move 0 (about 0.9 by 200k); a 10% shift of a 2M time constant. An n-step row, not a move, advances the gradient clock, which matches BTR's one update per vector step on average |
+| **the paper cell is the paper wherever the game allows** (the user's rule, later the same day; `README.md`'s paper-fidelity row widened with it) | the first version kept two codebase choices in the paper cells, and both are now the papers': **importance weights over the batch maximum** (`SNEK_IS_NORMALIZATION=batch_max`, `algos/dqn/replay.py`; PER's `1 / max w`, over the batch as Dopamine and the BTR code take it -- the buffer-wide maximum would need a min tree beside the sum tree), and **BTR's warmup acts under the schedule with its moves on the clock** (`SNEK_RAINBOW_PREFILL_EPSILON=schedule`; Rainbow keeps Dopamine's random warmup). The snek2 measurement behind mean normalisation was for a different loss, clip and optimiser, so it is a **local-cell** setting: the local specs state `SNEK_IS_NORMALIZATION=mean`. Still departing, both forced: rewards unclipped with the support from the return range (asked 2026-09-23, kept), and an n-step row rather than a move advancing the gradient clock, which equals BTR's one update per vector step on average |
+| **resets were accepted on nets they crash** | `resets.partition` finds the trunk by the `hidden.` name; the residual trunk's stem and blocks do not carry it (and, briefly, a single-layer plain trunk had none). `RainbowAlgo` now refuses `SNEK_RESET_INTERVAL` at construction when the net has no partition, naming the trunk; the plain trunk resets. A reset ablation on C2 needs the residual trunk named for the partition first |
 
 The question: does the strongest single-box stack of value-learning tricks beat the PPO incumbent on
 this game? C is read against A. If C2 beats C1 by about what IQN plus Munchausen beat C51 by in Group A,
@@ -135,7 +136,7 @@ at the fraction.
 | batch, replay | 32; 1M; 20k steps before learning | 256; 2²⁰; 200k transitions before learning | the paper's, per row |
 | update frequency | one update per 4 agent steps: 8 samples per transition | one update per 64-env step: 4 samples per transition | `SNEK_REPLAY_RATIO` 0.25 at batch 32 (Rainbow) and 1/64 ≈ 0.0156 at batch 256 (BTR); the knob is gradient steps per transition |
 | target period | 8,000 agent steps = 2,000 gradient updates (32k frames) | 500 gradient steps | `SNEK_TARGET_UPDATE_PERIOD` 2,000 / 500 -- the knob counts gradient updates |
-| PER | α 0.5, β 0.4 → 1 | α 0.2; β declared 0.45, the code uses 0.2 (α) with batch-max weights | Rainbow the paper's; BTR the code's 0.2; mean-normalised weights for both |
+| PER | α 0.5, β 0.4 → 1 | α 0.2; β declared 0.45, the code uses 0.2 (α) with batch-max weights | Rainbow the paper's; BTR the code's 0.2; weights over the batch max for both (`mean` in the local cells) |
 | n-step | 3 | 3 | 3 |
 | distribution | C51, 51 atoms, [−10, 10] | IQN, 8 taus | A2's stable support; IQN 8 / 8 / 8 |
 | double-Q | on | off | per row |
@@ -144,13 +145,15 @@ at the fraction.
 | Munchausen | -- | α 0.9, τ 0.03, l₀ −1; actions averaged inside each target quantile; log π(a\|s) from the online net (the code) | per row |
 | gradient clipping | none stated (the dueling paper: norm 10) | norm 10 | per row |
 | discount | 0.99 | 0.997 | the paper's, per row |
-| trunk | Nature CNN, then a 512 hidden layer in each dueling stream | IMPALA ×2, spectral norm on residual convs, adaptive maxpool 6×6, then a noisy 512 hidden layer in each stream, no layer norm | `fc 320` for Rainbow, moved into each stream; the residual MLP above for BTR, with a 320 hidden layer per stream |
+| trunk | Nature CNN, then a 512 hidden layer in each dueling stream | IMPALA ×2, spectral norm on residual convs, adaptive maxpool 6×6, then a noisy 512 hidden layer in each stream, no layer norm | `fc 320` for the Nature CNN, then a 512 hidden layer per stream (the paper's); the residual MLP above for BTR's IMPALA stack, then the same 512 streams |
 | environments | 1 | 64 vectorised | 1 (`collect_envs` 1, no fork) for Rainbow; 64 for BTR |
 | frames | 200M | 200M | 50M moves a cell, raised if still rising |
 | reward | clipped [−1, 1] | clipped [−1, 1] | not clipped; supports from the return range |
 
 Rainbow's **local** cell is C1 on `algos/dqn/`'s replay, target and collection defaults (the same split as
-Group A). **BTR's local cell** (decided 2026-09-20) keeps the paper's stack -- residual trunk, dueling, noisy,
+Group A). **Both local cells state `SNEK_IS_NORMALIZATION=mean`** (the codebase's importance weights; the paper
+cells take the batch max since 2026-09-23), so the local cell carries every codebase choice and the paper
+cell none. **BTR's local cell** (decided 2026-09-20) keeps the paper's stack -- residual trunk, dueling, noisy,
 Munchausen, no double-Q -- on what Group A's local cells found better: `algos/dqn/`'s replay, target and
 collection defaults (fork, shield, target period 8, replay ratio 1, batch 128, `collect_envs` 1) and **A3's
 QR-DQN N 32 head** in place of IQN 8, the head that plateaued at 55-65% in A4. The paper cell's wide

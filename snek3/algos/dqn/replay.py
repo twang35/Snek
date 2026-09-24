@@ -43,8 +43,15 @@ PRIORITY_EPSILON = 1e-6
 BUFFER_FILENAME = 'replay.npz'
 
 
-def normalize_is_weights(weights):
-    """Rescales importance-sampling weights to mean 1.0.
+IS_NORMALIZATIONS = ('mean', 'batch_max')
+
+
+def normalize_is_weights(weights, mode='mean'):
+    """Rescales importance-sampling weights to mean 1.0, or (`batch_max`) to a batch maximum of 1.0.
+
+    `batch_max` is the papers' form -- PER's `1 / max_i w_i`, taken over the batch as Dopamine and the
+    BTR code take it -- and exists for the paper cells that emulate them (`algos/rainbow/algo.py`,
+    decided 2026-09-23). Everything else runs `mean`, for the reason below.
 
     **Mean, not max, and this is not cosmetic.** Dividing by the largest weight in the buffer — which
     is what the textbook formulation and cpprb both do — makes a batch's weights average about 0.09
@@ -56,10 +63,10 @@ def normalize_is_weights(weights):
     keeps the correction exactly while leaving the average gradient magnitude — and therefore the
     tuned learning rate — where it was.
     """
-    mean = weights.mean()
-    if mean <= 0:
+    scale = weights.max() if mode == 'batch_max' else weights.mean()
+    if scale <= 0:
         return np.ones_like(weights)
-    return weights / mean
+    return weights / scale
 
 
 class SumTree(object):
@@ -156,7 +163,10 @@ class PrioritizedReplay(object):
     """
 
     def __init__(self, capacity, obs_len, alpha=0.6, initial_beta=0.4, final_beta=1.0,
-                 beta_anneal_steps=300000, seed=None):
+                 beta_anneal_steps=300000, seed=None, normalization='mean'):
+        if normalization not in IS_NORMALIZATIONS:
+            raise ValueError('normalization must be one of {0}, got {1!r}'.format(IS_NORMALIZATIONS, normalization))
+        self.normalization = normalization
         self.capacity = int(capacity)
         self.obs_len = int(obs_len)
         self.alpha = float(alpha)
@@ -232,7 +242,7 @@ class PrioritizedReplay(object):
         batch = {'obs': self.obs[indexes], 'action': self.action[indexes],
                  'reward': self.reward[indexes], 'next_obs': self.next_obs[indexes],
                  'discount': self.discount[indexes], 'aux': self.aux[indexes]}
-        return batch, indexes, normalize_is_weights(weights)
+        return batch, indexes, normalize_is_weights(weights, self.normalization)
 
     def update_priorities(self, indexes, td_errors):
         """Feeds absolute TD errors back as priorities."""

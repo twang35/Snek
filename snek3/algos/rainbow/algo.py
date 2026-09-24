@@ -15,7 +15,9 @@ states only what departs. The knobs DQN owns keep DQN's names (`SNEK_LEARNING_RA
 | `SNEK_RAINBOW_EPSILON_ZERO_AT` | 0 | 0.5 | with the linear schedule, epsilon drops to 0 at this fraction of the run's moves (`max_steps` x lanes); 0 never |
 | `SNEK_BTR_RESIDUAL`, `SNEK_BTR_BLOCKS` | 0, 3 | 1, 3 | the residual trunk in place of `QNet`'s stack |
 | `SNEK_BTR_SPECTRAL_NORM`, `SNEK_BTR_LAYER_NORM` | 1, 0 | 1, 0 | inside the residual blocks only |
-| `SNEK_RAINBOW_STREAM_HIDDEN` | 1 | 1 | a hidden layer in each dueling stream (`net.py`); 0 is the one-linear layout of the 2026-09-20 build |
+| `SNEK_RAINBOW_STREAM_WIDTH` | 512 | 512 | the hidden layer in each dueling stream (`net.py`), the papers' 512; 0 is one linear per stream |
+| `SNEK_IS_NORMALIZATION` | batch_max | batch_max | importance weights over the batch maximum, as PER, Dopamine and the BTR code; `mean` is this codebase's (`algos/dqn/replay.py`) |
+| `SNEK_RAINBOW_PREFILL_EPSILON` | random | schedule | the warmup at epsilon 1 off the clock (Dopamine), or acting under the schedule with its moves on the clock (the BTR code) |
 | `SNEK_RAINBOW_EPSILON_DECAY` | linear | geometric | the shape of the linear schedule's anneal: a straight line to `min_epsilon` at `epsilon_anneal_steps`, or BTR's code, `eps -= (eps - min) / steps` per move (about 0.37 at `steps`) |
 | `SNEK_RAINBOW_MUNCHAUSEN_LOGPI` | target | online | the net that reads the taken action's `tau log pi(a|s)` (`agent.py`) |
 
@@ -23,8 +25,14 @@ states only what departs. The knobs DQN owns keep DQN's names (`SNEK_LEARNING_RA
 for what the paper does not state; `btr` is the **authors' released code**, since the code produced the
 published numbers. For BTR that means PER's importance exponent is 0.2, not the declared 0.45 (`PER.py`
 uses `alpha` for it, "an accident but actually performed better"), epsilon decays geometrically, and
-Munchausen's log-policy is the online net's. Both keep this codebase's mean-normalised importance weights
-(`algos/dqn/replay.py`, measured in snek2) rather than max normalisation.
+Munchausen's log-policy is the online net's, and the warmup acts under the schedule.
+
+**The paper cell is the paper wherever the game allows** (the user's rule, 2026-09-23): losses and their
+reduction, priorities, importance-weight normalisation, clipping, the optimiser, widths that have a
+counterpart. The only departures are the series README's translation table (no reward clipping, supports
+from the return range, the MLP trunk for the CNN) and what the game cannot express. This codebase's own
+choices -- mean-normalised weights, the fork, the shield, the eval-driven epsilon -- are the local cell's,
+set in its spec.
 
 `SNEK_BETA_ANNEAL_STEPS` 0 (Rainbow's default) means **the run's cap**: `max_steps` x lanes x replay ratio
 gradient updates, so beta reaches 1 at the end of whatever run the spec asks for rather than of a 50M-move one.
@@ -39,6 +47,7 @@ import os
 
 from algos.dqn import algo as dqn_algo
 from algos.dqn import collect
+from algos.dqn import replay
 from algos.dqn import resets
 from algos.dqn import schedules
 from algos.rainbow import net as network
@@ -47,6 +56,7 @@ from algos.sac import algo as sac_algo
 
 NAMES = ('rainbow', 'btr')
 EPSILON_DECAYS = ('linear', 'geometric')
+PREFILL_EPSILONS = ('random', 'schedule')
 
 # The papers' settings, per name. Rainbow: Hessel et al. 2018 Table 1 and Dopamine's `rainbow.gin`;
 # BTR: Table D6 and the authors' code. Units: moves for the anneal, gradient updates for the target
@@ -61,7 +71,7 @@ PAPER = {
         # 0 is the run's cap (`RainbowAlgo`): beta reaches 1.0 at the last update whatever `max_steps` is.
         'beta_anneal_steps': 0,
         'munchausen_alpha': 0.0, 'head': 'c51', 'double': 1, 'epsilon_zero_at': 0.0, 'residual': 0,
-        'epsilon_decay': 'linear', 'munchausen_logpi': 'target',
+        'epsilon_decay': 'linear', 'munchausen_logpi': 'target', 'prefill_epsilon': 'random',
     },
     'btr': {
         'learning_rate': 1e-4, 'adam_epsilon': 0.005 / 256, 'batch_size': 256, 'discount': 0.997,
@@ -71,7 +81,7 @@ PAPER = {
         'initial_collect_steps': 200000, 'priority_exponent': 0.2, 'is_beta': 0.2, 'is_beta_final': 0.2,
         'beta_anneal_steps': 1,
         'munchausen_alpha': 0.9, 'head': 'iqn', 'double': 0, 'epsilon_zero_at': 0.5, 'residual': 1,
-        'epsilon_decay': 'geometric', 'munchausen_logpi': 'online',
+        'epsilon_decay': 'geometric', 'munchausen_logpi': 'online', 'prefill_epsilon': 'schedule',
     },
 }
 
@@ -152,7 +162,9 @@ def build_config(tuned, name):
         'btr_blocks': int(tuned('BTR_BLOCKS', 3, int)),
         'btr_spectral_norm': bool(int(tuned('BTR_SPECTRAL_NORM', 1, int))),
         'btr_layer_norm': bool(int(tuned('BTR_LAYER_NORM', 0, int))),
-        'rainbow_stream_hidden': bool(int(tuned('RAINBOW_STREAM_HIDDEN', 1, int))),
+        'rainbow_stream_width': int(tuned('RAINBOW_STREAM_WIDTH', 512, int)),
+        'is_normalization': str(tuned('IS_NORMALIZATION', 'batch_max', str)),
+        'rainbow_prefill_epsilon': str(tuned('RAINBOW_PREFILL_EPSILON', paper['prefill_epsilon'], str)),
         'rainbow_epsilon_decay': str(tuned('RAINBOW_EPSILON_DECAY', paper['epsilon_decay'], str)),
         'rainbow_munchausen_logpi': str(tuned('RAINBOW_MUNCHAUSEN_LOGPI', paper['munchausen_logpi'], str)),
         'fork': fork,
@@ -182,6 +194,15 @@ def build_config(tuned, name):
     if config['rainbow_munchausen_logpi'] not in MUNCHAUSEN_LOGPI:
         raise ValueError('SNEK_RAINBOW_MUNCHAUSEN_LOGPI={0!r} is not one of {1}'.format(
             config['rainbow_munchausen_logpi'], MUNCHAUSEN_LOGPI))
+    if config['is_normalization'] not in replay.IS_NORMALIZATIONS:
+        raise ValueError('SNEK_IS_NORMALIZATION={0!r} is not one of {1}'.format(
+            config['is_normalization'], replay.IS_NORMALIZATIONS))
+    if config['rainbow_prefill_epsilon'] not in PREFILL_EPSILONS:
+        raise ValueError('SNEK_RAINBOW_PREFILL_EPSILON={0!r} is not one of {1}'.format(
+            config['rainbow_prefill_epsilon'], PREFILL_EPSILONS))
+    if config['rainbow_stream_width'] < 0:
+        raise ValueError('SNEK_RAINBOW_STREAM_WIDTH={0} is negative; 0 means one linear per stream'.format(
+            config['rainbow_stream_width']))
     if config['beta_anneal_steps'] < 0:
         raise ValueError('SNEK_BETA_ANNEAL_STEPS={0} is negative; 0 means the run\'s cap'.format(
             config['beta_anneal_steps']))
@@ -206,7 +227,7 @@ def arch_fields(config):
     trunk = {'dueling': bool(config['rainbow_dueling']), 'noisy': bool(config['rainbow_noisy']),
              'noisy_sigma': float(config['rainbow_noisy_sigma']), 'residual': bool(config['btr_residual']),
              'blocks': int(config['btr_blocks']), 'spectral_norm': bool(config['btr_spectral_norm']),
-             'layer_norm': bool(config['btr_layer_norm']), 'stream_hidden': bool(config['rainbow_stream_hidden'])}
+             'layer_norm': bool(config['btr_layer_norm']), 'stream_width': int(config['rainbow_stream_width'])}
     return {'head': head, 'trunk': trunk}
 
 
@@ -256,10 +277,35 @@ class RainbowAlgo(dqn_algo.DqnAlgo):
                                   n_tau=config['dist_tau_samples'],
                                   n_tau_prime=config['dist_tau_prime_samples'])
         self.collector.agent = self.agent
+        self.buffer.normalization = config['is_normalization']
+        if config['reset_interval'] > 0:
+            # Refused here, before the first step, rather than at the first reset: `resets.partition` finds
+            # the trunk by the `hidden.` name, which the residual trunk's stem and blocks do not carry.
+            try:
+                resets.partition(self.agent.net)
+            except ValueError as error:
+                raise ValueError('SNEK_RESET_INTERVAL={0} cannot run on this net ({1}): {2}'.format(
+                    config['reset_interval'], 'residual trunk' if arch['trunk']['residual'] else 'plain trunk',
+                    error)) from None
         # BTR's second half at epsilon 0: a fraction of the run's moves, the cap in counted steps times
         # the moves one step is (every lane advances once). 0 means never.
         fraction = float(config['rainbow_epsilon_zero_at'])
         self.epsilon_zero_after = int(round(fraction * int(config.get('max_steps', 0)) * lanes)) if fraction > 0.0 else 0
+
+    def prefill(self):
+        """The warmup. `random` is the parent's: epsilon 1, off the clock (Dopamine). `schedule` is BTR's
+        code: the agent acts under the linear schedule from move 0, noisy greedy under the epsilon mask,
+        and the warmup's moves count toward the anneal and the zero point."""
+        if self.config['rainbow_prefill_epsilon'] != 'schedule' or not self.linear_schedule:
+            return super().prefill()
+        target = self.config['initial_collect_steps']
+        banked = 0
+        while self.buffer.size < target:
+            self.epsilon = self._linear_epsilon()
+            transitions = self.collector.step(self.epsilon)
+            self.moves += int(transitions)
+            banked += transitions
+        return banked
 
     def _linear_epsilon(self):
         if self.epsilon_zero_after > 0 and self.moves >= self.epsilon_zero_after:
@@ -279,7 +325,10 @@ class RainbowAlgo(dqn_algo.DqnAlgo):
                                                     ' layernorm' if trunk['layer_norm'] else '')
                  if trunk['residual'] else 'plain trunk',
                  'double-Q' if self.agent.double else 'target argmax',
-                 'stream hidden layers' if trunk.get('stream_hidden') else 'one-linear streams']
+                 'streams {0} wide'.format(trunk['stream_width']) if trunk.get('stream_width') else 'one-linear streams',
+                 'importance weights {0}'.format(self.buffer.normalization)]
+        if self.config['rainbow_prefill_epsilon'] == 'schedule' and self.linear_schedule:
+            parts.append('warmup under the schedule')
         if self.linear_schedule and self.config['rainbow_epsilon_decay'] == 'geometric':
             parts.append('epsilon decay geometric (the linear line above is its time constant)')
         if self.config['munchausen_alpha'] > 0.0:

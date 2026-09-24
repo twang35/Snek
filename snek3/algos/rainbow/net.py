@@ -5,7 +5,7 @@ One `RainbowNet` assembled from two sidecar fields (`tools/arch.py`, `OPTIONAL_F
 | field | what it decides |
 |---|---|
 | `arch['head']` | the distribution read off the streams, in Group A's formats: `c51` (`atoms`, `v_min`, `v_max`), `quantile` (`n`), `iqn` (`embedding`, `n_tau`, `k`) |
-| `arch['trunk']` | `dueling`, `noisy`, `noisy_sigma`, `residual`, `blocks`, `spectral_norm`, `layer_norm`, and optionally `stream_hidden` |
+| `arch['trunk']` | `dueling`, `noisy`, `noisy_sigma`, `residual`, `blocks`, `spectral_norm`, `layer_norm`, and optionally `stream_width` |
 
 **Separate from `algos/dist/net.py` on purpose** (decided 2026-09-20): Group A's heads build their own
 `QNet` and read features by walking it, so dueling streams and a residual trunk cannot be composed onto
@@ -21,17 +21,17 @@ then `blocks` residual blocks of two linears with ReLUs, spectral normalisation 
 only (the paper's placement -- the residual path, never the stem or the head) and an optional layer norm
 at each block's input (the paper's post-submission variant, off in the paper cell).
 
-The streams are combined as `V + A - mean_a(A)` per atom, quantile or tau. With `stream_hidden` off they
-are one linear each (`value: width -> outputs`, `advantage: width -> actions * outputs`) -- BBF's layout
-and every checkpoint written before 2026-09-23. With it on (`rainbow` and `btr` since then) each stream
-is a hidden linear, a ReLU and the output linear, the dueling paper's split of Nature DQN's 512-unit layer
-into one per stream, which Rainbow (Table 4) and BTR (Table D6; `networks.py`'s `fc1V`/`fc1A`) both keep.
-The MLP analogue: the last width of `fc_layer_params` moves out of the shared stack into each stream, so
-a plain single-stream net is still `QNet` weight for weight; the residual trunk keeps its width and each
-stream adds a hidden layer of that width, as BTR's streams follow its IMPALA stack. `NoisyLinear` for
-**both** layers of each stream when `noisy`, as both papers have it; otherwise the hidden layer takes
-`QNet`'s hidden initialiser and the output its head initialiser. For IQN the streams read the
-feature-embedding product one tau at a time, as A4's head does, so the dueling combine is per tau.
+The streams are combined as `V + A - mean_a(A)` per atom, quantile or tau. With `stream_width` 0 (or
+absent) they are one linear each (`value: width -> outputs`, `advantage: width -> actions * outputs`) --
+BBF's layout. With a width (`rainbow` and `btr` default to 512 since 2026-09-23) each stream is a hidden
+linear of that width, a ReLU and the output linear: the dueling paper's split of Nature DQN's 512-unit
+layer into one per stream, which Rainbow (Table 4) and BTR (Table D6; `networks.py`'s `fc1V`/`fc1A`,
+`linear_size` 512) both keep. The trunk -- `QNet`'s stack or the residual MLP -- is the analogue of the
+papers' convolutional encoder, so it keeps every `fc_layer_params` layer and the streams take the paper's
+own width. `NoisyLinear` for **both** layers of each stream when `noisy`, as both papers have it;
+otherwise the hidden layer takes `QNet`'s hidden initialiser and the output its head initialiser. For IQN
+the streams read the feature-embedding product one tau at a time, as A4's head does, so the dueling
+combine is per tau.
 """
 
 import math
@@ -44,8 +44,8 @@ from algos.rainbow.noisy import NoisyLinear, noisy_layers, set_noise
 
 HEAD_TYPES = ('c51', 'quantile', 'iqn')
 TRUNK_FIELDS = ('dueling', 'noisy', 'noisy_sigma', 'residual', 'blocks', 'spectral_norm', 'layer_norm')
-# Optional in the sidecar, off when absent: a trunk written before the field existed is the one-linear layout.
-OPTIONAL_TRUNK_FIELDS = ('stream_hidden',)
+# Optional in the sidecar, 0 when absent: a trunk written without the field is the one-linear layout.
+OPTIONAL_TRUNK_FIELDS = ('stream_width',)
 
 # snek2's He-normal with Keras' truncation correction, as `algos/dqn/net.QNet.reset_parameters`.
 _TRUNC_CORRECTION = 0.87962566103423978
@@ -180,7 +180,7 @@ class RainbowNet(nn.Module):
         self.num_actions = int(arch['num_actions'])
         self.dueling = bool(trunk['dueling'])
         self.noisy = bool(trunk['noisy'])
-        self.stream_hidden = bool(trunk.get('stream_hidden', False))
+        self.stream_width = int(trunk.get('stream_width', 0))
         if self.head_type == 'c51':
             self.atoms = int(head['atoms'])
             self.v_min, self.v_max = float(head['v_min']), float(head['v_max'])
@@ -200,13 +200,9 @@ class RainbowNet(nn.Module):
             if self.embedding < 1:
                 raise ValueError('iqn needs embedding >= 1, got {0}'.format(head))
             self.outputs = 1
-        widths = [int(width) for width in arch['fc_layer_params']]
-        # With stream hidden layers the plain trunk hands its last width to the streams; the residual
-        # trunk keeps it and the streams repeat it.
-        shared = widths[:-1] if self.stream_hidden and not trunk['residual'] else widths
-        stream_width = widths[-1] if self.stream_hidden else 0
-        self.trunk = Trunk(arch['obs_len'], shared, trunk, generator)
+        self.trunk = Trunk(arch['obs_len'], arch['fc_layer_params'], trunk, generator)
         width = self.trunk.width
+        stream_width = self.stream_width
         if self.head_type == 'iqn':
             self.tau_embed = nn.Linear(self.embedding, width)
             bound = 1.0 / math.sqrt(self.embedding)

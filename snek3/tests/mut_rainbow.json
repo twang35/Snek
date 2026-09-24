@@ -1,6 +1,7 @@
 {
  "tests": [
-  "tests/test_rainbow.py"
+  "tests/test_rainbow.py",
+  "tests/test_replay.py"
  ],
  "mutations": [
   {
@@ -106,12 +107,6 @@
    "to": "    return nn.Sequential(_stream_layer(in_features, hidden, False, sigma, generator, _he_init), nn.ReLU(),"
   },
   {
-   "desc": "the plain trunk keeps its last width with stream hidden layers on",
-   "file": "algos/rainbow/net.py",
-   "from": "        shared = widths[:-1] if self.stream_hidden and not trunk['residual'] else widths",
-   "to": "        shared = widths"
-  },
-  {
    "desc": "the Munchausen quantile target as the mixture (Group A's form)",
    "file": "algos/rainbow/agent.py",
    "from": "        soft = (pi_next.unsqueeze(2) * (target_quantiles - log_pi_next.unsqueeze(2))).sum(dim=1)  # (B, M)",
@@ -170,6 +165,42 @@
    "file": "algos/rainbow/algo.py",
    "from": "                int(config.get('max_steps', 0)) * lanes * float(config['replay_ratio']))))",
    "to": "                int(config.get('max_steps', 0)) * lanes)))"
+  },
+  {
+   "desc": "the stream width ignored",
+   "file": "algos/rainbow/net.py",
+   "from": "        stream_width = self.stream_width",
+   "to": "        stream_width = self.trunk.width"
+  },
+  {
+   "desc": "batch_max normalises by the mean",
+   "file": "algos/dqn/replay.py",
+   "from": "    scale = weights.max() if mode == 'batch_max' else weights.mean()",
+   "to": "    scale = weights.mean()"
+  },
+  {
+   "desc": "the paper cell's normalisation never reaches the buffer",
+   "file": "algos/rainbow/algo.py",
+   "from": "        self.buffer.normalization = config['is_normalization']\n",
+   "to": "\n"
+  },
+  {
+   "desc": "the warmup ignores the schedule",
+   "file": "algos/rainbow/algo.py",
+   "from": "            self.epsilon = self._linear_epsilon()\n            transitions = self.collector.step(self.epsilon)",
+   "to": "            self.epsilon = 1.0\n            transitions = self.collector.step(self.epsilon)"
+  },
+  {
+   "desc": "the warmup's moves kept off the clock",
+   "file": "algos/rainbow/algo.py",
+   "from": "            self.moves += int(transitions)\n            banked += transitions",
+   "to": "            banked += transitions"
+  },
+  {
+   "desc": "resets not checked before training",
+   "file": "algos/rainbow/algo.py",
+   "from": "        if config['reset_interval'] > 0:\n            # Refused here",
+   "to": "        if False:\n            # Refused here"
   }
  ]
 }
