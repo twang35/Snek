@@ -360,7 +360,7 @@ def _top_rows(rows, count):
     return {int(row['step']) for row in ranked[:count]}
 
 
-def checkpoint_plan(policy, keep_above=None, label=None, keep_top=KEEP_TOP):
+def checkpoint_plan(policy, keep_above=None, label=None, keep_top=KEEP_TOP, allow_no_stage_b=False):
     """`(keep, drop, reason)` — the checkpoint steps to keep and to delete for one arm.
 
     Keeps, as a union: the `keep_top` best rows of **every measurement the arm has** -- stage A (the
@@ -372,6 +372,8 @@ def checkpoint_plan(policy, keep_above=None, label=None, keep_top=KEEP_TOP):
 
     Refuses a running arm, and an arm whose stage-B pass has not run: until it has, nothing says which
     checkpoints matter. A pass that ran and selected nothing (a file with no rows) is not a refusal.
+    `allow_no_stage_b` lifts the second refusal for an arm whose stage B will never run (stopped short,
+    dead, an old era): it then keeps the top `keep_top` by stage A alone.
     """
     directory = os.path.join(constants.POLICY_DIR, policy)
     if not os.path.isdir(directory):
@@ -379,7 +381,7 @@ def checkpoint_plan(policy, keep_above=None, label=None, keep_top=KEEP_TOP):
     if policy in {name for name, _pid in live_runs.live()}:
         return set(), set(), 'the arm is running'
     payload = results.read(results.stage_b_path(policy, label))
-    if payload is None:
+    if payload is None and not allow_no_stage_b:
         return set(), set(), 'no stage-B pass on disk, so nothing says which checkpoints matter'
     rows = results.rows_of(payload)
 
@@ -411,10 +413,12 @@ def _rule(keep_above, keep_top):
     return ' + '.join(parts) or 'the best row only'
 
 
-def prune_checkpoints(policies, keep_above=None, label=None, apply=False, keep_top=KEEP_TOP):
+def prune_checkpoints(policies, keep_above=None, label=None, apply=False, keep_top=KEEP_TOP,
+                      allow_no_stage_b=False):
     freed = 0
     for policy in policies:
-        keep, drop, reason = checkpoint_plan(policy, keep_above, label=label, keep_top=keep_top)
+        keep, drop, reason = checkpoint_plan(policy, keep_above, label=label, keep_top=keep_top,
+                                             allow_no_stage_b=allow_no_stage_b)
         if not keep and not drop:
             print('  SKIP  {0:<40} {1}'.format(policy, reason))
             continue
@@ -465,6 +469,8 @@ def main(argv=None):
     checkpoints.add_argument('--keep-above', type=float, default=None,
                              help='also keep every checkpoint whose stage-B row is >= this')
     checkpoints.add_argument('--label', default=None, help='which stage-B pass to read')
+    checkpoints.add_argument('--allow-no-stage-b', action='store_true',
+                             help='prune an arm with no stage-B pass, keeping its top --keep-top by stage A')
     args = parser.parse_args(argv)
 
     if not args.apply:
@@ -479,7 +485,7 @@ def main(argv=None):
         prune_columns(apply=args.apply, include_tracked=args.include_tracked)
     else:
         prune_checkpoints(args.policies, args.keep_above, label=args.label, apply=args.apply,
-                          keep_top=args.keep_top)
+                          keep_top=args.keep_top, allow_no_stage_b=args.allow_no_stage_b)
     return 0
 
 

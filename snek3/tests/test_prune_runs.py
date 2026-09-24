@@ -231,6 +231,20 @@ def test_keep_top_still_refuses_an_arm_with_no_stage_b_file(runs_dir):
     assert (keep, drop) == (set(), set()) and 'no stage-B pass' in why
 
 
+def test_allow_no_stage_b_ranks_by_stage_a_alone(runs_dir):
+    # An arm stopped before its stage B (b41a-d) or from an old era: the refusal is lifted only by asking.
+    make_arm('arm', [1000, 2000, 3000])
+    write_stage_a('arm', {1000: 5.0, 2000: 20.0, 3000: 10.0})
+    keep, drop, _ = prune_runs.checkpoint_plan('arm', keep_top=1, allow_no_stage_b=True)
+    assert keep == {2000} and drop == {1000, 3000}
+
+
+def test_allow_no_stage_b_still_refuses_an_arm_with_nothing_to_rank(runs_dir):
+    make_arm('arm', [1000, 2000])
+    keep, drop, why = prune_runs.checkpoint_plan('arm', allow_no_stage_b=True)
+    assert (keep, drop) == (set(), set()) and 'nothing ranked' in why
+
+
 def test_the_cli_default_is_the_top_25(runs_dir):
     make_arm('arm', list(range(1000, 31000, 1000)))
     write_pass('arm', None, [row(step, 400 + step // 1000) for step in range(1000, 31000, 1000)])
