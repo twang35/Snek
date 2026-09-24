@@ -74,6 +74,10 @@ are in git history before 2026-09-10.
 
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
+| [b49](#b49--btr-paper-cell-ablations-the-trunk-and-its-norm) | BTR's trunk: `SNEK_BTR_RESIDUAL=0` / `SNEK_BTR_SPECTRAL_NORM=0` | b47a-d's paper cell | 2 × 4 | 1M steps | registered | — |
+| [b48](#b48--rainbow-paper-cell-with-noisy-nets-off) | noisy nets off, ε 1 → 0.01 over 62.5k moves | b46a-d's paper cell | 1 × 4 | 3M steps | registered | — |
+| [b47](#b47--beyond-the-rainbow-paper-cell-beside-the-local-plumbing) | the algorithm: BTR as its code has it (IQN 8 + Munchausen, residual trunk with spectral norm, 512 noisy dueling streams, 64 lanes) / the same stack with QR-DQN N 32 on the local plumbing | none (paper) / b35's local cell | 2 × 4 | 1M steps (64M / 4M moves) | registered | — |
+| [b46](#b46--rainbow-paper-cell-beside-the-local-plumbing) | the algorithm: Rainbow as its paper has it (C51, double Q, 512 noisy dueling streams, PER, n-step 3, 1 lane) / the same on the local plumbing | none (paper) / b35's local cell | 2 × 4 | 3M steps | registered | — |
 | [b45](#b45--quantile-reads-acting-on-the-return-distribution-other-than-by-its-mean) | **the read, not the training**: sixteen acting rules over the same frozen weights (`--policy-variant`: `mean:fixed` control, `leastneg[:-2]` and `leastnegmean[:-2]`, `mix:0.7/0.5/0.3`, `mixmass:0.7`, `above:10/30/60`, `abovemean:10/30`, `cvar:0.25/0.5`) | the top 25 stage-A checkpoints of each arm of b37's C51 and QR-DQN cells, b38's IQN, b39's FQF and b40's M-QR-DQN | 5 cells × 16 reads × 100 checkpoints | 1,000 episodes a checkpoint (500 on the IQN reads), no stop rule | registered | — |
 | [b44](#b44--bbf-the-papers-recipe-on-snake) | the algorithm: BBF as written (`SNEK_ALGO=bbf`: ×4 dueling C51 `fc 1280,2048`, replay ratio 8, batch 32, AdamW 1e-4 wd 0.1, EMA τ 0.005, SPR K 5 weight 5, resets every 40k gradient steps with n 10 → 3 and γ 0.97 → 0.997 over 10k, ε 1 → 0 over 2,001 moves, PER 0.5, 1M replay) | none: the paper cell alone; hist8, b2 reward, step penalty 0.01, shaping **off**, 1 lane | 1 × 4 | **100k moves** (= 100k steps at 1 lane, ~800k gradient steps) | registered | — |
 | [b43](#b43--bbf-style-resets-on-b40s-m-qr-dqn-cell) | BBF-style shrink-and-perturb resets, the reset alone (no replay ratio 8, wider net, AdamW, EMA target, SPR or within-cycle anneal) (`SNEK_RESET_INTERVAL` 600k / 2.4M gradient steps, `_ALPHA` 0.5, `_STOP_AFTER` 10.5M) | b40's M-QR-DQN cell (`b40e`-`h`) | 2 × 4 | 3M steps | falsified | the reset alone is harmful: 600k never above ~60% (0 stage-B rows), 2.4M at 30-70 with a climb only after the resets stop (`b43g` 90 at 2.94M, 2 rows); both far under `b40e`-`h`. "Worse everywhere", so the anneal wave runs before D1 closes; not a verdict on BBF |
@@ -145,6 +149,64 @@ evals below 50% and 80%), then best30. `hof5000` re-measures the top rows at 5,0
 at complete separation (Mann-Whitney p=0.029). Details in [`protocol.md`](protocol.md).
 
 ---
+
+## b49 — BTR paper cell ablations: the trunk, and its norm
+
+| | |
+|---|---|
+| base | b47a-d's paper cell (`SNEK_ALGO=btr` at its defaults, 64 lanes, shaping off) |
+| varies | **btrplaintrunk** (`b49a`-`d`): `SNEK_BTR_RESIDUAL=0`, `QNet`'s `fc 320` in place of the residual stack, the 512 streams unchanged. **btrnospectral** (`b49e`-`h`): `SNEK_BTR_SPECTRAL_NORM=0`, the residual stack without its norm |
+| cells × seeds | 2 × 4, seeds 1-8 pinned to the letter |
+| cap | 1M counted steps (64M moves), eval every 1,000, as b47 |
+| control | b47a-d |
+| predicted | registered 2026-09-23 by the agent: the plain trunk is within noise of b47a-d (a 26-value observation needs no deep encoder); without spectral norm, within noise or slightly worse late |
+
+**Why.** `c-value-stack.md` §3's C2 ablation: without it, C2 minus C1 is one number with four changes behind it. Queued beside
+b47 rather than after it (2026-09-23, the user's call to queue the group): the paper cell's settings are the paper's, so there is
+no tuning wave for the ablation to wait on.
+
+## b48 — Rainbow paper cell with noisy nets off
+
+| | |
+|---|---|
+| base | b46a-d's paper cell (`SNEK_ALGO=rainbow` at its defaults, 1 lane, shaping off) |
+| varies | `SNEK_RAINBOW_NOISY=0` with the paper's own non-noisy schedule: ε 1 → 0.01 over 250k frames = 62,500 moves, then held |
+| cells × seeds | 1 × 4, seeds 1-4, matching b46a-d |
+| cap | 3M counted steps (3M moves), eval every 1,000, as b46 |
+| control | b46a-d |
+| predicted | registered 2026-09-23 by the agent: within noise of b46a-d, if anything earlier; on three actions a 1% ε explores about as much as the noise |
+
+**Why.** `c-value-stack.md` §3's C1 ablation: whether noisy nets matter here, the one ingredient C1 adds that nothing earlier built.
+Pinned to the laptop, the smallest Group C batch, to finish overnight.
+
+## b47 — Beyond the Rainbow: paper cell beside the local plumbing
+
+| | |
+|---|---|
+| base | none for the paper cell: `SNEK_ALGO=btr` at its defaults, the authors' code where it and the paper disagree -- IQN 8/8/8, Munchausen α 0.9 τ 0.03 l₀ −1 (actions averaged per quantile, log π from the online net), no double Q, dueling 512-wide noisy streams, a 3-block residual MLP with spectral norm inside the blocks, 64 lanes, batch 256, one update per vector step, Adam 1e-4 ε 0.005/256, clip 10, target every 500 updates, γ 0.997, 2²⁰ replay, 200k prefill under the schedule, ε 1 → 0.01 geometric over 2M moves then 0 from half the run, PER α 0.2 with importance exponent 0.2 over the batch max; hist8, the b2 reward, shaping off |
+| varies | **btrpaper** (`b47a`-`d`) against **btrlocal** (`b47e`-`h`): the same stack with QR-DQN N 32 in place of IQN 8 on b35's local plumbing (fork 4, shield 0.8, PER 0.6 mean-normalised, target every 8, replay ratio 1, batch 128, lr 1e-5, eval-driven ε, γ 0.99, shaping 0.1 gate 75) |
+| cells × seeds | 2 × 4, seeds 1-8 pinned to the letter |
+| cap | **1M counted steps for both cells**, eval every 1,000 (the user, 2026-09-23: paper and local share steps and evals): 64M moves in the paper cell, about the paper's 50M; 4M in the local cell |
+| control | paper: A4's IQN (b38) and C1's paper cell (b46a-d); local: b40e-h (M-QR-DQN local, 3M) |
+| predicted | registered 2026-09-23 by the agent: the paper cell is the best paper cell the series has run -- above 50% perfect by 64M moves -- with no stage-B row; the local cell tracks b40e-h's first million steps, before its onset (1.13-1.54M), so it reads as shape only at this cap |
+
+**Why.** Row C2 (`plans/algoExploration/c-value-stack.md`): the practical ceiling of the value family on one box. Built 2026-09-20,
+reworked 2026-09-23 after two external reviews so the paper cell is the paper wherever the game allows (the spectral-norm start,
+the stream layers, M-IQN's target, the loss reduction and priorities, batch-max weights, the code's β, ε shape and warmup).
+
+## b46 — Rainbow: paper cell beside the local plumbing
+
+| | |
+|---|---|
+| base | none for the paper cell: `SNEK_ALGO=rainbow` at its defaults, the paper's -- C51 51 atoms on [−10, 110] with double Q, dueling 512-wide noisy streams (σ₀ 0.5) over `fc 320`, PER α 0.5 with β 0.4 → 1 over the run and KL priorities over the batch max, n-step 3, Adam 6.25e-5 ε 1.5e-4, batch 32, 1M replay, a 20k random prefill, one update per 4 moves, target every 2,000 updates, no clipping, ε 0, 1 lane; hist8, the b2 reward, shaping off |
+| varies | **rainbowpaper** (`b46a`-`d`) against **rainbowlocal** (`b46e`-`h`): the same algorithm and network on b35's local plumbing (as b47's local cell) |
+| cells × seeds | 2 × 4, seeds 1-8 pinned to the letter |
+| cap | 3M counted steps for both cells, eval every 1,000: 3M moves in the paper cell, 12M in the local cell |
+| control | paper: b36 (C51 paper, 10M moves); local: b37a-d (C51 local, 3M) |
+| predicted | registered 2026-09-23 by the agent: the paper cell learns faster per move than b36's C51 paper cell (n-step 3 and PER) but is under 50% perfect at 3M moves, with no stage-B row; the local cell reaches b37a-d's onset (1.1-1.8M) and plateau within 5 pp, noisy nets adding nothing measurable over the shield |
+
+**Why.** Row C1: does Rainbow's composition add anything over its C51 head on this game. Gates re-passed 2026-09-23 on the reworked
+build (smokes of both names, `mut_rainbow.json` 33 / 33, the suite).
 
 ## b45 — Quantile reads: acting on the return distribution other than by its mean
 

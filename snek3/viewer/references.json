@@ -443,5 +443,53 @@
   "after": "reset2400k",
   "value": "mqrdqnlocal",
   "knob": "name"
+ },
+ "b46": {
+  "arms": [
+   "b37a-c51local-seed1",
+   "b37b-c51local-seed2",
+   "b37c-c51local-seed3",
+   "b37d-c51local-seed4"
+  ],
+  "label": "reference: b37's local C51 cell (b37a-d, 3M) -- Rainbow's head on the same plumbing; b46e-h adds dueling, noisy streams, n-step 3 and double Q, b46a-d is the paper as written",
+  "after": "rainbowlocal",
+  "value": "c51local",
+  "knob": "name"
+ },
+ "b47": {
+  "arms": [
+   "b40e-mqrdqnlocal-seed5",
+   "b40f-mqrdqnlocal-seed6",
+   "b40g-mqrdqnlocal-seed7",
+   "b40h-mqrdqnlocal-seed8"
+  ],
+  "label": "reference: b40's M-QR-DQN N 32 cell (b40e-h, 3M) -- b47e-h is BTR's stack with that head on the same plumbing; b47a-d is BTR as its code has it",
+  "after": "btrlocal",
+  "value": "mqrdqnlocal",
+  "knob": "name"
+ },
+ "b48": {
+  "arms": [
+   "b46a-rainbowpaper-seed1",
+   "b46b-rainbowpaper-seed2",
+   "b46c-rainbowpaper-seed3",
+   "b46d-rainbowpaper-seed4"
+  ],
+  "label": "reference: b46's Rainbow paper cell (b46a-d, 3M) -- b48 is the same cell with noisy nets off and the paper's epsilon",
+  "after": "rainbowepsgreedy",
+  "value": "rainbowpaper",
+  "knob": "name"
+ },
+ "b49": {
+  "arms": [
+   "b47a-btrpaper-seed1",
+   "b47b-btrpaper-seed2",
+   "b47c-btrpaper-seed3",
+   "b47d-btrpaper-seed4"
+  ],
+  "label": "reference: b47's BTR paper cell (b47a-d, 1M) -- b49a-d replaces its residual trunk with fc 320, b49e-h drops its spectral norm",
+  "after": "btrnospectral",
+  "value": "btrpaper",
+  "knob": "name"
  }
 }
