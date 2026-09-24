@@ -1,0 +1,26 @@
+{
+ "box": "desktop",
+ "env": {
+  "SNEK_ALGO": "btr",
+  "SNEK_BTR_SPECTRAL_NORM": "0",
+  "SNEK_CHASE_SAFE_SHAPING": "0",
+  "SNEK_EVAL_INTERVAL": "1000",
+  "SNEK_EVAL_QUEUE": "1",
+  "SNEK_EVAL_QUEUE_DEPTH": "16",
+  "SNEK_EVAL_WORKERS": "8",
+  "SNEK_FC_LAYERS": "320",
+  "SNEK_FOOD_DISTANCE_REWARD": "0",
+  "SNEK_OBS_HISTORY": "8",
+  "SNEK_REWARD_PRESET": "b2",
+  "SNEK_SEED": "8",
+  "SNEK_STEP_PENALTY": "0.01"
+ },
+ "id": "b49h-btrnospectral-seed8",
+ "label": "b49: BTR paper cell ablations (C2 ablation) -- plain fc 320 trunk / residual trunk without spectral norm, hist8 at 1M counted steps, btr paper, no spectral norm, seed 8 of 8",
+ "max_steps": 1000000,
+ "notes": "Batch b49: the C2 ablation, two flag flips on b47a-d's paper cell: btrplaintrunk (b49a-d) SNEK_BTR_RESIDUAL=0 -- QNet's fc 320 in place of the residual stack, the streams unchanged -- and btrnospectral (b49e-h) SNEK_BTR_SPECTRAL_NORM=0 -- the residual stack without its norm. Read against b47a-d: is the trunk what carries BTR here, and is it the norm. Prediction (agent, 2026-09-23): the plain trunk is within noise of b47a-d (a 26-value observation does not need a deep encoder), and removing spectral norm is within noise too or slightly worse late, the paper's gain from it being an Atari-scale stability effect. Paper cells follow the paper wherever the game allows (plans/algoExploration/README.md, widened 2026-09-23): the paper's loss and reduction, priorities, batch-max importance weights, clipping, Adam and its eps, batch, replay, prefill, target, n-step 3, exploration and its shape, 512-wide noisy dueling streams; departures are the README's forced ones only -- rewards unclipped with the support from the return range, fc 320 as the conv encoder's analogue, hist8 as the game, the potential shaping off (the b2 preset's food 1, death -5, win +100, step 0.01 stay). Local cells run the same algorithm on b35's local DQN plumbing (fork 4, shield 0.8, PER 0.6 mean-normalised, target every 8, replay ratio 1, batch 128, lr 1e-5, eval-driven epsilon, gamma 0.99, shaping 0.1 gate 75). Paper and local share the step cap and eval every 1,000 counted steps (the user, 2026-09-23). Built and reviewed 2026-09-23 (algos/rainbow; mut_rainbow.json 33/33; smokes of both names).",
+ "policy": "b49h-btrnospectral-seed8",
+ "priority": 480,
+ "project": "snek3",
+ "type": "train"
+}

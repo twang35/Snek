@@ -1,0 +1,29 @@
+{
+ "box": "laptop",
+ "env": {
+  "SNEK_ALGO": "rainbow",
+  "SNEK_CHASE_SAFE_SHAPING": "0",
+  "SNEK_EPSILON_ANNEAL_STEPS": "62500",
+  "SNEK_EVAL_INTERVAL": "1000",
+  "SNEK_EVAL_QUEUE": "1",
+  "SNEK_EVAL_QUEUE_DEPTH": "16",
+  "SNEK_EVAL_WORKERS": "8",
+  "SNEK_FC_LAYERS": "320",
+  "SNEK_FOOD_DISTANCE_REWARD": "0",
+  "SNEK_INITIAL_EPSILON": "1.0",
+  "SNEK_MIN_EPSILON": "0.01",
+  "SNEK_OBS_HISTORY": "8",
+  "SNEK_RAINBOW_NOISY": "0",
+  "SNEK_REWARD_PRESET": "b2",
+  "SNEK_SEED": "3",
+  "SNEK_STEP_PENALTY": "0.01"
+ },
+ "id": "b48c-rainbowepsgreedy-seed3",
+ "label": "b48: Rainbow paper cell with noisy nets off (C1 ablation), epsilon 1 -> 0.01 over 62.5k moves, hist8 at 3M counted steps, rainbow paper, noisy off, seed 3 of 4",
+ "max_steps": 3000000,
+ "notes": "Batch b48: the C1 ablation -- b46a-d's paper cell with SNEK_RAINBOW_NOISY=0 and the paper's own non-noisy schedule, epsilon 1 -> 0.01 linearly over 250k frames = 62,500 moves, then held; plain linear streams at the same 512 width; seeds 1-4 match b46a-d. Pinned to the laptop, to finish overnight. Read against b46a-d. Prediction (agent, 2026-09-23): within noise of b46a-d -- on three actions a 1% epsilon explores about as much as the noise does -- and if anything the epsilon cell is earlier, as the noise's sigma decays slowly. Paper cells follow the paper wherever the game allows (plans/algoExploration/README.md, widened 2026-09-23): the paper's loss and reduction, priorities, batch-max importance weights, clipping, Adam and its eps, batch, replay, prefill, target, n-step 3, exploration and its shape, 512-wide noisy dueling streams; departures are the README's forced ones only -- rewards unclipped with the support from the return range, fc 320 as the conv encoder's analogue, hist8 as the game, the potential shaping off (the b2 preset's food 1, death -5, win +100, step 0.01 stay). Local cells run the same algorithm on b35's local DQN plumbing (fork 4, shield 0.8, PER 0.6 mean-normalised, target every 8, replay ratio 1, batch 128, lr 1e-5, eval-driven epsilon, gamma 0.99, shaping 0.1 gate 75). Paper and local share the step cap and eval every 1,000 counted steps (the user, 2026-09-23). Built and reviewed 2026-09-23 (algos/rainbow; mut_rainbow.json 33/33; smokes of both names).",
+ "policy": "b48c-rainbowepsgreedy-seed3",
+ "priority": 470,
+ "project": "snek3",
+ "type": "train"
+}
