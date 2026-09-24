@@ -77,7 +77,7 @@ are in git history before 2026-09-10.
 | [b49](#b49--btr-paper-cell-ablations-the-trunk-and-its-norm) | BTR's trunk: `SNEK_BTR_RESIDUAL=0` / `SNEK_BTR_SPECTRAL_NORM=0` | b47a-d's paper cell | 2 × 4 | 1M steps | registered | — |
 | [b48](#b48--rainbow-paper-cell-with-noisy-nets-off) | noisy nets off, ε 1 → 0.01 over 62.5k moves | b46a-d's paper cell | 1 × 4 | 3M steps | registered | — |
 | [b47](#b47--beyond-the-rainbow-paper-cell-beside-the-local-plumbing) | the algorithm: BTR as its code has it (IQN 8 + Munchausen, residual trunk with spectral norm, 512 noisy dueling streams, 64 lanes) / the same stack with QR-DQN N 32 on the local plumbing | none (paper) / b35's local cell | 2 × 4 | 1M steps (64M / 4M moves) | registered | — |
-| [b46](#b46--rainbow-paper-cell-beside-the-local-plumbing) | the algorithm: Rainbow as its paper has it (C51, double Q, 512 noisy dueling streams, PER, n-step 3, 1 lane) / the same on the local plumbing | none (paper) / b35's local cell | 2 × 4 | 3M steps | registered | — |
+| [b46](#b46--rainbow-paper-cell-beside-the-local-plumbing) | the algorithm: Rainbow as its paper has it (C51, double Q, 512 noisy dueling streams, PER, n-step 3, 1 lane) / the same on the fork/shield plumbing at the paper's update budget, batch 32, ratio 0.25 / 0.0625 | none (paper) / b46a-d | 3 × 4 | 3M steps | registered | — |
 | [b45](#b45--quantile-reads-acting-on-the-return-distribution-other-than-by-its-mean) | **the read, not the training**: sixteen acting rules over the same frozen weights (`--policy-variant`: `mean:fixed` control, `leastneg[:-2]` and `leastnegmean[:-2]`, `mix:0.7/0.5/0.3`, `mixmass:0.7`, `above:10/30/60`, `abovemean:10/30`, `cvar:0.25/0.5`) | the top 25 stage-A checkpoints of each arm of b37's C51 and QR-DQN cells, b38's IQN, b39's FQF and b40's M-QR-DQN | 5 cells × 16 reads × 100 checkpoints | 1,000 episodes a checkpoint (500 on the IQN reads), no stop rule | registered | — |
 | [b44](#b44--bbf-the-papers-recipe-on-snake) | the algorithm: BBF as written (`SNEK_ALGO=bbf`: ×4 dueling C51 `fc 1280,2048`, replay ratio 8, batch 32, AdamW 1e-4 wd 0.1, EMA τ 0.005, SPR K 5 weight 5, resets every 40k gradient steps with n 10 → 3 and γ 0.97 → 0.997 over 10k, ε 1 → 0 over 2,001 moves, PER 0.5, 1M replay) | none: the paper cell alone; hist8, b2 reward, step penalty 0.01, shaping **off**, 1 lane | 1 × 4 | **100k moves** (= 100k steps at 1 lane, ~800k gradient steps) | registered | — |
 | [b43](#b43--bbf-style-resets-on-b40s-m-qr-dqn-cell) | BBF-style shrink-and-perturb resets, the reset alone (no replay ratio 8, wider net, AdamW, EMA target, SPR or within-cycle anneal) (`SNEK_RESET_INTERVAL` 600k / 2.4M gradient steps, `_ALPHA` 0.5, `_STOP_AFTER` 10.5M) | b40's M-QR-DQN cell (`b40e`-`h`) | 2 × 4 | 3M steps | falsified | the reset alone is harmful: 600k never above ~60% (0 stage-B rows), 2.4M at 30-70 with a climb only after the resets stop (`b43g` 90 at 2.94M, 2 rows); both far under `b40e`-`h`. "Worse everywhere", so the anneal wave runs before D1 closes; not a verdict on BBF |
@@ -199,14 +199,21 @@ the stream layers, M-IQN's target, the loss reduction and priorities, batch-max 
 | | |
 |---|---|
 | base | none for the paper cell: `SNEK_ALGO=rainbow` at its defaults, the paper's -- C51 51 atoms on [−10, 110] with double Q, dueling 512-wide noisy streams (σ₀ 0.5) over `fc 320`, PER α 0.5 with β 0.4 → 1 over the run and KL priorities over the batch max, n-step 3, Adam 6.25e-5 ε 1.5e-4, batch 32, 1M replay, a 20k random prefill, one update per 4 moves, target every 2,000 updates, no clipping, ε 0, 1 lane; hist8, the b2 reward, shaping off |
-| varies | **rainbowpaper** (`b46a`-`d`) against **rainbowlocal** (`b46e`-`h`): the same algorithm and network on b35's local plumbing (as b47's local cell) |
-| cells × seeds | 2 × 4, seeds 1-8 pinned to the letter |
-| cap | 3M counted steps for both cells, eval every 1,000: 3M moves in the paper cell, 12M in the local cell |
-| control | paper: b36 (C51 paper, 10M moves); local: b37a-d (C51 local, 3M) |
+| varies | **rainbowpaper** (`b46a`-`d`) against the same algorithm and network on the fork/shield plumbing (fork 4, shield 0.8, PER 0.6 mean-normalised, target every 8 updates, lr 1e-5, eval-driven ε, γ 0.99, shaping 0.1 gate 75) **at the paper cell's update budget**, batch 32: **rainbowfork25** (`b46i`-`l`, replay ratio 0.25: the paper's 8 samples a move, 32 a counted step) and **rainbowfork0625** (`b46m`-`p`, ratio 0.0625: the paper's 8 samples a counted step, 2 a move). `b46e`-`h` (**rainbowlocal**, the true local cell at ratio 1, batch 128) were stopped 12 minutes in (below) |
+| cells × seeds | 3 × 4, seeds 1-4 and 9-16 pinned to the letter |
+| cap | 3M counted steps for every cell, eval every 1,000: 3M moves in the paper cell, 12M in the fork cells |
+| control | b36 (C51 paper, 10M moves) for the paper cell; the fork cells read against b46a-d, not b37 -- they are no longer the local setup |
 | predicted | registered 2026-09-23 by the agent: the paper cell learns faster per move than b36's C51 paper cell (n-step 3 and PER) but is under 50% perfect at 3M moves, with no stage-B row; the local cell reaches b37a-d's onset (1.1-1.8M) and plateau within 5 pp, noisy nets adding nothing measurable over the shield |
 
 **Why.** Row C1: does Rainbow's composition add anything over its C51 head on this game. Gates re-passed 2026-09-23 on the reworked
 build (smokes of both names, `mut_rainbow.json` 33 / 33, the suite).
+
+**Revised 2026-09-24.** `b46e`-`h` ran at 26 counted steps/s on the desktop (about 38 h a wave): 4 updates of 128 a counted step
+through the 512-wide noisy streams, 3x b37a-d's 76 st/s on the same plumbing and 64x the paper cell's gradient work a step. The paper
+wave had meanwhile finished in about 4 h at 89-95% perfect (best30 96.9-98.1, far above the registered prediction). The user's call:
+stop the local cell and run the fork plumbing at the paper cell's budget instead, in two cells because the fork makes a step four
+moves -- a comparison against the paper cell rather than the local setup. The target period stays 8 updates, so per move it copies
+4x (ratio 0.25) and 16x (0.0625) less often than the local cell did.
 
 ## b45 — Quantile reads: acting on the return distribution other than by its mean
 
