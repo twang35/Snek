@@ -245,6 +245,47 @@ def test_allow_no_stage_b_still_refuses_an_arm_with_nothing_to_rank(runs_dir):
     assert (keep, drop) == (set(), set()) and 'nothing ranked' in why
 
 
+def test_the_replay_buffer_goes_with_the_checkpoints_by_default(runs_dir):
+    directory = make_arm('arm', [1000, 2000])
+    write_pass('arm', None, [row(2000, 495)])
+    for name in prune_runs.REPLAY_FILES:
+        with open(os.path.join(directory, name), 'wb') as handle:
+            handle.write(b'r' * 500)
+    freed = prune_runs.prune_checkpoints(['arm'], keep_top=0, apply=True)
+    assert freed == 1000 + 2 * 500
+    assert sorted(os.listdir(directory)) == [os.path.basename(checkpoints.path(directory, 2000))]
+
+
+def test_keep_replay_leaves_the_buffer(runs_dir):
+    directory = make_arm('arm', [1000, 2000])
+    write_pass('arm', None, [row(2000, 495)])
+    with open(os.path.join(directory, 'replay.npz'), 'wb') as handle:
+        handle.write(b'r' * 500)
+    prune_runs.prune_checkpoints(['arm'], keep_top=0, apply=True, keep_replay=True)
+    assert os.path.exists(os.path.join(directory, 'replay.npz'))
+
+
+def test_a_refused_arm_keeps_its_replay_buffer(runs_dir, monkeypatch):
+    directory = make_arm('arm', [1000, 2000])
+    write_pass('arm', None, [row(2000, 495)])
+    with open(os.path.join(directory, 'replay.npz'), 'wb') as handle:
+        handle.write(b'r' * 500)
+    monkeypatch.setattr(prune_runs.live_runs, 'live', lambda *a, **k: [('arm', 4242)])
+    assert prune_runs.prune_checkpoints(['arm'], apply=True) == 0
+    assert os.path.exists(os.path.join(directory, 'replay.npz'))
+
+
+def test_an_arm_without_stage_b_keeps_its_replay_even_when_its_checkpoints_are_pruned(runs_dir):
+    # Not completed: stopped or crashed short of its cap, so the buffer is what a resume would continue on.
+    directory = make_arm('arm', [1000, 2000])
+    write_stage_a('arm', {1000: 5.0, 2000: 20.0})
+    with open(os.path.join(directory, 'replay.npz'), 'wb') as handle:
+        handle.write(b'r' * 500)
+    prune_runs.prune_checkpoints(['arm'], keep_top=1, apply=True, allow_no_stage_b=True)
+    assert os.path.exists(os.path.join(directory, 'replay.npz'))
+    assert not os.path.exists(checkpoints.path(directory, 1000))
+
+
 def test_the_cli_default_is_the_top_25(runs_dir):
     make_arm('arm', list(range(1000, 31000, 1000)))
     write_pass('arm', None, [row(step, 400 + step // 1000) for step in range(1000, 31000, 1000)])

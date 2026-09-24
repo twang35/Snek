@@ -19,7 +19,7 @@ Three things accumulate, in ascending order of how much thought deleting them ne
 | `arrays` | `episode_perfect` and `episode_rewards` from stored rows | nothing — one is derivable, the other has no reader (`tools/eval_plan.py`) |
 | `histogram` | the `episode_scores` array from every pass row, replaced by its `score_counts` histogram (2026-09-11) | the order of episodes within a row, which nothing reads. Every summary field is checked against the histogram first and a file with one disagreement is left alone |
 | `columns` | a stage-A `_evals.json`'s list of row dicts, rewritten as columns (`results.stage_a_payload`) | nothing — the round trip is checked before the write. A live arm's file is skipped: its trainer is the single writer |
-| `checkpoints` | `ckpt-*.pt` outside the top 25 (`--keep-top`) of stage A, stage B, `hof5000` and `hof30k`, and below `--keep-above` when given | the ability to re-measure or re-watch **that** checkpoint. Its measurement stays in `runs/` |
+| `checkpoints` | `ckpt-*.pt` outside the top 25 (`--keep-top`) of stage A, stage B, `hof5000` and `hof30k`, and below `--keep-above` when given; and a completed arm's `replay.npz` (its stage B has run) unless `--keep-replay` | the ability to re-measure or re-watch **that** checkpoint (its measurement stays in `runs/`), and a resume's buffer: a continued run refills it from scratch |
 
 **`checkpoints` is the only one that loses anything, and it is also the one worth the most** — an arm
 keeps a checkpoint per rollout, so a 100M-transition arm holds ~14,000 files at 109 KB each. It
@@ -413,8 +413,23 @@ def _rule(keep_above, keep_top):
     return ' + '.join(parts) or 'the best row only'
 
 
+REPLAY_FILES = ('replay.npz', 'replay.npz.partial.npz')
+
+
+def replay_files(directory):
+    """The replay buffer a value-family arm keeps beside its checkpoints (`algos/dqn/replay.py`), and a
+    save that died half-written. Read only when the arm resumes training, and a resume without it is
+    supported: the trainer says `buffer empty` and `prefill()` refills it before the first update."""
+    return [path for path in (os.path.join(directory, name) for name in REPLAY_FILES) if os.path.exists(path)]
+
+
 def prune_checkpoints(policies, keep_above=None, label=None, apply=False, keep_top=KEEP_TOP,
-                      allow_no_stage_b=False):
+                      allow_no_stage_b=False, keep_replay=False):
+    """Deletes each arm's checkpoints outside `checkpoint_plan`'s keep set and, unless `keep_replay`, a
+    **completed** arm's replay buffer: one that is only ever read to continue training it, and a continued
+    run refills an empty one. Completed means its stage-B pass is on disk, which the scheduler runs only
+    once the training is over -- so an arm pruned under `allow_no_stage_b` (stopped or crashed short of
+    its cap) keeps its buffer, and so does anything the refusals skip."""
     freed = 0
     for policy in policies:
         keep, drop, reason = checkpoint_plan(policy, keep_above, label=label, keep_top=keep_top,
@@ -429,9 +444,16 @@ def prune_checkpoints(policies, keep_above=None, label=None, apply=False, keep_t
             size += os.path.getsize(path)
             if apply:
                 os.remove(path)
+        completed = results.read(results.stage_b_path(policy)) is not None
+        replay = [] if keep_replay or not completed else replay_files(directory)
+        for path in replay:
+            size += os.path.getsize(path)
+            if apply:
+                os.remove(path)
         freed += size
-        print('  {0}  {1:<40} keep {2:>6}  drop {3:>6}  {4:>10}  ({5})'.format(
-            'PRUNED' if apply else ' would', policy, len(keep), len(drop), _mb(size), reason))
+        print('  {0}  {1:<40} keep {2:>6}  drop {3:>6}{6}  {4:>10}  ({5})'.format(
+            'PRUNED' if apply else ' would', policy, len(keep), len(drop), _mb(size), reason,
+            ' + replay' if replay else '         '))
     print('checkpoints: {0} {1}, keeping {2}'.format(
         'freed' if apply else 'would free', _mb(freed), _rule(keep_above, keep_top)))
     return freed
@@ -469,6 +491,8 @@ def main(argv=None):
     checkpoints.add_argument('--keep-above', type=float, default=None,
                              help='also keep every checkpoint whose stage-B row is >= this')
     checkpoints.add_argument('--label', default=None, help='which stage-B pass to read')
+    checkpoints.add_argument('--keep-replay', action='store_true',
+                             help='leave the arm\'s replay.npz (default: delete it; a resume refills an empty buffer)')
     checkpoints.add_argument('--allow-no-stage-b', action='store_true',
                              help='prune an arm with no stage-B pass, keeping its top --keep-top by stage A')
     args = parser.parse_args(argv)
@@ -485,7 +509,8 @@ def main(argv=None):
         prune_columns(apply=args.apply, include_tracked=args.include_tracked)
     else:
         prune_checkpoints(args.policies, args.keep_above, label=args.label, apply=args.apply,
-                          keep_top=args.keep_top, allow_no_stage_b=args.allow_no_stage_b)
+                          keep_top=args.keep_top, allow_no_stage_b=args.allow_no_stage_b,
+                          keep_replay=args.keep_replay)
     return 0
 
 
