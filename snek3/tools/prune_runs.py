@@ -5,6 +5,7 @@
     PYTHONPATH=. python -m tools.prune_runs arrays --apply
     PYTHONPATH=. python -m tools.prune_runs histogram --apply --include-tracked   # episode_scores -> score_counts
     PYTHONPATH=. python -m tools.prune_runs columns --apply --include-tracked     # stage-A rows -> columns
+    PYTHONPATH=. python -m tools.prune_runs checkpoints b6a-... --apply             # the top 25 of each measurement
     PYTHONPATH=. python -m tools.prune_runs checkpoints b6a-... --keep-above 97.5 --apply
 
 **Dry run is the default and `--apply` is the only thing that deletes.** Every subcommand prints
@@ -18,7 +19,7 @@ Three things accumulate, in ascending order of how much thought deleting them ne
 | `arrays` | `episode_perfect` and `episode_rewards` from stored rows | nothing — one is derivable, the other has no reader (`tools/eval_plan.py`) |
 | `histogram` | the `episode_scores` array from every pass row, replaced by its `score_counts` histogram (2026-09-11) | the order of episodes within a row, which nothing reads. Every summary field is checked against the histogram first and a file with one disagreement is left alone |
 | `columns` | a stage-A `_evals.json`'s list of row dicts, rewritten as columns (`results.stage_a_payload`) | nothing — the round trip is checked before the write. A live arm's file is skipped: its trainer is the single writer |
-| `checkpoints` | `ckpt-*.pt` whose stage-B row is below a threshold | the ability to re-measure or re-watch **that** checkpoint. Its measurement stays in `runs/` |
+| `checkpoints` | `ckpt-*.pt` outside the top 25 (`--keep-top`) of stage A, stage B, `hof5000` and `hof30k`, and below `--keep-above` when given | the ability to re-measure or re-watch **that** checkpoint. Its measurement stays in `runs/` |
 
 **`checkpoints` is the only one that loses anything, and it is also the one worth the most** — an arm
 keeps a checkpoint per rollout, so a 100M-transition arm holds ~14,000 files at 109 KB each. It
@@ -39,7 +40,7 @@ import numpy as np
 
 from env import constants
 from env.observations import is_perfect_score
-from tools import checkpoints, eval_plan, live_runs, results
+from tools import checkpoints, eval_plan, live_runs, results, step_selectors
 
 DEAD_ARRAYS = ('episode_perfect', 'episode_rewards')
 SHARD_SUFFIX = re.compile(r'-s(\d+)of(\d+)\.json$')
@@ -344,35 +345,76 @@ def prune_columns(apply=False, include_tracked=False):
 
 # ------------------------------------------------------------- checkpoints
 
-def checkpoint_plan(policy, keep_above, label=None):
+KEEP_TOP = 25
+
+
+def _pass_labels():
+    """Every pass a batch gets, stage B first: the labels `closeout.PASSES` writes its files under."""
+    from tools import closeout
+    return [settings['label'] for settings in closeout.PASSES.values()]
+
+
+def _top_rows(rows, count):
+    """The `count` best rows' steps: highest `perfect_percent`, then the later step."""
+    ranked = sorted(rows, key=lambda row: (-float(row['perfect_percent']), -int(row['step'])))
+    return {int(row['step']) for row in ranked[:count]}
+
+
+def checkpoint_plan(policy, keep_above=None, label=None, keep_top=KEEP_TOP):
     """`(keep, drop, reason)` — the checkpoint steps to keep and to delete for one arm.
 
-    Keeps: every step whose stage-B row is at or above `keep_above`, the best row's step whatever the
-    threshold, and any checkpoint the pass never measured is **dropped** — it failed stage A's screen,
-    which is the same judgement, made earlier and on 100 episodes rather than 500.
+    Keeps, as a union: the `keep_top` best rows of **every measurement the arm has** -- stage A (the
+    trainer's 100-episode evals, ranked as `topa:` ranks them), stage B, and each deeper pass on disk
+    (`hof5000`, `hof30k`) -- so an arm whose stage B selected nothing still keeps its best stage-A
+    checkpoints, and an arm with hundreds of `hof5000` rows keeps the best of those rather than only
+    stage B's order; every stage-B row at or above `keep_above` when it is given; and the best row of
+    the pass being read whatever else is set. Everything else on disk is dropped.
+
+    Refuses a running arm, and an arm whose stage-B pass has not run: until it has, nothing says which
+    checkpoints matter. A pass that ran and selected nothing (a file with no rows) is not a refusal.
     """
     directory = os.path.join(constants.POLICY_DIR, policy)
     if not os.path.isdir(directory):
         return set(), set(), 'no such policy directory'
     if policy in {name for name, _pid in live_runs.live()}:
         return set(), set(), 'the arm is running'
-    rows = results.rows_of(results.read(results.stage_b_path(policy, label)))
-    if not rows:
+    payload = results.read(results.stage_b_path(policy, label))
+    if payload is None:
         return set(), set(), 'no stage-B pass on disk, so nothing says which checkpoints matter'
+    rows = results.rows_of(payload)
 
     # `tools/checkpoints.py` owns the naming, both directions, so this cannot drift from it.
     on_disk = {step for step in (checkpoints.step_of(name) for name in os.listdir(directory))
                if step is not None}
-    scored = {row['step']: row['perfect_percent'] for row in rows}
-    best = max(scored, key=lambda step: scored[step])
-    keep = {step for step, percent in scored.items() if percent >= keep_above} | {best}
-    return keep & on_disk, on_disk - keep, '{0} measured, {1} on disk'.format(len(scored), len(on_disk))
+    keep = set()
+    if rows:
+        keep |= _top_rows(rows, 1)
+        if keep_above is not None:
+            keep |= {int(row['step']) for row in rows if row['perfect_percent'] >= keep_above}
+    if keep_top:
+        try:
+            keep |= set(step_selectors._top_stage_a(policy, keep_top, on_disk))
+        except step_selectors.SelectorError:
+            pass
+        for pass_label in _pass_labels():
+            keep |= _top_rows(results.rows_of(results.read(results.stage_b_path(policy, pass_label))),
+                              keep_top)
+    if not keep:
+        return set(), set(), 'nothing ranked: no stage-B row and no stage-A file'
+    return keep & on_disk, on_disk - keep, '{0} stage-B rows, {1} on disk'.format(len(rows), len(on_disk))
 
 
-def prune_checkpoints(policies, keep_above, label=None, apply=False):
+def _rule(keep_above, keep_top):
+    parts = ['the top {0} of each measurement'.format(keep_top)] if keep_top else []
+    if keep_above is not None:
+        parts.append('stage B >={0}%'.format(keep_above))
+    return ' + '.join(parts) or 'the best row only'
+
+
+def prune_checkpoints(policies, keep_above=None, label=None, apply=False, keep_top=KEEP_TOP):
     freed = 0
     for policy in policies:
-        keep, drop, reason = checkpoint_plan(policy, keep_above, label=label)
+        keep, drop, reason = checkpoint_plan(policy, keep_above, label=label, keep_top=keep_top)
         if not keep and not drop:
             print('  SKIP  {0:<40} {1}'.format(policy, reason))
             continue
@@ -386,8 +428,8 @@ def prune_checkpoints(policies, keep_above, label=None, apply=False):
         freed += size
         print('  {0}  {1:<40} keep {2:>6}  drop {3:>6}  {4:>10}  ({5})'.format(
             'PRUNED' if apply else ' would', policy, len(keep), len(drop), _mb(size), reason))
-    print('checkpoints: {0} {1} at >={2}%'.format(
-        'freed' if apply else 'would free', _mb(freed), keep_above))
+    print('checkpoints: {0} {1}, keeping {2}'.format(
+        'freed' if apply else 'would free', _mb(freed), _rule(keep_above, keep_top)))
     return freed
 
 
@@ -418,8 +460,10 @@ def main(argv=None):
     checkpoints = sub.add_parser('checkpoints', parents=[common],
                                  help='a closed arm\'s unwanted checkpoints')
     checkpoints.add_argument('policies', nargs='+')
-    checkpoints.add_argument('--keep-above', type=float, default=97.5,
-                             help='keep checkpoints whose stage-B row is >= this (default 97.5)')
+    checkpoints.add_argument('--keep-top', type=int, default=KEEP_TOP,
+                             help='keep the N best rows of stage A and of each pass (default %(default)s; 0 for none)')
+    checkpoints.add_argument('--keep-above', type=float, default=None,
+                             help='also keep every checkpoint whose stage-B row is >= this')
     checkpoints.add_argument('--label', default=None, help='which stage-B pass to read')
     args = parser.parse_args(argv)
 
@@ -434,7 +478,8 @@ def main(argv=None):
     elif args.what == 'columns':
         prune_columns(apply=args.apply, include_tracked=args.include_tracked)
     else:
-        prune_checkpoints(args.policies, args.keep_above, label=args.label, apply=args.apply)
+        prune_checkpoints(args.policies, args.keep_above, label=args.label, apply=args.apply,
+                          keep_top=args.keep_top)
     return 0
 
 

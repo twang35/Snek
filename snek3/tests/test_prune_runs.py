@@ -136,10 +136,10 @@ def test_rewriting_twice_is_a_no_op(runs_dir):
 def test_checkpoints_below_the_threshold_go_and_measured_ones_above_it_stay(runs_dir):
     make_arm('arm', [1000, 2000, 3000, 4000])
     write_pass('arm', None, [row(1000, 480), row(2000, 493), row(3000, 495)])   # 96.0, 98.6, 99.0
-    keep, drop, _ = prune_runs.checkpoint_plan('arm', 97.5)
+    keep, drop, _ = prune_runs.checkpoint_plan('arm', 97.5, keep_top=0)
     assert keep == {2000, 3000}
     assert drop == {1000, 4000}, 'the unmeasured 4000 goes too: stage A screened it out'
-    prune_runs.prune_checkpoints(['arm'], 97.5, apply=True)
+    prune_runs.prune_checkpoints(['arm'], 97.5, apply=True, keep_top=0)
     directory = os.path.join(constants.POLICY_DIR, 'arm')
     assert sorted(checkpoints.step_of(n) for n in os.listdir(directory)) == [2000, 3000]
 
@@ -148,13 +148,13 @@ def test_the_best_row_is_kept_however_high_the_threshold(runs_dir):
     # Otherwise a threshold nobody clears deletes the arm's own champion.
     make_arm('arm', [1000, 2000])
     write_pass('arm', None, [row(1000, 400), row(2000, 450)])
-    keep, drop, _ = prune_runs.checkpoint_plan('arm', 99.9)
+    keep, drop, _ = prune_runs.checkpoint_plan('arm', 99.9, keep_top=0)
     assert keep == {2000} and drop == {1000}
 
 
 def test_it_refuses_an_arm_with_no_stage_b_pass(runs_dir):
     make_arm('arm', [1000, 2000])
-    keep, drop, why = prune_runs.checkpoint_plan('arm', 97.5)
+    keep, drop, why = prune_runs.checkpoint_plan('arm', 97.5, keep_top=0)
     assert (keep, drop) == (set(), set()) and 'no stage-B pass' in why
 
 
@@ -162,14 +162,14 @@ def test_it_refuses_a_running_arm(runs_dir, monkeypatch):
     make_arm('arm', [1000, 2000])
     write_pass('arm', None, [row(1000, 480), row(2000, 495)])
     monkeypatch.setattr(prune_runs.live_runs, 'live', lambda *a, **k: [('arm', 4242)])
-    keep, drop, why = prune_runs.checkpoint_plan('arm', 97.5)
+    keep, drop, why = prune_runs.checkpoint_plan('arm', 97.5, keep_top=0)
     assert (keep, drop) == (set(), set()) and 'running' in why
 
 
 def test_a_dry_run_leaves_every_checkpoint_on_disk(runs_dir):
     make_arm('arm', [1000, 2000])
     write_pass('arm', None, [row(1000, 400), row(2000, 495)])
-    freed = prune_runs.prune_checkpoints(['arm'], 97.5, apply=False)
+    freed = prune_runs.prune_checkpoints(['arm'], 97.5, apply=False, keep_top=0)
     directory = os.path.join(constants.POLICY_DIR, 'arm')
     assert freed > 0 and len(os.listdir(directory)) == 2
 
@@ -178,8 +178,65 @@ def test_a_labelled_pass_can_drive_the_pruning(runs_dir):
     # `hof5000` rows are the 5,000-episode re-measure; pruning against them is the tighter cut.
     make_arm('arm', [1000, 2000, 3000])
     write_pass('arm', 'hof5000', [row(2000, 4930, episodes=5000), row(3000, 4800, episodes=5000)])
-    keep, drop, _ = prune_runs.checkpoint_plan('arm', 97.5, label='hof5000')
+    keep, drop, _ = prune_runs.checkpoint_plan('arm', 97.5, label='hof5000', keep_top=0)
     assert keep == {2000} and drop == {1000, 3000}
+
+
+def write_stage_a(policy, percents):
+    """A stage-A file: `{step: perfect_percent}` as the trainer's columns."""
+    evals = [{'step': step, 'perfect_percent': percent, 'trailing_avg_score': 50.0}
+             for step, percent in sorted(percents.items())]
+    results.write(results.stage_a_path(policy), results.stage_a_payload({}, evals))
+
+
+def test_keep_top_keeps_the_best_n_of_stage_b_and_drops_the_rest(runs_dir):
+    make_arm('arm', [1000, 2000, 3000, 4000, 5000])
+    write_pass('arm', None, [row(1000, 480), row(2000, 495), row(3000, 490), row(4000, 485)])
+    keep, drop, _ = prune_runs.checkpoint_plan('arm', keep_top=2)
+    assert keep == {2000, 3000}
+    assert drop == {1000, 4000, 5000}
+
+
+def test_keep_top_ties_go_to_the_later_step(runs_dir):
+    make_arm('arm', [1000, 2000, 3000])
+    write_pass('arm', None, [row(1000, 490), row(2000, 490), row(3000, 480)])
+    keep, _, _ = prune_runs.checkpoint_plan('arm', keep_top=1)
+    assert keep == {2000}
+
+
+def test_keep_top_keeps_stage_a_best_when_stage_b_selected_nothing(runs_dir):
+    # b36's case: the pass ran and no checkpoint reached 97/100, so the file has no rows. The arm's
+    # best stage-A checkpoints are still the ones anyone would re-watch or re-read.
+    make_arm('arm', [1000, 2000, 3000, 4000])
+    write_pass('arm', None, [])
+    write_stage_a('arm', {1000: 10.0, 2000: 40.0, 3000: 30.0, 4000: 5.0})
+    keep, drop, _ = prune_runs.checkpoint_plan('arm', keep_top=2)
+    assert keep == {2000, 3000} and drop == {1000, 4000}
+
+
+def test_keep_top_is_a_union_over_stage_a_and_every_pass(runs_dir):
+    make_arm('arm', [1000, 2000, 3000, 4000, 5000])
+    write_stage_a('arm', {1000: 99.0, 2000: 90.0, 3000: 90.0, 4000: 90.0, 5000: 90.0})
+    write_pass('arm', None, [row(2000, 495), row(3000, 494), row(4000, 493)])
+    write_pass('arm', 'hof5000', [row(3000, 4800, episodes=5000), row(4000, 4960, episodes=5000)])
+    keep, drop, _ = prune_runs.checkpoint_plan('arm', keep_top=1)
+    assert keep == {1000, 2000, 4000}, 'stage A best, stage B best, hof5000 best'
+    assert drop == {3000, 5000}
+
+
+def test_keep_top_still_refuses_an_arm_with_no_stage_b_file(runs_dir):
+    make_arm('arm', [1000, 2000])
+    write_stage_a('arm', {1000: 99.0, 2000: 98.0})
+    keep, drop, why = prune_runs.checkpoint_plan('arm')
+    assert (keep, drop) == (set(), set()) and 'no stage-B pass' in why
+
+
+def test_the_cli_default_is_the_top_25(runs_dir):
+    make_arm('arm', list(range(1000, 31000, 1000)))
+    write_pass('arm', None, [row(step, 400 + step // 1000) for step in range(1000, 31000, 1000)])
+    prune_runs.main(['checkpoints', 'arm', '--apply'])
+    directory = os.path.join(constants.POLICY_DIR, 'arm')
+    assert sorted(checkpoints.step_of(n) for n in os.listdir(directory)) == list(range(6000, 31000, 1000))
 
 
 def test_git_tracked_files_are_skipped_by_default(runs_dir, monkeypatch):
