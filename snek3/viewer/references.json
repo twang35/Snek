@@ -489,5 +489,17 @@
   "after": "btrnospectral",
   "value": "btrpaper",
   "knob": "name"
+ },
+ "b50": {
+  "arms": [
+   "b43a-reset600k-seed1",
+   "b43b-reset600k-seed2",
+   "b43c-reset600k-seed3",
+   "b43d-reset600k-seed4"
+  ],
+  "label": "reference: b43's reset600k cell (b43a-d, 3M) -- b50 is the same cell and cadence plus BBF's within-cycle n-step / gamma anneal",
+  "after": "resetanneal",
+  "value": "reset600k",
+  "knob": "name"
  }
 }
