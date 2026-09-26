@@ -1,0 +1,24 @@
+{
+ "env": {
+  "SNEK_ALGO": "bbf",
+  "SNEK_CHASE_SAFE_SHAPING": "0",
+  "SNEK_EVAL_INTERVAL": "1000",
+  "SNEK_EVAL_QUEUE": "1",
+  "SNEK_EVAL_QUEUE_DEPTH": "16",
+  "SNEK_EVAL_WORKERS": "8",
+  "SNEK_FC_LAYERS": "1280,2048",
+  "SNEK_FOOD_DISTANCE_REWARD": "0",
+  "SNEK_OBS_HISTORY": "8",
+  "SNEK_REWARD_PRESET": "b2",
+  "SNEK_SEED": "1",
+  "SNEK_STEP_PENALTY": "0.01"
+ },
+ "id": "b44a-bbfpaper-seed1",
+ "label": "b44: BBF, the paper's recipe whole (SNEK_ALGO=bbf at its defaults: x4 dueling C51 fc 1280,2048, replay ratio 8, AdamW, EMA target, SPR, resets every 40k gradient steps with the n/gamma anneal), 100k moves, bbf paper, seed 1 of 4",
+ "max_steps": 100000,
+ "notes": "Batch b44: BBF, the paper's recipe whole, on Snake (Schwarzer et al. 2023; plans/algoExploration/d-data-efficiency.md section 7; docs/runs.md b44, written 2026-09-20 and queued 2026-09-26 on the user's go-ahead). SNEK_ALGO=bbf at its defaults, which are the paper's: dueling C51 (51 atoms on [-10, 110], double Q) on fc 1280,2048 (the plan's MLP analogue of the x4 IMPALA encoder plus the 2048 dense layer), replay ratio 8 at batch 32, AdamW lr 1e-4 eps 1.5e-4 wd 0.1, grad clip 10, EMA target tau 0.005, SPR K 5 weight 5 (transition width 256, projection 512), shrink-and-perturb resets every 40k gradient steps at alpha 0.5 with n-step 10 -> 3 and gamma 0.97 -> 0.997 over the 10k gradient steps after each, epsilon 1 -> 0 over 2,001 moves after a 2,000-move prefill, PER 0.5, 1M replay, 1 lane; hist8, the b2 reward with step penalty 0.01, potential shaping off (the sample-time anneal keeps the reward/discount coupling exact only with it off). Departures from the paper are the README's forced ones: the MLP encoder, the transition width, the reward unclipped with the support from the return range. Cap 100k moves, the paper's regime: at 1 lane 100k counted steps and about 800k gradient steps, roughly nine hours an arm at the laptop's 25 gradient steps/s. Eval every 1,000 counted steps. It is its own question, separate from D1's reset probe (b43, b50): whether BBF's recipe learns Snake at all in 100k moves. Control: none in-family; b35's paper cells (DQN-Adam, C51 at 10M moves: 7-16%) and b43 give the shape of a value paper cell here. Read for the shape first: the saw-tooth at each reset (every 5k moves, 20 in the run), what each reset costs and recovers, whether the SPR loss falls within the first cycle. Prediction (agent, 2026-09-20): the perfect rate at 100k moves stays under 20% on every seed, no checkpoint at 97, stage B empty. If a seed reaches 50% the recipe has done in 100k moves what b35's paper cells could not in 10M, which would be the finding. Gates (2026-09-20): tests/test_bbf.py 25 tests, mut_bbf.json 18 of 18, a smoke with resets every 2,000 gradient steps that checkpointed, resumed with its buffer and restored through evaluate.py; the suite. Unpinned; either box claims the wave of 4.",
+ "policy": "b44a-bbfpaper-seed1",
+ "priority": 490,
+ "project": "snek3",
+ "type": "train"
+}
