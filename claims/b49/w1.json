@@ -1,0 +1,14 @@
+{
+ "arms": [
+  "b49a-btrplaintrunk-seed1",
+  "b49b-btrplaintrunk-seed2",
+  "b49c-btrplaintrunk-seed3",
+  "b49d-btrplaintrunk-seed4"
+ ],
+ "batch": "b49",
+ "box": "desktop",
+ "claimed_iso": "2026-09-26T15:42:40",
+ "claimed_ts": 1790462560.861765,
+ "kind": "wave",
+ "wave": 1
+}
