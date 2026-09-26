@@ -1,0 +1,14 @@
+{
+ "arms": [
+  "b44a-bbfpaper-seed1",
+  "b44b-bbfpaper-seed2",
+  "b44c-bbfpaper-seed3",
+  "b44d-bbfpaper-seed4"
+ ],
+ "batch": "b44",
+ "box": "laptop",
+ "claimed_iso": "2026-09-26T16:18:14",
+ "claimed_ts": 1790464694.4641302,
+ "kind": "wave",
+ "wave": 1
+}
