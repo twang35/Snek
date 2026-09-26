@@ -17,6 +17,15 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### The value stacks hold at 90-96 and top out at 96-97.5 best30: Rainbow and BTR reach stage B, none survives `hof5000`, and BTR's local cell learns ten times faster than M-QR-DQN without rising higher
+
+b46, b47 (closed 2026-09-26, `docs/results.md`). Six Group C cells, best30 and stage-B rows: Rainbow paper 96.9-98.1 / 2,200, Rainbow on
+the fork plumbing at ratio 0.25 96.1-97.1 / 1,819 (the steadiest hold, sef 92.5) and at 0.0625 93.8-95.7 / 377, BTR paper 96.2-96.7 /
+419, BTR on the local plumbing 94.9-96.7 / 490. Every `hof5000` candidate (four in b46, two in b47) stopped early; the best was 98.6
+at 3,070 episodes. BTR's local cell crosses 90 at 0.11-0.17M counted steps against b40e-h's 1.13-1.54M on the same plumbing, and
+plateaus where b40 did. BTR's paper cell crosses 90 at 0.53-0.54M on every seed, the step its ε reaches 0. **This retires the b42
+heading below**: the value family now holds as SAC does, and like SAC it holds two to three points under PPO.
+
 ### Rainbow's paper cell holds 89-95% perfect at 3M moves with its noisy nets and 78-86 average score without them
 
 b46a-d and b48 (the paper cell's wave closed 2026-09-24, b48 closed 2026-09-24; `docs/results.md`). Rainbow as its paper has it -- C51
@@ -36,7 +45,7 @@ upper tail (`above:*`, `abovemean:*`, `mix:0.5`, `mix:0.3`) is 10-94 pp below th
 quantiles own that tail. The family is head-specific: C51 loses 11.6 pp under `leastneg` and 93 under `leastnegmean`, FQF 43-58 under
 `cvar`. No read is worth a `hof5000` pass.
 
-### Discrete SAC with Zhou et al.'s fixes holds where nothing in the value family has: the paper cell at 93-96% to the cap with no drawdown, and the fixes stop b41's drift on the local cell
+### Discrete SAC with Zhou et al.'s fixes holds where nothing in the value family had (until b46, above): the paper cell at 93-96% to the cap with no drawdown, and the fixes stop b41's drift on the local cell
 
 b42 (closed 2026-09-22, `docs/results.md`). `sac2paper` -- lr 1e-5, α fixed 0.05, batch 64, uniform 1e5 replay, 0.1 updates a move, Polyak
 0.005, 3-step, per-state entropy-penalty 0.5, double average Q with a Q-clip of 0.5 -- reaches 90 at 0.25-0.33M counted steps and then sits at

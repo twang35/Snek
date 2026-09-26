@@ -13,10 +13,10 @@ are in git history before 2026-09-10.
 
 ## Open
 
-- **Group C, the value stacks** (b46-b49, queued 2026-09-23): Rainbow's paper cell (b46a-d) held 89-95% perfect at 3M moves, the
-  first value-family paper cell to reach stage B, and b48 says noisy nets are most of that. Still live: b46's fork cells at the paper's
-  update budget, then BTR (b47) and its trunk ablations (b49) on the desktop. The question after them is whether a paper cell with
-  noise holds past 95 given the moves the local cells spend.
+- **Group C, the value stacks** (b46-b49, queued 2026-09-23): b46, b47 and b48 closed 2026-09-26. Rainbow's paper cell and BTR's
+  both hold at 90-96 with stage-B rows and no `hof5000` survivor; noisy nets are most of Rainbow's (b48); BTR's local cell learns ten
+  times faster than b40's and plateaus at the same height. Still live: b49, BTR's trunk ablations. The value family's ceiling is now
+  96-97.5 best30 across six cells against PPO's 99.8, and no Rainbow-family work is planned after b49 (the user, 2026-09-26).
 - **The quantile reads** (b45, closed 2026-09-24): `cvar:0.5` turns most of a cell's deaths into starves for +0.5-2.8 pp, and the
   starve (~5% of games on M-QR-DQN) is what is left. Not worth a `hof5000` pass; the starve is.
 - **Group A runs on the local plumbing** (decided 2026-09-17): b35 and b36 showed the papers' recipe does not reach
@@ -78,8 +78,8 @@ are in git history before 2026-09-10.
 |---|---|---|---:|---:|---|---|
 | [b49](#b49--btr-paper-cell-ablations-the-trunk-and-its-norm) | BTR's trunk: `SNEK_BTR_RESIDUAL=0` / `SNEK_BTR_SPECTRAL_NORM=0` | b47a-d's paper cell | 2 × 4 | 1M steps | registered | — |
 | [b48](#b48--rainbow-paper-cell-with-noisy-nets-off) | noisy nets off, ε 1 → 0.01 over 62.5k moves | b46a-d's paper cell | 1 × 4 | 3M steps | **falsified** | best30 9.0-21.4 against the noisy cell's 96.9-98.1; no stage-B row. Noisy nets are most of this cell |
-| [b47](#b47--beyond-the-rainbow-paper-cell-beside-the-local-plumbing) | the algorithm: BTR as its code has it (IQN 8 + Munchausen, residual trunk with spectral norm, 512 noisy dueling streams, 64 lanes) / the same stack with QR-DQN N 32 on the local plumbing | none (paper) / b35's local cell | 2 × 4 | 1M steps (64M / 4M moves) | registered | — |
-| [b46](#b46--rainbow-paper-cell-beside-the-local-plumbing) | the algorithm: Rainbow as its paper has it (C51, double Q, 512 noisy dueling streams, PER, n-step 3, 1 lane) / the same on the fork/shield plumbing at the paper's update budget, batch 32, ratio 0.25 / 0.0625 | none (paper) / b46a-d | 3 × 4 | 3M steps | registered | — |
+| [b47](#b47--beyond-the-rainbow-paper-cell-beside-the-local-plumbing) | the algorithm: BTR as its code has it (IQN 8 + Munchausen, residual trunk with spectral norm, 512 noisy dueling streams, 64 lanes) / the same stack with QR-DQN N 32 on the local plumbing | none (paper) / b35's local cell | 2 × 4 | 1M steps (64M / 4M moves) | **falsified** | paper cell best30 96.2-96.7 (419 rows) below Rainbow's 97.45; local cell 90 by 0.11-0.17M, a tenth of b40's onset, and holds (sef 87). No `hof5000` survivor |
+| [b46](#b46--rainbow-paper-cell-beside-the-local-plumbing) | the algorithm: Rainbow as its paper has it (C51, double Q, 512 noisy dueling streams, PER, n-step 3, 1 lane) / the same on the fork/shield plumbing at the paper's update budget, batch 32, ratio 0.25 / 0.0625 | none (paper) / b46a-d | 3 × 4 | 3M steps | **falsified** | paper cell best30 96.9-98.1, 2,200 rows; `rainbowfork25` holds steadier (sef 92.5, best30 96.1-97.1), `rainbowfork0625` lower (94.5). No `hof5000` survivor |
 | [b45](#b45--quantile-reads-acting-on-the-return-distribution-other-than-by-its-mean) | **the read, not the training**: sixteen acting rules over the same frozen weights (`--policy-variant`: `mean:fixed` control, `leastneg[:-2]` and `leastnegmean[:-2]`, `mix:0.7/0.5/0.3`, `mixmass:0.7`, `above:10/30/60`, `abovemean:10/30`, `cvar:0.25/0.5`) | the top 25 stage-A checkpoints of each arm of b37's C51 and QR-DQN cells, b38's IQN, b39's FQF and b40's M-QR-DQN | 5 cells × 16 reads × 100 checkpoints | 1,000 episodes a checkpoint (500 on the IQN reads), no stop rule | **held**, but for the noise floor | upward reads collapse everywhere; `cvar:0.5` the best read on three cells (+0.55 to +2.8 pp, deaths cut 5-10x, starves up), none moves a cell's standing |
 | [b44](#b44--bbf-the-papers-recipe-on-snake) | the algorithm: BBF as written (`SNEK_ALGO=bbf`: ×4 dueling C51 `fc 1280,2048`, replay ratio 8, batch 32, AdamW 1e-4 wd 0.1, EMA τ 0.005, SPR K 5 weight 5, resets every 40k gradient steps with n 10 → 3 and γ 0.97 → 0.997 over 10k, ε 1 → 0 over 2,001 moves, PER 0.5, 1M replay) | none: the paper cell alone; hist8, b2 reward, step penalty 0.01, shaping **off**, 1 lane | 1 × 4 | **100k moves** (= 100k steps at 1 lane, ~800k gradient steps) | registered | — |
 | [b43](#b43--bbf-style-resets-on-b40s-m-qr-dqn-cell) | BBF-style shrink-and-perturb resets, the reset alone (no replay ratio 8, wider net, AdamW, EMA target, SPR or within-cycle anneal) (`SNEK_RESET_INTERVAL` 600k / 2.4M gradient steps, `_ALPHA` 0.5, `_STOP_AFTER` 10.5M) | b40's M-QR-DQN cell (`b40e`-`h`) | 2 × 4 | 3M steps | falsified | the reset alone is harmful: 600k never above ~60% (0 stage-B rows), 2.4M at 30-70 with a climb only after the resets stop (`b43g` 90 at 2.94M, 2 rows); both far under `b40e`-`h`. "Worse everywhere", so the anneal wave runs before D1 closes; not a verdict on BBF |
@@ -196,7 +196,13 @@ Pinned to the laptop, the smallest Group C batch, to finish overnight.
 | cells × seeds | 2 × 4, seeds 1-8 pinned to the letter |
 | cap | **1M counted steps for both cells**, eval every 1,000 (the user, 2026-09-23: paper and local share steps and evals): 64M moves in the paper cell, about the paper's 50M; 4M in the local cell |
 | control | paper: A4's IQN (b38) and C1's paper cell (b46a-d); local: b40e-h (M-QR-DQN local, 3M) |
-| predicted | registered 2026-09-23 by the agent: the paper cell is the best paper cell the series has run -- above 50% perfect by 64M moves -- with no stage-B row; the local cell tracks b40e-h's first million steps, before its onset (1.13-1.54M), so it reads as shape only at this cap |
+| predicted | registered 2026-09-23 by the agent: the paper cell is the best paper cell the series has run -- above 50% perfect by 64M moves -- with no stage-B row; the local cell tracks b40e-h's first million steps, before its onset (1.13-1.54M), so it reads as shape only at this cap -- **falsified** both ways: the paper cell reaches stage B (419 rows, best30 96.2-96.7) but sits below b46a-d's 97.45; the local cell reaches 90 by 0.11-0.17M and holds, not shape only |
+
+**Learned (closed 2026-09-26).** The paper cell reaches stage B -- every seed crosses 90 at 0.53-0.54M counted steps (34M moves), the
+step its ε schedule reaches 0 -- and holds 90-96 to the cap, best30 96.2-96.7, 419 rows, two `hof5000` candidates that both stopped
+early (best 98.1 at 2,055 episodes). That is below Rainbow's paper cell, which got there on 3M moves to BTR's 64M. The local cell
+is the surprise: 90 by 0.11-0.17M counted steps where b40e-h's M-QR-DQN needed 1.13-1.54M, then held (sef 87, drawdowns under 80 in
+0.6% of evals). The stack is a faster learner, not a higher one.
 
 **Why.** Row C2 (`plans/algoExploration/c-value-stack.md`): the practical ceiling of the value family on one box. Built 2026-09-20,
 reworked 2026-09-23 after two external reviews so the paper cell is the paper wherever the game allows (the spectral-norm start,
@@ -211,7 +217,13 @@ the stream layers, M-IQN's target, the loss reduction and priorities, batch-max 
 | cells × seeds | 3 × 4, seeds 1-4 and 9-16 pinned to the letter |
 | cap | 3M counted steps for every cell, eval every 1,000: 3M moves in the paper cell, 12M in the fork cells |
 | control | b36a-b (C51 paper, 51 atoms, 10M moves) for the paper cell; the fork cells read against b46a-d, not b37 -- they are no longer the local setup |
-| predicted | registered 2026-09-23 by the agent: the paper cell learns faster per move than b36's C51 paper cell (n-step 3 and PER) but is under 50% perfect at 3M moves, with no stage-B row; the local cell reaches b37a-d's onset (1.1-1.8M) and plateau within 5 pp, noisy nets adding nothing measurable over the shield |
+| predicted | registered 2026-09-23 by the agent: the paper cell learns faster per move than b36's C51 paper cell (n-step 3 and PER) but is under 50% perfect at 3M moves, with no stage-B row; the local cell reaches b37a-d's onset (1.1-1.8M) and plateau within 5 pp, noisy nets adding nothing measurable over the shield -- **falsified** on the paper cell (best30 96.9-98.1, 2,200 stage-B rows); the local cell was replaced by the fork cells before it could be read |
+
+**Learned (closed 2026-09-26).** Rainbow's paper cell is the best value-family cell the project has run: 90 by 0.38M moves, 89-95%
+perfect to 3M, best30 96.9-98.1, 2,200 stage-B rows -- where b36's C51 paper cell had best30 ~31 after 10M -- and b48 puts most of it
+on the noisy nets. On the fork plumbing at the paper's update budget, ratio 0.25 holds steadier (sef 92.5, 0.55% of evals under 80,
+best30 96.1-97.1, 1,819 rows) and ratio 0.0625 is lower (94.5, 377 rows). No cell gets a `hof5000` survivor: all four candidates
+stopped early, best 98.6 at 3,070 episodes. The value family now holds; it still does not reach PPO's 99.
 
 **Why.** Row C1: does Rainbow's composition add anything over its C51 head on this game. Gates re-passed 2026-09-23 on the reworked
 build (smokes of both names, `mut_rainbow.json` 33 / 33, the suite).

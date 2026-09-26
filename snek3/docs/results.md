@@ -22,6 +22,91 @@ whose published artifacts are history, and the daemon's ledger, whose keys are t
 waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
 
 
+<!-- progress_update: batch b47 -->
+## Batch b47 — the `knob` sweep, 2 values x 4 seeds, 1M, closed 2026-09-26
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b40e-mqrdqnlocal-seed5, b40f-mqrdqnlocal-seed6, b40g-mqrdqnlocal-seed7, b40h-mqrdqnlocal-seed8`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| knob | rows | ≥98%/500 | per-seed share | ≥99.2 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| btrpaper | 419 | 10.7% | 7.3 11.8 17.1 4.5 | 2 | 99.2 | 96.58 (96.2-96.7) | 45.1 | 0.0% | 3.61% | 5.3% |
+| btrlocal | 490 | 2.9% | 2.8 5.2 0.7 0.0 | 0 | 98.8 | 96.08 (94.9-96.7) | 86.9 | 0.0% | 0.61% | 5.9% |
+| **mqrdqnlocal** (reference) | 436 | 0.2% | 0.0 0.0 0.0 0.5 | 0 | 98.0 | 95.40 (93.6-96.5) | 53.8 | 0.0% | 11.61% | 1.6% |
+
+<!-- reading -->
+
+Read `btrpaper` against b46a-d, Rainbow's paper cell: every seed crosses 90 at 0.53-0.54M counted steps -- the step its ε reaches 0
+-- and holds 90-96 to the cap, best30 96.2-96.7 and 419 rows, below Rainbow's on 21x the moves. `btrlocal` against b40e-h is the
+surprise: 90 at 0.11-0.17M counted steps where M-QR-DQN needed 1.13-1.54M on the same plumbing, then a steady hold (sef 87) at the
+same height b40 reached. Both halves of the prediction are **falsified**: the paper cell has stage-B rows but is not the best paper
+cell, and the local cell is a full result at this cap, not shape. The two `hof5000` candidates stopped early (best 98.1 at 2,055
+episodes).
+
+<!-- /reading -->
+
+### Every arm
+
+| arm | knob | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b47a-btrpaper-seed1` | btrpaper | 82 | 7.3% | 0 | 98.8 | 96.2 @0.9M | 44.7 | 0.0% |
+| `b47b-btrpaper-seed2` | btrpaper | 144 | 11.8% | 1 | 99.2 | 96.7 @0.9M | 45.0 | 0.0% |
+| `b47c-btrpaper-seed3` | btrpaper | 105 | 17.1% | 1 | 99.2 | 96.7 @0.9M | 45.3 | 0.0% |
+| `b47d-btrpaper-seed4` | btrpaper | 88 | 4.5% | 0 | 98.8 | 96.7 @1.0M | 45.5 | 0.0% |
+| `b47e-btrlocal-seed5` | btrlocal | 177 | 2.8% | 0 | 98.8 | 96.7 @0.9M | 88.9 | 0.0% |
+| `b47f-btrlocal-seed6` | btrlocal | 155 | 5.2% | 0 | 98.4 | 96.3 @0.7M | 88.3 | 0.0% |
+| `b47g-btrlocal-seed7` | btrlocal | 138 | 0.7% | 0 | 98.6 | 96.4 @0.5M | 87.4 | 0.0% |
+| `b47h-btrlocal-seed8` | btrlocal | 20 | 0.0% | 0 | 96.4 | 94.9 @1.0M | 82.9 | 0.0% |
+
+<!-- /progress_update: batch b47 -->
+
+<!-- progress_update: batch b46 -->
+## Batch b46 — the `knob` sweep, 4 values x 4 seeds, 3M, closed 2026-09-26
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b36a-c51a51-seed1, b36b-c51a51-seed2`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| knob | rows | ≥98%/500 | per-seed share | ≥99.2 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| rainbowpaper | 2,200 | 9.0% | 16.8 4.6 3.2 5.8 | 3 | 99.6 | 97.45 (96.9-98.1) | 61.6 | 0.0% | 4.44% | 10.4% |
+| rainbowlocal | 0 | – | – – – – | 0 | – | 2.77 (0.4-5.9) | 0.0 | – | – | 0.0% |
+| rainbowfork25 | 1,819 | 1.8% | 0.7 1.4 3.3 0.3 | 1 | 99.6 | 96.65 (96.1-97.1) | 92.5 | 0.0% | 0.55% | 7.4% |
+| rainbowfork0625 | 377 | 0.0% | 0.0 0.0 0.0 0.0 | 0 | 97.6 | 94.53 (93.8-95.7) | 67.2 | 0.02% | 5.24% | 1.3% |
+| **c51paper** (reference) | 0 | – | – – | 0 | – | 31.35 (30.3-32.4) | 0.0 | – | – | 0.0% |
+
+<!-- reading -->
+
+Read `rainbowpaper` first, against b36's C51 paper cell: the same head with dueling noisy streams, PER, n-step 3 and double Q goes
+from best30 ~31 at 10M moves to 96.9-98.1 at 3M, 2,200 stage-B rows -- the best value-family cell so far, and b48 says the noise is
+most of it. The fork cells at the paper's update budget trade top for hold: `rainbowfork25` has the steadier trace (sef 92.5, 0.55%
+of evals under 80) at a slightly lower best30 (96.1-97.1), `rainbowfork0625`, a quarter of the updates, is lower again (94.5, 377
+rows). The registered prediction (under 50% at 3M, no stage-B row) is **falsified**. No `hof5000` survivor: the four candidates all
+stopped early, best 98.6 at 3,070 episodes. b46i-l crashed at 771-794k on the desktop's full disk (2026-09-24) and resumed from
+their last save with the buffer restored; the traces show no seam.
+
+<!-- /reading -->
+
+### Every arm
+
+| arm | knob | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b46a-rainbowpaper-seed1` | rainbowpaper | 798 | 16.8% | 2 | 99.6 | 98.1 @2.3M | 73.4 | 0.0% |
+| `b46b-rainbowpaper-seed2` | rainbowpaper | 635 | 4.6% | 0 | 99.0 | 97.5 @1.7M | 67.1 | 0.05% |
+| `b46c-rainbowpaper-seed3` | rainbowpaper | 339 | 3.2% | 1 | 99.4 | 96.9 @2.2M | 51.5 | 0.0% |
+| `b46d-rainbowpaper-seed4` | rainbowpaper | 428 | 5.8% | 0 | 98.8 | 97.3 @2.0M | 54.6 | 0.0% |
+| `b46e-rainbowlocal-seed5` | rainbowlocal | – | – | – | – | 0.4 @0.0M | 0.0 | – |
+| `b46f-rainbowlocal-seed6` | rainbowlocal | – | – | – | – | 3.1 @0.0M | 0.0 | – |
+| `b46g-rainbowlocal-seed7` | rainbowlocal | – | – | – | – | 5.9 @0.0M | 0.0 | – |
+| `b46h-rainbowlocal-seed8` | rainbowlocal | – | – | – | – | 1.7 @0.0M | 0.0 | – |
+| `b46i-rainbowfork25-seed9` | rainbowfork25 | 295 | 0.7% | 0 | 98.4 | 96.6 @0.9M | 92.0 | 0.0% |
+| `b46j-rainbowfork25-seed10` | rainbowfork25 | 439 | 1.4% | 0 | 98.4 | 96.8 @1.3M | 92.9 | 0.0% |
+| `b46k-rainbowfork25-seed11` | rainbowfork25 | 689 | 3.3% | 1 | 99.6 | 97.1 @1.8M | 92.0 | 0.0% |
+| `b46l-rainbowfork25-seed12` | rainbowfork25 | 396 | 0.3% | 0 | 98.0 | 96.1 @1.9M | 93.3 | 0.0% |
+| `b46m-rainbowfork0625-seed13` | rainbowfork0625 | 43 | 0.0% | 0 | 96.2 | 93.8 @1.4M | 64.7 | 0.0% |
+| `b46n-rainbowfork0625-seed14` | rainbowfork0625 | 73 | 0.0% | 0 | 96.6 | 94.5 @1.2M | 66.8 | 0.19% |
+| `b46o-rainbowfork0625-seed15` | rainbowfork0625 | 59 | 0.0% | 0 | 96.8 | 94.1 @2.4M | 64.4 | 0.0% |
+| `b46p-rainbowfork0625-seed16` | rainbowfork0625 | 202 | 0.0% | 0 | 97.6 | 95.7 @2.4M | 72.9 | 0.04% |
+
+<!-- /progress_update: batch b46 -->
+
 ## Batch b45 — quantile reads, 5 cells × 16 reads × 100 checkpoints, closed 2026-09-24
 
 No training: each cell's top 25 stage-A checkpoints per arm, re-measured under every read at 1,000 episodes (IQN's reads 500), paired
