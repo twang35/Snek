@@ -1,0 +1,14 @@
+{
+ "arms": [
+  "b47e-btrlocal-seed5",
+  "b47f-btrlocal-seed6",
+  "b47g-btrlocal-seed7",
+  "b47h-btrlocal-seed8"
+ ],
+ "batch": "b47",
+ "box": "desktop",
+ "claimed_iso": "2026-09-25T18:22:52",
+ "claimed_ts": 1790385772.2889662,
+ "kind": "wave",
+ "wave": 2
+}
