@@ -658,6 +658,37 @@ def test_the_worker_count_is_the_default_when_the_specs_disagree_or_say_nothing_
     assert scheduler.wave_workers([spec('a', SNEK_EVAL_QUEUE='0'), spec('b', SNEK_EVAL_QUEUE='0')]) == 0
 
 
+def test_workers_that_exited_idle_are_started_again_while_a_request_waits(box):
+    """2026-09-26: b44's BBF arms took five minutes to their first checkpoint, the workers exited idle
+    at 300 s, and fourteen requests an arm sat unclaimed for 75 minutes. The tick re-ensures the wave's
+    workers while a wave arm has an unclaimed request, and does nothing while the queue is empty."""
+    from tools import eval_queue
+    asked = []
+    calls = Calls()
+    real_popen = calls.popen
+
+    def popen(argv, **kw):
+        real_popen(argv, **kw)
+        return FakeProcess(1, polls=4)
+    calls.popen = popen
+    d = driver([spec('b44a-bbfpaper-seed1', SNEK_EVAL_WORKERS='8')], box, calls, wave=1, stage_b=False,
+               ensure_workers=lambda n, runs_dir=None, env=None: asked.append(n) or [])
+    original_tick = d._tick
+    polls = {'n': 0}
+
+    def tick():
+        polls['n'] += 1
+        if polls['n'] == 2:
+            eval_queue.enqueue('b44a-bbfpaper-seed1', 1000, {'step': 1000}, 100, runs_dir=box['runs'])
+        if polls['n'] == 3:
+            eval_queue.claim('b44a-bbfpaper-seed1', 1000, runs_dir=box['runs'])
+        original_tick()
+    d._tick = tick
+    d.run()
+    assert asked == [8, 8], 'once before the wave, once at the tick that found the request; not on the empty polls'
+    assert d.wave_arms == [], 'cleared when the wave\'s arms have exited'
+
+
 def test_no_workers_are_started_when_every_arm_of_the_wave_is_already_done_or_live(box):
     asked = []
     specs = [spec('b13aa-mb32-seed1')]

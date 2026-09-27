@@ -440,6 +440,7 @@ class Driver(object):
         self.results = results
         self._last_live = None          # None: the first report publishes, whatever the clock reads
         self.workers = []
+        self.wave_arms = []      # the arms live in the current wave; `_refill_workers` serves these
         self.killpg = killpg
         # For the time estimates (`tools/eta.py`): when the pass or eval in flight started, so its
         # line says what is left rather than the whole.
@@ -578,8 +579,24 @@ class Driver(object):
             _log('republish requested; publishing the status now')
             self._report()
         self.workers = eval_queue.reap(self.workers)
+        self._refill_workers()
         if self.reporter is not None and self._due(self._last_report):
             self._report()
+
+    def _refill_workers(self):
+        """Brings the wave's stage-A workers back while a request sits unclaimed. A worker exits after
+        `eval_queue.IDLE_EXIT_SECONDS` with nothing to do, and until 2026-09-26 nothing restarted it:
+        b44's BBF arms (replay ratio 8 on a 2048-wide net, ~3 counted steps/s) took five minutes to
+        their first checkpoint, the eight workers had exited idle at 300 s, and fourteen requests an arm
+        sat unclaimed for 75 minutes -- the chart window read 0k the whole time. `ensure_workers` is
+        idempotent over the slot files, so this is a `listdir` a poll when the workers are up, and a
+        relaunch within one poll when they are not. Only while arms of this wave are live."""
+        if not self.wave_arms:
+            return
+        pending = eval_queue.pending(self.runs_dir)
+        if not any(spec['policy'] in pending for spec in self.wave_arms):
+            return
+        self._start_workers(self.wave_arms, quiet=True)
 
     def _show(self, panels):
         """Points the window at `panels` and opens it if it is not up. Called at every launch."""
@@ -634,21 +651,24 @@ class Driver(object):
             self.sleep(POLL_SECONDS)
             self._tick()
 
-    def _start_workers(self, arms):
-        """The wave's shared stage-A workers, started before its arms so no arm has to race for a slot.
-        Built for the wave's move-history depth; a wave that mixes depths gets none (see
-        `wave_obs_history`)."""
+    def _start_workers(self, arms, quiet=False):
+        """The wave's shared stage-A workers, started before its arms so no arm has to race for a slot,
+        and again from `_refill_workers` whenever they have exited idle with a request waiting. Built
+        for the wave's move-history depth; a wave that mixes depths gets none (see `wave_obs_history`).
+        `quiet` logs only when something was started."""
         wanted = wave_workers(arms)
         if wanted <= 0:
             return
         depth = wave_obs_history(arms)
         if depth is None:
-            _log('wave arms disagree on SNEK_OBS_HISTORY; no shared eval workers for it')
+            if not quiet:
+                _log('wave arms disagree on SNEK_OBS_HISTORY; no shared eval workers for it')
             return
         env = {**os.environ, 'SNEK_OBS_HISTORY': depth}
         started = self.ensure_workers(wanted, self.runs_dir, env=env)
         self.workers.extend(started)
-        _log('{0} eval worker(s) wanted for the wave, {1} started here'.format(wanted, len(started)))
+        if started or not quiet:
+            _log('{0} eval worker(s) wanted for the wave, {1} started here'.format(wanted, len(started)))
 
     def run_wave(self, number, arms):
         started, adopted, to_launch = [], [], []
@@ -677,6 +697,7 @@ class Driver(object):
         for spec in to_launch:
             started.append((spec, self._launch(spec)))
         self.live = [(spec, process.pid) for spec, process in started] + list(adopted)
+        self.wave_arms = to_launch + [spec for spec, _ in adopted]
         if self.live:
             self._show(training_panels(arms, self.runs_dir))
         self._report()
@@ -688,6 +709,7 @@ class Driver(object):
             self._wait_pid(pid)
             _log('{0} (pid {1}) exited'.format(spec['policy'], pid))
             self._settle(spec)
+        self.wave_arms = []
         if not self.stage_b:
             return 0
         code = 0
