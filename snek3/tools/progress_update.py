@@ -571,6 +571,19 @@ def running_arms(status):
 
 
 # ------------------------------------------------------------------------------------------ main
+def catalogued_batches(runs_md, hand_written):
+    """The batches `docs/runs.md` has an entry for, newer than the last hand-written `charts.md` section.
+
+    A batch is catalogued from the moment it is queued (the `queue-batch` skill), so this is what catches
+    one that has no reference cell and trained and closed between two updates: until 2026-09-27 a batch
+    was tabled only if it had a `references.json` entry, an existing section or work left on a box, and
+    b44 (BBF's paper cell, no in-family control) had none of the three and was never tabled. The floor
+    keeps b1-b3, which predate the generated sections, out."""
+    floor = max((int(re.sub(r'\D', '', b) or 0) for b in hand_written), default=0)
+    found = set(re.findall(r'^## (b\d+) ', runs_md, re.M))
+    return set(b for b in found if int(b[1:]) > floor)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('--no-sync', action='store_true', help='no git fetch, import, rsync')
@@ -601,8 +614,10 @@ def main(argv=None):
     owned = set(re.findall(r'<!-- progress_update: batch (\S+) -->', charts))
     adopt = set(a for a in args.adopt.split(',') if a)
     hand_written = set(re.findall(r'^## Batch (\S+) ', charts, re.M)) - owned      # b8: prose, not a table
+    with open(os.path.join(DOCS, 'runs.md')) as handle:
+        catalogued = catalogued_batches(handle.read(), hand_written)
     batches = [b for b in args.batches.split(',') if b] or sorted(
-        owned | adopt | (set(refs) - hand_written) | (set(live_batches(view)) if view else set()),
+        owned | adopt | ((set(refs) | catalogued) - hand_written) | (set(live_batches(view)) if view else set()),
         key=lambda b: int(re.sub(r'\D', '', b) or 0))
     batches = [b for b in batches if any(a['batch'] == b for a in manifest['arms'])]
 

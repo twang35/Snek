@@ -113,6 +113,13 @@ def test_regeneration_preserves_the_reading_verbatim_and_replaces_everything_els
     assert again.index('## Batch b20') < again.index('## Batch b19')
 
 
+def test_a_catalogued_batch_is_tabled_without_a_reference_but_not_below_the_hand_written_sections():
+    """b44 had no reference cell and closed between two updates, so it was never tabled (2026-09-27)."""
+    runs_md = '## b50 — anneal\n\n## b44 — BBF\n\n## b8 — old\n\n## b3 — older\n\n| b44 | row |\n'
+    assert pu.catalogued_batches(runs_md, {'b4', 'b8'}) == {'b44', 'b50'}
+    assert pu.catalogued_batches(runs_md, set()) == {'b3', 'b8', 'b44', 'b50'}
+
+
 def test_new_batch_goes_above_the_first_batch_section():
     text = CHARTS.replace('b20', 'b21')
     out = pu.update_charts_md(text, _table(), 'Batch b20 — t', 'status')
