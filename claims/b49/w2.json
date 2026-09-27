@@ -1,0 +1,14 @@
+{
+ "arms": [
+  "b49e-btrnospectral-seed5",
+  "b49f-btrnospectral-seed6",
+  "b49g-btrnospectral-seed7",
+  "b49h-btrnospectral-seed8"
+ ],
+ "batch": "b49",
+ "box": "desktop",
+ "claimed_iso": "2026-09-27T12:35:56",
+ "claimed_ts": 1790537756.4385996,
+ "kind": "wave",
+ "wave": 2
+}
