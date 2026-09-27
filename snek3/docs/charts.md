@@ -38,6 +38,14 @@ on why the arms stopped opening it, and [`findings.md`](findings.md) on the thre
 
 <!-- reading -->
 
+BBF's recipe does not learn Snake in its own regime. Every seed relearns to an average score of 20-67 inside each 5k-move cycle
+and the next reset takes it back to 0 at the following eval, twenty times over; the best score in a cycle does not rise across the
+run, so the resets are not compounding anything. Best perfect rate 3% (`b44c`), best30 0.0-0.1, stage B empty. The prediction
+**held** on the headline (under 20% on every seed, no 97, stage B empty) and on the saw-tooth, and was **falsified** on SPR: its
+loss rises from 0.11-0.18 to 0.64-0.97 rather than falling in the first cycle and staying low. Read against b35's paper cells
+(7-16% at 10M moves) this is the value family's usual paper-cell shape at a hundredth of the moves, not a win. It is BBF's own
+question, not D1's; D1 still waits on b50.
+
 <!-- /reading -->
 
 **knob bbfpaper** — `b44a`-`b44d`:
@@ -61,9 +69,10 @@ on why the arms stopped opening it, and [`findings.md`](findings.md) on the thre
 
 <!-- reading -->
 
-Four `btrplaintrunk` arms training on the desktop since 2026-09-26 15:37, all at 0%. Read against b47a-d, whose arms took about a
-day each at four wide and crossed 90 at 0.53M, so this wave reads a day from now and `btrnospectral` a day after that; the
-digest's 2.5 h wave cadence is the wrong batch's.
+Four `btrplaintrunk` arms at 88% on the desktop, due about 12:30 today; `btrnospectral` (`b49e`-`h`) is the second wave and
+still unclaimed, so it reads about a day after that. Stage A so far: best30 94.15 (92.0-95.0) against b47a-d's 96.58, sef 34.8
+against 45.1 -- a plain `fc 320` trunk is a little below the residual stack so far, which is the registered prediction's
+"within noise" read at the edge. Stage B has not run yet, so the row count is not a reading.
 
 <!-- /reading -->
 

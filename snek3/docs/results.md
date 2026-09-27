@@ -22,6 +22,37 @@ whose published artifacts are history, and the daemon's ledger, whose keys are t
 waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
 
 
+<!-- progress_update: batch b44 -->
+## Batch b44 — the `knob` sweep, 1 values x 4 seeds, 0M, closed 2026-09-27
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`none named`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| knob | rows | ≥98%/500 | per-seed share | ≥99.2 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| bbfpaper | 0 | – | – – – – | 0 | – | 0.03 (0.0-0.1) | 0.0 | – | – | 0.0% |
+
+<!-- reading -->
+
+**bbfpaper, falsified as a learner, prediction held.** BBF as written (Schwarzer et al. 2023, `algos/bbf/`) at the paper's 100k
+moves: four seeds, no checkpoint above 3% perfect, best30 0.0-0.1, no stage-B row. The stage-A trace is a saw-tooth with no trend:
+each 40k-gradient-step cycle relearns to a score of 20-67 and each reset returns it to 0, and the cycle maxima do not rise across
+the twenty cycles. SPR's loss climbs over the run instead of settling. What it does not settle: whether the recipe would compound at
+a longer budget or a slower reset; the plan runs BBF "a few batches and then rests", and this one says the paper's regime is not
+enough on this game. D1's question is b50's, not this batch's.
+
+<!-- /reading -->
+
+### Every arm
+
+| arm | knob | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b44a-bbfpaper-seed1` | bbfpaper | 0 | – | – | – | 0.0 @0.1M | 0.0 | – |
+| `b44b-bbfpaper-seed2` | bbfpaper | 0 | – | – | – | 0.0 @0.0M | 0.0 | – |
+| `b44c-bbfpaper-seed3` | bbfpaper | 0 | – | – | – | 0.1 @0.1M | 0.0 | – |
+| `b44d-bbfpaper-seed4` | bbfpaper | 0 | – | – | – | 0.0 @0.1M | 0.0 | – |
+
+<!-- /progress_update: batch b44 -->
+
 <!-- progress_update: batch b47 -->
 ## Batch b47 — the `knob` sweep, 2 values x 4 seeds, 1M, closed 2026-09-26
 
