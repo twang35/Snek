@@ -32,7 +32,10 @@ FIELDS = ('algo', 'fc_layer_params', 'num_actions', 'obs_len', 'obs_era')
 # present, so every sidecar that predates them reads unchanged, and **part of the signature**, so a
 # checkpoint cannot load into a differently shaped head silently (2026-09-17, group A of
 # `plans/algoExploration/`). Absence means the scalar head every `dqn` and `ppo` checkpoint has.
-OPTIONAL_FIELDS = ('head', 'trunk')
+# `recurrent` (group E, 2026-09-30) is the memory cell between the trunk and the head -- `{"type": "gru" |
+# "lstm" | "dense", "hidden": N, ...}` -- and a checkpoint with it cannot load into a feed-forward net or
+# the reverse, which is the point of its being in the signature.
+OPTIONAL_FIELDS = ('head', 'trunk', 'recurrent')
 
 
 class ArchMismatch(Exception):
@@ -46,7 +49,8 @@ def arch_path(policy_dir):
     return os.path.join(policy_dir, ARCH_FILENAME)
 
 
-def build_arch(fc_layer_params, num_actions, obs_len, obs_era, algo='dqn', head=None, trunk=None):
+def build_arch(fc_layer_params, num_actions, obs_len, obs_era, algo='dqn', head=None, trunk=None,
+               recurrent=None):
     """The canonical dict.
 
     `fc_layer_params` is stored as a list of ints, because JSON has no tuples and every reader
@@ -63,6 +67,8 @@ def build_arch(fc_layer_params, num_actions, obs_len, obs_era, algo='dqn', head=
         arch['head'] = dict(head)
     if trunk is not None:
         arch['trunk'] = dict(trunk)
+    if recurrent is not None:
+        arch['recurrent'] = dict(recurrent)
     return arch
 
 
@@ -172,4 +178,4 @@ def assert_same_network(built, target, built_dir='<built>', target_dir='<target>
         raise ArchMismatch(
             'cannot restore {0} into a network built for {1}: {2} differ ({3} vs {4})'.format(
                 target_dir, built_dir, ', '.join(differing),
-                [built[field] for field in differing], [target[field] for field in differing]))
+                [built.get(field) for field in differing], [target.get(field) for field in differing]))

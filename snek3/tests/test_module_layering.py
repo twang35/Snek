@@ -23,7 +23,8 @@ import sys
 import sysconfig
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PACKAGES = ('env', 'vectorized', 'algos/dqn', 'algos/ppo', 'algos/dist', 'algos/sac', 'tools')
+PACKAGES = ('env', 'vectorized', 'algos/dqn', 'algos/ppo', 'algos/dist', 'algos/sac', 'algos/rainbow', 'algos/bbf',
+            'algos/r2d2', 'tools')
 
 
 def loaded_after_importing(*modules):

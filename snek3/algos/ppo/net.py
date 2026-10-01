@@ -34,10 +34,17 @@ local `torch.Generator`, so two nets built with the same seed are the same netwo
 critic that opened as transposes of one another would be a coincidence nobody intended.
 """
 
+import math
+
 import numpy as np
 import torch
+from torch import nn
 
 from algos.dqn import net as qnet
+from algos.stateful import StatefulPolicy
+
+# `arch['recurrent']['type']` for a PPO tower: a GRU cell or an LSTM cell between the trunk and the head.
+RECURRENT_KINDS = ('gru', 'lstm')
 
 # Which sub-stream of the arm's seed the critic takes. The actor takes the seed itself, so an actor's
 # initialisation is identical to the DQN arm's at the same `SNEK_SEED` — which is what makes a
@@ -53,23 +60,151 @@ def critic_seed(seed):
                .generate_state(1, dtype=np.uint32)[0])
 
 
+def recurrent_of(arch):
+    """The sidecar's `recurrent` block as `{'type', 'hidden'}`, or None for a feed-forward arch. Refuses an
+    unknown cell or a width below 1 by name rather than building a tower that is silently feed-forward."""
+    spec = arch.get('recurrent')
+    if not spec:
+        return None
+    kind = spec.get('type')
+    if kind not in RECURRENT_KINDS:
+        raise ValueError('arch recurrent.type must be one of {0}, got {1!r}'.format(RECURRENT_KINDS, kind))
+    hidden = int(spec.get('hidden', 0))
+    if hidden < 1:
+        raise ValueError('arch recurrent.hidden must be at least 1, got {0}'.format(hidden))
+    return {'type': kind, 'hidden': hidden}
+
+
+class RecurrentTower(nn.Module):
+    """`obs_len -> fc_layer_params (relu) -> GRU | LSTM (hidden) -> outputs`: E1's actor and E1's critic
+    (`plans/algoExploration/e-memory.md` §2), each its own tower as the feed-forward pair is.
+
+    The trunk is `QNet`'s hidden stack to the initialiser, so a recurrent arm differs from b27's in the cell
+    and nothing else. The cell's parameters take torch's own uniform `(-1/sqrt(hidden), 1/sqrt(hidden))`,
+    drawn from the arm's generator so a seed pins them. The head is `QNet`'s head initialiser.
+
+    **The state is one flat `(n, state_width)` tensor**: a GRU's hidden, or an LSTM's `(h, c)` side by side,
+    so the rollout stores one array per tower and `StatefulPolicy` carries one per lane whatever the cell.
+    `step` zeroes the state of a `fresh` row *before* using it, which is what `done` resets inside a sequence
+    and what an episode's first step starts from.
+    """
+
+    def __init__(self, obs_len, fc_layer_params, outputs, kind, hidden, seed=None):
+        super().__init__()
+        if kind not in RECURRENT_KINDS:
+            raise ValueError('kind must be one of {0}, got {1!r}'.format(RECURRENT_KINDS, kind))
+        if int(hidden) < 1:
+            raise ValueError('hidden must be at least 1, got {0}'.format(hidden))
+        widths = [int(obs_len)] + [int(width) for width in fc_layer_params]
+        self.kind = kind
+        self.hidden_size = int(hidden)
+        self.hidden = nn.ModuleList([nn.Linear(widths[i], widths[i + 1]) for i in range(len(widths) - 1)])
+        # `nn.LSTM` / `nn.GRU` rather than the `*Cell` modules, for `unroll`: the fused kernel runs a whole
+        # segment between episode starts in one call, where a cell call per step on a two-lane minibatch is
+        # Python overhead 256 times over (measured 2026-09-30: 1,021 transitions/s against 54,340 feed-forward).
+        # `step` is the same module on a length-1 sequence.
+        if kind == 'lstm':
+            self.cell = nn.LSTM(widths[-1], self.hidden_size)
+        else:
+            self.cell = nn.GRU(widths[-1], self.hidden_size)
+        self.head = nn.Linear(self.hidden_size, int(outputs))
+        self.reset_parameters(seed)
+
+    @property
+    def state_width(self):
+        return self.hidden_size * (2 if self.kind == 'lstm' else 1)
+
+    def reset_parameters(self, seed=None):
+        generator = qnet.make_generator(seed, self.head.weight.device)
+        for layer in self.hidden:
+            qnet.he_init(layer, generator)
+        bound = 1.0 / math.sqrt(self.hidden_size)
+        for parameter in self.cell.parameters():
+            nn.init.uniform_(parameter, -bound, bound, generator=generator)
+        qnet.head_init(self.head, generator)
+
+    def initial_state(self, n, device=None):
+        return torch.zeros((int(n), self.state_width), dtype=torch.float32,
+                           device=device or self.head.weight.device)
+
+    def features(self, observations):
+        values = observations
+        for layer in self.hidden:
+            values = torch.relu(layer(values))
+        return values
+
+    def _run(self, features, state):
+        """`(L, n, in) x (n, state_width) -> (outputs (L, n, hidden), state)`: the cell over a segment with no
+        reset inside it."""
+        if self.kind == 'lstm':
+            h = state[:, :self.hidden_size].unsqueeze(0).contiguous()
+            c = state[:, self.hidden_size:].unsqueeze(0).contiguous()
+            out, (h, c) = self.cell(features, (h, c))
+            return out, torch.cat([h[0], c[0]], dim=-1)
+        out, h = self.cell(features, state.unsqueeze(0).contiguous())
+        return out, h[0]
+
+    def step(self, observations, state, fresh=None):
+        """One step of every row: `(n, obs_len) x (n, state_width) [x (n,) bool] -> (outputs (n, k), state)`."""
+        if fresh is not None:
+            state = state * (~fresh).to(state.dtype).unsqueeze(-1)
+        out, state = self._run(self.features(observations).unsqueeze(0), state)
+        return self.head(out[0]), state
+
+    def unroll(self, observations, state, fresh):
+        """`(T, n, obs_len) x (n, state_width) x (T, n) bool -> (outputs (T, n, k), final state)`: the cell
+        run forward through a stored sequence from its stored initial state, the state zeroed at every
+        `fresh` step, with gradient. Truncated backpropagation: nothing flows into `state`'s past.
+
+        The sequence is cut at every step where some row is fresh and each piece runs through the fused
+        kernel in one call, which is `step` applied T times (a fixture pins the equality) at a fraction of
+        the cost."""
+        T, n = observations.shape[0], observations.shape[1]
+        features = self.features(observations.reshape(T * n, -1)).reshape(T, n, -1)
+        starts = fresh.any(dim=1).nonzero().flatten().tolist()
+        cuts = sorted(set([0] + starts + [T]))
+        outputs = []
+        for a, b in zip(cuts[:-1], cuts[1:]):
+            state = state * (~fresh[a]).to(state.dtype).unsqueeze(-1)
+            out, state = self._run(features[a:b], state)
+            outputs.append(out)
+        return self.head(torch.cat(outputs, dim=0)), state
+
+    def forward(self, observations, state=None):
+        """One step from `state`, or from a zero state: the outputs alone. For a caller that treats the tower
+        as a feed-forward net; the stateful callers use `step` and `unroll`."""
+        if state is None:
+            state = self.initial_state(observations.shape[0], observations.device)
+        return self.step(observations, state)[0]
+
+
 def build(arch, device='cpu', seed=None):
     """The actor, sized by an `arch.json`. **The signature `tools/restore.py` calls.**
 
-    Returns a `dqn.net.QNet` — see the module docstring. Its `num_actions` outputs are read as
-    logits, which is a difference in interpretation and not in the tensor.
+    Returns a `dqn.net.QNet` — see the module docstring — or, when the sidecar carries a `recurrent`
+    block, a `RecurrentTower` with `num_actions` outputs. Either way the outputs are read as logits,
+    which is a difference in interpretation and not in the tensor.
     """
-    return qnet.build(arch, device=device, seed=seed)
+    spec = recurrent_of(arch)
+    if spec is None:
+        return qnet.build(arch, device=device, seed=seed)
+    return RecurrentTower(arch['obs_len'], arch['fc_layer_params'], arch['num_actions'],
+                          spec['type'], spec['hidden'], seed=seed).to(device)
 
 
 def build_critic(arch, device='cpu', seed=None):
-    """The critic: the same trunk with a single output.
+    """The critic: the same trunk with a single output, and the same cell when the actor has one
+    (**its own**, not the actor's -- the two towers share nothing, as the feed-forward pair share nothing).
 
     The arch is copied with `num_actions` set to 1 rather than being built through
     `arch_tools.build_arch`, because this shape is never written to disk and must never be mistaken
     for the policy's. `arch.json` describes the actor, which is what a checkpoint holds.
     """
-    return qnet.build(dict(arch, num_actions=1), device=device, seed=critic_seed(seed))
+    spec = recurrent_of(arch)
+    if spec is None:
+        return qnet.build(dict(arch, num_actions=1), device=device, seed=critic_seed(seed))
+    return RecurrentTower(arch['obs_len'], arch['fc_layer_params'], 1, spec['type'], spec['hidden'],
+                          seed=critic_seed(seed)).to(device)
 
 
 def greedy_policy_fn(net, device='cpu'):
@@ -80,8 +215,20 @@ def greedy_policy_fn(net, device='cpu'):
     it is what `watch.py` and `record_gif.py` show, and it makes a PPO stage-B row and a DQN stage-B
     row the same kind of number. Measuring the stochastic policy is a different question and a later
     knob.
+
+    A `RecurrentTower` gets a `StatefulPolicy` (`algos/stateful.py`): the same callable, carrying the
+    cell's state per lane, zeroed where the engine says a lane is fresh. E1's net takes no previous
+    action or reward, so those two inputs are ignored here.
     """
-    return qnet.greedy_policy_fn(net, device=device)
+    if not isinstance(net, RecurrentTower):
+        return qnet.greedy_policy_fn(net, device=device)
+    net.eval()
+
+    def step_fn(observations, prev_action, prev_reward, state):
+        logits, state = net.step(observations, state)
+        return logits.argmax(dim=1), state
+
+    return StatefulPolicy(step_fn, net.state_width, device=device)
 
 
 # ---------------------------------------------------------------- the categorical policy

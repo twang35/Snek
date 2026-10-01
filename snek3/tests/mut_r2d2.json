@@ -1,0 +1,97 @@
+{
+ "tests": [
+  "tests/test_r2d2.py"
+ ],
+ "mutations": [
+  {
+   "desc": "no burn-in: every window starts at its loss block",
+   "file": "algos/r2d2/collect.py",
+   "from": "            burn = min(self.burn_in, position)",
+   "to": "            burn = 0"
+  },
+  {
+   "desc": "a window banked before its lookahead rows exist",
+   "file": "algos/r2d2/collect.py",
+   "from": "        complete = [w for w in pending if w['closed'] and w['ahead'] >= self.lookahead]",
+   "to": "        complete = [w for w in pending if w['closed']]"
+  },
+  {
+   "desc": "the stored state is the one after the first row, not before it",
+   "file": "algos/r2d2/collect.py",
+   "from": "            first_row, first_state = recent[-1 - burn]        # `burn` rows back: the window's first row",
+   "to": "            first_row, first_state = recent[-1 - burn][0], (recent[-burn][1] if burn else recent[-1][1] + 1.0)"
+  },
+  {
+   "desc": "a short burn-in window not marked fresh at its first row",
+   "file": "algos/r2d2/replay.py",
+   "from": "            fresh[b, first] = self.burn[slot] < self.burn_in",
+   "to": "            fresh[b, first] = False"
+  },
+  {
+   "desc": "windows placed at slot 0 instead of on the grid",
+   "file": "algos/r2d2/replay.py",
+   "from": "            first = self.burn_in - int(self.burn[slot])",
+   "to": "            first = 0"
+  },
+  {
+   "desc": "importance weights normalised by the mean",
+   "file": "algos/r2d2/replay.py",
+   "from": "        weights = (weights / weights.max()).astype(np.float32)",
+   "to": "        weights = (weights / weights.mean()).astype(np.float32)"
+  },
+  {
+   "desc": "a new window enters at priority 1 rather than the running maximum",
+   "file": "algos/r2d2/replay.py",
+   "from": "        self.tree.set_one(slot, self.max_priority ** self.alpha)",
+   "to": "        self.tree.set_one(slot, 1.0)"
+  },
+  {
+   "desc": "the n-step sum runs past a terminal",
+   "file": "algos/r2d2/agent.py",
+   "from": "            alive = alive * (1.0 - done[slot].to(reward.dtype))",
+   "to": "            alive = alive"
+  },
+  {
+   "desc": "the bootstrap added whether or not the lookahead survived",
+   "file": "algos/r2d2/agent.py",
+   "from": "            total = total + alive * discount * bootstrap[t + n]",
+   "to": "            total = total + discount * bootstrap[t + n]"
+  },
+  {
+   "desc": "the target copied one update early",
+   "file": "algos/r2d2/agent.py",
+   "from": "        if self.target_update_period > 0 and self.train_step % self.target_update_period == 0:",
+   "to": "        if self.target_update_period > 0 and self.train_step % self.target_update_period == 1:"
+  },
+  {
+   "desc": "the priority is the max alone",
+   "file": "algos/r2d2/agent.py",
+   "from": "    return eta * magnitude.max(dim=0).values + (1.0 - eta) * magnitude.sum(dim=0) / count",
+   "to": "    return magnitude.max(dim=0).values"
+  },
+  {
+   "desc": "the rescaling without its linear term",
+   "file": "algos/r2d2/agent.py",
+   "from": "    return torch.sign(x) * (torch.sqrt(torch.abs(x) + 1.0) - 1.0) + eps * x",
+   "to": "    return torch.sign(x) * (torch.sqrt(torch.abs(x) + 1.0) - 1.0)"
+  },
+  {
+   "desc": "the ladder divided by the lane count rather than lanes - 1",
+   "file": "algos/dqn/schedules.py",
+   "from": "    exponents = 1.0 + float(alpha) * np.arange(lanes, dtype=np.float64) / (lanes - 1)",
+   "to": "    exponents = 1.0 + float(alpha) * np.arange(lanes, dtype=np.float64) / lanes"
+  },
+  {
+   "desc": "a fresh row keeps its state",
+   "file": "algos/r2d2/net.py",
+   "from": "            state = state * (~fresh).to(state.dtype).unsqueeze(-1)",
+   "to": "            state = state"
+  },
+  {
+   "desc": "the burn-in runs from the zero state rather than the stored one",
+   "file": "algos/r2d2/agent.py",
+   "from": "        online_state, target_state = b['state'], b['state'].clone()",
+   "to": "        online_state, target_state = torch.zeros_like(b['state']), torch.zeros_like(b['state'])"
+  }
+ ]
+}

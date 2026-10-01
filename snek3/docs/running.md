@@ -210,6 +210,37 @@ Throughput on the laptop **under a live 4-arm wave**, 1 thread, replay ratio 8 (
 256: **25 gradient steps/s = 3 moves/s**; transition 2048: 8/s; transition 64: 31/s; `fc 1280`: 61/s; `fc 320`: 210/s; 4 threads was
 slower than 1 under that load. A 100k-move paper arm is ~800k gradient steps, about nine hours of learning before stage A.
 
+### R2D2 — only under `SNEK_ALGO=r2d2`
+
+Recurrent Replay Distributed DQN (Kapturowski et al. 2019), the paper's learner and actor recipe in one
+process (`algos/r2d2/`, `plans/algoExploration/e-memory.md` §2). The shared names keep their meaning
+(`SNEK_LEARNING_RATE`, `SNEK_ADAM_EPSILON`, `SNEK_BATCH_SIZE`, `SNEK_DISCOUNT`, `SNEK_N_STEP_UPDATE`,
+`SNEK_TARGET_UPDATE_PERIOD`, `SNEK_GRADIENT_CLIPPING`, `SNEK_COLLECT_ENVS`, `SNEK_PRIORITY_EXPONENT`,
+`SNEK_INITIAL_COLLECT_STEPS`, `SNEK_DIST_ATOMS/V_MIN/V_MAX`) at the paper's defaults; what is R2D2's
+carries `R2D2_`. The fork, shield, EMA target, IS-beta anneal, Munchausen, resets, the quantile heads, noisy
+nets and every PPO, SAC and BBF knob are refused by name.
+
+| knob | default | notes |
+|---|---|---|
+| `SNEK_COLLECT_ENVS` | **32** | lanes, each with its own LSTM state, previous action and reward, and epsilon. A counted step is one lockstep of every lane: 32 moves, 32 replay rows |
+| `SNEK_EPSILON_SCHEDULE` | `apex` | the Ape-X ladder: lane i of N holds `base^(1 + alpha i/(N-1))` for the run, 0.4 down to 0.4^8 = 6.5e-4 at the defaults. `linear` is one shared anneal (`SNEK_MIN_EPSILON`, `SNEK_EPSILON_ANNEAL_STEPS`) |
+| `SNEK_INITIAL_EPSILON`, `SNEK_APEX_ALPHA` | 0.4, 7 | the ladder's base and spread |
+| `SNEK_R2D2_SEQ_LENGTH`, `SNEK_R2D2_BURN_IN`, `SNEK_R2D2_STRIDE` | 120, 40, 40 | a stored window, the steps replayed with no gradient before the loss (the **loss block** is the difference, 80: the paper's m = 80 with the l = 40 burn-in prefix), and the step between consecutive loss blocks (40: the paper's overlap). A loss block starts every `stride` steps of an episode from its first step; each block's window takes as many burn-in rows as the episode has before it (0 at the start, from the exact zero state) and the `n` lookahead rows after it. Every step is a loss position once, a 20-step episode included |
+| `SNEK_R2D2_WINDOWS` | 100,000 | the replay, in windows (the paper's 1e5 sequences). Rows are stored once and shared; each window also stores its `(h, c)`. ~8 KB a window at the defaults, so **a desktop arm runs 30,000** (15 GB box; the spec says so) |
+| `SNEK_PRIORITY_EXPONENT`, `SNEK_R2D2_IS_BETA`, `SNEK_R2D2_PRIORITY_ETA` | 0.9, 0.6, 0.9 | PER alpha, the IS exponent (held, max-normalised over the batch), the `eta max + (1 - eta) mean` mix over a window's TD errors. A new window enters at the running maximum priority (a stated departure: Ape-X's actors compute an initial TD priority) |
+| `SNEK_R2D2_RESCALE`, `SNEK_R2D2_RESCALE_EPS` | 1, 1e-3 | `h(x) = sign(x)(sqrt(|x|+1) - 1) + eps x` on the targets, rewards unclipped. **Must be 0 under `SNEK_R2D2_HEAD=c51`** |
+| `SNEK_R2D2_HIDDEN`, `SNEK_R2D2_STREAM_WIDTH` | 512, 512 | the LSTM and the dueling streams' hidden width (0: one linear per stream) |
+| `SNEK_R2D2_RECURRENT` | `lstm` | `dense` is the paper's feed-forward ablation and E2's memory control (`ffr2d2`): a `Linear + ReLU` in the cell's place, no state, **the same windows, loss positions, priorities and targets** |
+| `SNEK_R2D2_PREV_INPUT` | 1 | the previous action's one-hot and the raw previous reward concatenated to the trunk's features before the cell; 0 feeds the features alone |
+| `SNEK_R2D2_HEAD` | `scalar` | `c51` is the local recipe: the categorical cross-entropy against the projected n-step target at the double-Q action, on `SNEK_DIST_*`'s support |
+| `SNEK_REPLAY_RATIO` | 1/32 | **gradient steps per banked transition** (one update per lockstep at 32 lanes), not the paper's replayed-rows-per-row; the E2 specs set it from the benchmark so the arm reaches its update count |
+| `SNEK_INITIAL_COLLECT_STEPS` | 20,000 | moves before the first update, on the ladder; learning also waits for `SNEK_BATCH_SIZE` windows |
+
+The checkpoint is the net alone; `arch.json` carries `recurrent: {type, hidden, stream_width, prev_input}`
+and `head`, and a greedy read is a `StatefulPolicy` carrying the state, the previous action and the previous
+reward per lane -- the engine tells it which lanes were reset (`begin`, `vectorized/engine.py`), so an eval of
+a recurrent checkpoint is the same 100 episodes every other algorithm gets.
+
 ### PPO — only under `SNEK_ALGO=ppo`
 
 Every knob above whose meaning is DQN-specific — `SNEK_FORK_*`, `SNEK_INITIAL_EPSILON`,
@@ -246,6 +277,9 @@ launchable at all.
 | `SNEK_PPO_TARGET_KL` | 0 (off) | stops the epoch loop early when `approx_kl` exceeds it — **between epochs, never mid-epoch**, or some samples are used more often than others. `approx_kl` is reported either way |
 | `SNEK_PPO_NORMALIZE_ADV` | 1 | zero-mean, unit-sd per minibatch. What makes the update invariant to the reward scale |
 | `SNEK_PPO_VALUE_LOSS` | `huber` | or `mse`. Huber for the reason `algos/dqn/agent.py` gives: one +100 terminal would dominate a squared error over 256 samples |
+| `SNEK_PPO_RECURRENT` | unset | `lstm` or `gru` puts a recurrent cell between the trunk and the head of **both** towers (`algos/ppo/net.py`'s `RecurrentTower`; the critic gets its own cell), the actor carrying a per-lane state through the rollout and the update replaying each lane's whole rollout from the state it stored at step 0, zeroed at every episode start. Unset is the feed-forward actor, byte for byte. Group E's E1 (`plans/algoExploration/e-memory.md`) |
+| `SNEK_PPO_RECURRENT_HIDDEN` | 128 | the cell's width. The checkpoint's `arch.json` carries `recurrent: {type, hidden}`, so a recurrent checkpoint restores through `tools/restore.py` and measures as a `StatefulPolicy` (`algos/stateful.py`) |
+| `SNEK_PPO_SEQ_MINIBATCH` | 2 | **lanes** per minibatch for a recurrent arm; each lane is a whole rollout, so the minibatch is `seq x rollout` transitions (2 x 256 = 512, b27's size). `SNEK_PPO_MINIBATCH` is derived from it and **refused if set to anything else** |
 
 **A PPO step is one transition is one game move**, so `SNEK_MAX_STEPS` means game moves for a PPO arm
 and four-moves-per-step for a DQN arm at `fork_branches=4`. Read `transitions`, which both write.

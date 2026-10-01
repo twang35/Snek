@@ -29,6 +29,8 @@ import os
 import sys
 import time
 
+import numpy as np
+
 from tools import sidecar_env  # noqa: E402  -- must precede anything that imports env.constants
 sidecar_env.adopt_from_argv(sys.argv)  # a history checkpoint's depth, from its sidecar
 
@@ -101,9 +103,16 @@ def main(argv):
         observation = env.reset()
         started = time.time()
         done = False
+        # A recurrent policy (`algos/stateful.py`) is told before every step whether this is the episode's
+        # first move and what the last one paid; a plain policy has no `begin` and is called as before.
+        begin = getattr(policy_fn, 'begin', None)
+        fresh, reward = True, 0.0
         while not done:
+            if begin is not None:
+                begin(np.array([0]), np.array([fresh]), np.array([reward], dtype=np.float32))
             action = int(policy_fn(observation.reshape(1, -1))[0])
-            observation, _, done, info = env.step(action)
+            observation, reward, done, info = env.step(action)
+            fresh = False
 
         episode += 1
         outcome = 'PERFECT' if info['perfect'] else ('starved' if info['starved'] else 'died')

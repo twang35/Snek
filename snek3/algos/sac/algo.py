@@ -14,6 +14,8 @@ Q-clip of 0.5, Polyak 0.005, lr 1e-5, 3-step, 1e5 replay, 0.1 updates a move (`b
 
 import os
 
+from algos.r2d2 import knobs as r2d2_knobs
+
 from algos.dqn import collect
 from algos.dqn.replay import PrioritizedReplay
 from algos.sac.agent import SacAgent, COMBINES, CRITIC_LOSSES
@@ -44,12 +46,13 @@ REJECTED = (
     'DIST_ATOMS', 'DIST_V_MIN', 'DIST_V_MAX', 'DIST_QUANTILES', 'DIST_TAU_SAMPLES',
     'DIST_TAU_PRIME_SAMPLES', 'DIST_POLICY_SAMPLES', 'DIST_EMBEDDING', 'DIST_KAPPA',
     'DIST_FRACTION_LR', 'DIST_FRACTION_ENTROPY', 'DIST_RISK_ALPHA', 'DIST_RISK_TRAIN',
+    'PPO_RECURRENT', 'PPO_RECURRENT_HIDDEN', 'PPO_SEQ_MINIBATCH',
     'PPO_ROLLOUT', 'PPO_EPOCHS', 'PPO_MINIBATCH', 'PPO_CLIP', 'PPO_CLIP_FINAL', 'PPO_GAE_LAMBDA',
     'PPO_GAE_LAMBDA_FINAL', 'PPO_DISCOUNT_FINAL', 'PPO_ENTROPY_COEF', 'PPO_ENTROPY_COEF_FINAL',
     'PPO_VF_COEF', 'PPO_LEARNING_RATE', 'PPO_LEARNING_RATE_FINAL', 'PPO_ANNEAL_FRACTION',
     'PPO_ADAM_EPSILON', 'PPO_TARGET_KL', 'PPO_GRADIENT_CLIPPING', 'PPO_NORMALIZE_ADV', 'PPO_VALUE_LOSS',
     'BBF_WEIGHT_DECAY', 'BBF_SPR_WEIGHT', 'BBF_SPR_STEPS', 'BBF_PROJECTION', 'BBF_TRANSITION_WIDTH', 'BBF_DUELING', 'BBF_DOUBLE',
-)
+) + r2d2_knobs.R2D2_KNOBS
 
 # The knobs this module reads, for `algos/ppo/algo.py`'s refusal list and the docs.
 SAC_KNOBS = (

@@ -45,6 +45,8 @@ conditional on the noisy flag, which DQN's validation cannot know about.
 import math
 import os
 
+from algos.r2d2 import knobs as r2d2_knobs
+
 from algos.dqn import algo as dqn_algo
 from algos.dqn import collect
 from algos.dqn import replay
@@ -86,6 +88,7 @@ PAPER = {
 }
 
 REJECTED = (
+    'PPO_RECURRENT', 'PPO_RECURRENT_HIDDEN', 'PPO_SEQ_MINIBATCH',
     'PPO_ROLLOUT', 'PPO_EPOCHS', 'PPO_MINIBATCH', 'PPO_CLIP', 'PPO_CLIP_FINAL', 'PPO_GAE_LAMBDA',
     'PPO_GAE_LAMBDA_FINAL', 'PPO_DISCOUNT_FINAL', 'PPO_ENTROPY_COEF', 'PPO_ENTROPY_COEF_FINAL',
     'PPO_VF_COEF', 'PPO_LEARNING_RATE', 'PPO_LEARNING_RATE_FINAL', 'PPO_ANNEAL_FRACTION',
@@ -93,7 +96,7 @@ REJECTED = (
     # FQF's proposal net and the risk-sensitive read are A5's and A4's; neither paper here has them.
     'DIST_FRACTION_LR', 'DIST_FRACTION_ENTROPY', 'DIST_RISK_ALPHA', 'DIST_RISK_TRAIN',
     'BBF_WEIGHT_DECAY', 'BBF_SPR_WEIGHT', 'BBF_SPR_STEPS', 'BBF_PROJECTION', 'BBF_TRANSITION_WIDTH', 'BBF_DUELING', 'BBF_DOUBLE',
-) + sac_algo.SAC_KNOBS
+) + r2d2_knobs.R2D2_KNOBS + sac_algo.SAC_KNOBS
 
 
 def _refuse_foreign_knobs(name):

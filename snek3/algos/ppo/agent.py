@@ -114,6 +114,13 @@ class PpoAgent(object):
         seed = config['seed']
         self.actor = network.build(arch, device=device, seed=seed)
         self.critic = network.build_critic(arch, device=device, seed=seed)
+        # Group E, row E1: a cell in each tower. `act` then takes and returns both towers' states, `update`
+        # iterates whole-lane sequences (`Rollout.sequence_minibatches`, `ppo_seq_minibatch` lanes each) and
+        # replays each cell from its stored state. Off, every method below is what it was.
+        self.recurrent = network.recurrent_of(arch) is not None
+        self.actor_state_width = self.actor.state_width if self.recurrent else 0
+        self.critic_state_width = self.critic.state_width if self.recurrent else 0
+        self.seq_minibatch = int(config.get('ppo_seq_minibatch', 2))
         self.optimizer = build_adam(list(self.actor.parameters()) + list(self.critic.parameters()),
                                    float(config['ppo_learning_rate']),
                                    float(config['ppo_adam_epsilon']))
@@ -145,27 +152,49 @@ class PpoAgent(object):
     def _tensor(self, observations):
         return torch.as_tensor(np.asarray(observations, dtype=np.float32), device=self.device)
 
-    def act(self, observations):
+    def act(self, observations, actor_state=None, critic_state=None, fresh=None):
         """Sample. Returns `(actions, log_probs, values)` as numpy, all `(n,)`.
 
         `no_grad` is correctness rather than speed: a rollout of 16,384 steps built under autograd
         would hold every intermediate activation of every step alive until the buffer was overwritten.
+
+        **Recurrent**: takes each tower's carried state and the `fresh` mask, and returns
+        `(actions, log_probs, values, actor_state, critic_state)` -- the states *after* the step, which the
+        collector carries into the next one.
         """
         self.actor.eval()
         self.critic.eval()
+        if not self.recurrent:
+            with torch.no_grad():
+                batch = self._tensor(observations)
+                actions, log_probs = network.sample(self.actor(batch), generator=self.torch_rng)
+                values = self.critic(batch).squeeze(-1)
+            return (actions.to(torch.int64).cpu().numpy(),
+                    log_probs.cpu().numpy(),
+                    values.cpu().numpy())
         with torch.no_grad():
             batch = self._tensor(observations)
-            actions, log_probs = network.sample(self.actor(batch), generator=self.torch_rng)
-            values = self.critic(batch).squeeze(-1)
-        return (actions.to(torch.int64).cpu().numpy(),
-                log_probs.cpu().numpy(),
-                values.cpu().numpy())
+            reset = torch.as_tensor(np.asarray(fresh, dtype=bool), device=self.device)
+            logits, actor_next = self.actor.step(batch, self._tensor(actor_state), reset)
+            actions, log_probs = network.sample(logits, generator=self.torch_rng)
+            values, critic_next = self.critic.step(batch, self._tensor(critic_state), reset)
+        return (actions.to(torch.int64).cpu().numpy(), log_probs.cpu().numpy(),
+                values.squeeze(-1).cpu().numpy(), actor_next.cpu().numpy(), critic_next.cpu().numpy())
 
-    def values(self, observations):
-        """`V` only, for GAE's bootstrap off the state after the last stored step."""
+    def values(self, observations, critic_state=None, fresh=None):
+        """`V` only, for GAE's bootstrap off the state after the last stored step.
+
+        **Never advances a recurrent critic's state**: the new state the cell computes here is dropped, so
+        the collector's carried state is the one the *next* step runs from, exactly as if this read had not
+        happened. A fixture pins it.
+        """
         self.critic.eval()
         with torch.no_grad():
-            return self.critic(self._tensor(observations)).squeeze(-1).cpu().numpy()
+            if not self.recurrent:
+                return self.critic(self._tensor(observations)).squeeze(-1).cpu().numpy()
+            reset = torch.as_tensor(np.asarray(fresh, dtype=bool), device=self.device)
+            values, _ = self.critic.step(self._tensor(observations), self._tensor(critic_state), reset)
+            return values.squeeze(-1).cpu().numpy()
 
     # ------------------------------------------------------------ learning
 
@@ -173,6 +202,27 @@ class PpoAgent(object):
         if self.value_loss == 'mse':
             return F.mse_loss(predicted, returns)
         return F.huber_loss(predicted, returns, delta=1.0)
+
+    def _forward(self, batch):
+        """`(logits, predicted values)` for one minibatch, flat `(k, ...)` in both arms.
+
+        Feed-forward: one forward of each tower over `(k, obs_len)`. Recurrent: each tower replayed over the
+        minibatch's `(T, n)` sequences from its stored step-0 state with the stored `fresh` mask
+        (`RecurrentTower.unroll`), then flattened to `(T n, ...)` so the three loss statements below are the
+        same statements. Truncated BPTT over the rollout: the stored state is a constant.
+        """
+        obs = self._tensor(batch['obs'])
+        if not self.recurrent:
+            return self.actor(obs), self.critic(obs).squeeze(-1)
+        fresh = torch.as_tensor(np.asarray(batch['fresh'], dtype=bool), device=self.device)
+        logits, _ = self.actor.unroll(obs, self._tensor(batch['actor_state']), fresh)
+        values, _ = self.critic.unroll(obs, self._tensor(batch['critic_state']), fresh)
+        return logits.reshape(-1, logits.shape[-1]), values.reshape(-1)
+
+    def _minibatches(self, rollout):
+        if self.recurrent:
+            return rollout.sequence_minibatches(self.seq_minibatch, self.shuffle_rng)
+        return rollout.minibatches(self.minibatch, self.shuffle_rng)
 
     def update(self, rollout):
         """Every epoch, every minibatch. Returns the diagnostics an eval row carries.
@@ -194,22 +244,24 @@ class PpoAgent(object):
         for _ in range(self.epochs):
             epoch_kl = 0.0
             epoch_batches = 0
-            for batch in rollout.minibatches(self.minibatch, self.shuffle_rng):
+            for batch in self._minibatches(rollout):
                 advantages = batch['advantages']
                 if self.normalise_advantages:
                     advantages = normalise(advantages)
-                obs = self._tensor(batch['obs'])
-                actions = torch.as_tensor(batch['actions'], device=self.device).long()
-                old_log_probs = self._tensor(batch['log_probs'])
-                advantage = self._tensor(advantages)
-                returns = self._tensor(batch['returns'])
+                # Flat `(k,)` in both arms: a sequence minibatch arrives `(T, n)` and `reshape(-1)` lays it
+                # out `t`-major, the same order `_forward` flattens the unrolled towers in.
+                actions = torch.as_tensor(np.asarray(batch['actions']).reshape(-1), device=self.device).long()
+                old_log_probs = self._tensor(np.asarray(batch['log_probs']).reshape(-1))
+                advantage = self._tensor(np.asarray(advantages).reshape(-1))
+                returns = self._tensor(np.asarray(batch['returns']).reshape(-1))
 
-                log_probs, entropy = network.evaluate(self.actor(obs), actions)
+                logits, predicted = self._forward(batch)
+                log_probs, entropy = network.evaluate(logits, actions)
                 ratio = (log_probs - old_log_probs).exp()
                 unclipped = ratio * advantage
                 clipped = torch.clamp(ratio, 1.0 - self.clip, 1.0 + self.clip) * advantage
                 policy_loss = -torch.min(unclipped, clipped).mean()
-                value_loss = self._value_loss(self.critic(obs).squeeze(-1), returns)
+                value_loss = self._value_loss(predicted, returns)
                 entropy_mean = entropy.mean()
                 loss = (policy_loss
                         + self.vf_coef * value_loss

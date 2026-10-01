@@ -1,0 +1,56 @@
+{
+ "tests": [
+  "tests/test_ppo_recurrent.py",
+  "tests/test_stateful_policy.py"
+ ],
+ "mutations": [
+  {
+   "desc": "a fresh row keeps its state in the tower",
+   "file": "algos/ppo/net.py",
+   "from": "            state = state * (~fresh).to(state.dtype).unsqueeze(-1)\n        out, state = self._run(self.features(observations).unsqueeze(0), state)",
+   "to": "            state = state\n        out, state = self._run(self.features(observations).unsqueeze(0), state)"
+  },
+  {
+   "desc": "the unroll ignores the per-step fresh flags",
+   "file": "algos/ppo/net.py",
+   "from": "            state = state * (~fresh[a]).to(state.dtype).unsqueeze(-1)\n            out, state = self._run(features[a:b], state)",
+   "to": "            out, state = self._run(features[a:b], state)"
+  },
+  {
+   "desc": "the minibatch takes the last step's state instead of the first's",
+   "file": "algos/ppo/rollout.py",
+   "from": "                   'actor_state': self.actor_states[0, index], 'critic_state': self.critic_states[0, index]}",
+   "to": "                   'actor_state': self.actor_states[-1, index], 'critic_state': self.critic_states[-1, index]}"
+  },
+  {
+   "desc": "the collector stores the state after the step rather than the one carried into it",
+   "file": "algos/ppo/collect.py",
+   "from": "                                 actor_state=self.actor_state, critic_state=self.critic_state,\n                                 fresh=self.fresh)",
+   "to": "                                 actor_state=actor_next, critic_state=critic_next,\n                                 fresh=self.fresh)"
+  },
+  {
+   "desc": "the fresh flag never set after a death",
+   "file": "algos/ppo/collect.py",
+   "from": "                self.fresh = np.asarray(done, dtype=bool).copy()",
+   "to": "                self.fresh = np.zeros_like(done, dtype=bool)"
+  },
+  {
+   "desc": "the bootstrap read ignores the fresh flags",
+   "file": "algos/ppo/agent.py",
+   "from": "            values, _ = self.critic.step(self._tensor(observations), self._tensor(critic_state), reset)",
+   "to": "            values, _ = self.critic.step(self._tensor(observations), self._tensor(critic_state), None)"
+  },
+  {
+   "desc": "the engine never marks a reassigned lane fresh",
+   "file": "vectorized/engine.py",
+   "from": "fresh[row] = True",
+   "to": "fresh[row] = False"
+  },
+  {
+   "desc": "the stateful policy keeps a fresh row's state",
+   "file": "algos/stateful.py",
+   "from": "            cleared = index[reset]\n            self.state[cleared] = 0.0",
+   "to": "            cleared = index[reset]\n            self.state[cleared] = self.state[cleared]"
+  }
+ ]
+}

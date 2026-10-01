@@ -18,6 +18,15 @@ Nothing here imports torch, which is what lets the engine be tested and benchmar
 hand-written heuristic policy, and what let snek2 run a distributional agent through it without the
 driver knowing what an atom is.
 
+**A recurrent policy is the same callable plus `begin(rows, fresh, prev_reward)`** (group E,
+2026-09-30; `algos/stateful.py`). Lanes migrate between jobs and reset between episodes without the
+policy seeing it, so before each job's call the engine tells a policy that has the method which lane
+rows the call covers, which of them were reset since the previous step, and each lane's reward from its
+previous step (R2D2's net takes it as an input; only the engine knows it). The policy owns its state;
+the engine keeps two arrays -- a `fresh` flag and the last reward per lane -- and a plain callable has
+no `begin` and is treated exactly as before. Duck-typed on the method name, so this file still imports
+no torch.
+
 **Why lanes migrate between checkpoints.** The obvious shape — K fixed blocks of `episodes` lanes —
 was measured and it drains: every block starts full and empties as its episodes finish, so mean
 utilisation was **39-50%** and the width advantage was half thrown away. Here a lane that finishes an
@@ -233,6 +242,10 @@ def measure_stream(next_job, on_complete, episodes, width=None, max_live=None, s
     # `owner`, and the reason a result lands in start order rather than completion order.
     slot = np.full(width, -1, dtype=np.int64)
     running = np.zeros(width, dtype=np.float64)     # this episode's undiscounted return, per lane
+    # For a stateful policy (module docstring): a lane reset since the previous policy call, and the
+    # reward its previous step paid (0 on a fresh lane). Every lane starts fresh.
+    fresh = np.ones(width, dtype=bool)
+    last_reward = np.zeros(width, dtype=np.float32)
     live = []                                       # resident jobs, in load order
     exhausted = False
 
@@ -282,6 +295,8 @@ def measure_stream(next_job, on_complete, episodes, width=None, max_live=None, s
             if not already_fresh:
                 vec.reset_rows([row])
             running[row] = 0.0
+            fresh[row] = True
+            last_reward[row] = 0.0
 
     stats = {'env_steps': 0, 'batch_steps': 0, 'steps': 0, 'checkpoints': 0,
              'episodes': 0, 'started_at': time.time()}
@@ -315,6 +330,9 @@ def measure_stream(next_job, on_complete, episodes, width=None, max_live=None, s
         for index, job in enumerate(live):
             rows = np.flatnonzero(owner == index)
             if rows.size:
+                begin = getattr(job.policy_fn, 'begin', None)
+                if begin is not None:
+                    begin(rows, fresh[rows], last_reward[rows])
                 actions[rows] = job.policy_fn(obs[rows])
 
         # `observe=False` plus one explicit `observe()` below, rather than letting `step` build the
@@ -322,6 +340,9 @@ def measure_stream(next_job, on_complete, episodes, width=None, max_live=None, s
         # step, so computing it twice on every step where a lane finished nearly doubled the bill.
         _, reward, done, info = vec.step(actions, autoreset=False, observe=False)
         running[active] += reward[active]
+        # Every lane that stepped has now stepped: the ones `assign` resets below are marked fresh there.
+        fresh[:] = False
+        last_reward[:] = reward
 
         hits = np.flatnonzero(done & active)
         if hits.size:

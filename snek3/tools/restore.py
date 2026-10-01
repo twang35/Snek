@@ -52,6 +52,13 @@ def _rainbow():
     return network
 
 
+def _r2d2():
+    # An R2D2 checkpoint is `R2d2Net` alone: `arch['recurrent']` says the cell and `arch['head']` the read; its greedy
+    # policy is a `StatefulPolicy` carrying the LSTM state, the previous action and the previous reward per lane.
+    from algos.r2d2 import net as network
+    return network
+
+
 def _sac():
     # A SAC checkpoint is the actor alone -- DQN's `QNet` read as logits, as PPO's is -- so its module's
     # `build` and `greedy_policy_fn` are PPO's, and `sac`/`sac2` need no sidecar field.
@@ -62,7 +69,7 @@ def _sac():
 ALGORITHMS = {'dqn': _dqn, 'ppo': _ppo, 'c51': _dist, 'qrdqn': _dist, 'iqn': _dist, 'fqf': _dist,
               'sac': _sac, 'sac2': _sac, 'rainbow': _rainbow, 'btr': _rainbow,
               # A BBF checkpoint is its dueling C51 Rainbow network alone; the SPR heads live in `resume.pt`.
-              'bbf': _rainbow}
+              'bbf': _rainbow, 'r2d2': _r2d2}
 
 
 def _module_for(arch):

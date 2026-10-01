@@ -30,7 +30,17 @@ refuses — and here the cost of ignoring is concrete: a PPO arm launched from a
 would silently take DQN's `1e-5` learning rate, which is ~64x too little total parameter movement, and
 report "PPO does not learn". That is why the learning rate and the batch size have `PPO_` names at all.
 
-## 3. There is no prefill and no replay buffer
+## 3. Recurrence is a knob on the same arm (group E, row E1; `plans/algoExploration/e-memory.md`)
+
+`SNEK_PPO_RECURRENT=gru|lstm` puts a cell of `SNEK_PPO_RECURRENT_HIDDEN` units between each tower's
+trunk and its head (`algos/ppo/net.py` `RecurrentTower`; the critic gets **its own** cell, as it has its own
+trunk), the rollout stores each tower's state at every step with a `fresh` mask, and the update iterates
+minibatches of **whole lanes** -- `SNEK_PPO_SEQ_MINIBATCH` lanes, each replayed over its T steps from the
+stored state -- so `SNEK_PPO_MINIBATCH` is derived (`seq_minibatch x rollout`) and refused if set to
+anything else. The sidecar gains `recurrent: {type, hidden}`, so a recurrent checkpoint cannot load into a
+feed-forward net. The default, off, is the feed-forward arm bit for bit (`tests/test_ppo_recurrent.py`).
+
+## 4. There is no prefill and no replay buffer
 
 `prefill()` returns 0 and `save_side_state` / `load_side_state` do nothing: the first rollout *is* the
 first batch, and there is no buffer beside the weights to keep in step with them. `load_side_state`
@@ -46,6 +56,7 @@ from algos.ppo import collect
 from algos.ppo import rollout as rollout_module
 from algos.ppo import schedules
 from algos.ppo.agent import PpoAgent
+from algos.r2d2 import knobs as r2d2_knobs
 from vectorized.vec_env import VecSnake
 from tools import checkpoints
 
@@ -74,7 +85,11 @@ REJECTED = (
     'SAC_CRITIC_COMBINE', 'SAC_Q_CLIP', 'SAC_REPLAY_BUFFER_MAX_LENGTH', 'SAC_PRIORITY_EXPONENT',
     'SAC_PREFILL',
     'BBF_WEIGHT_DECAY', 'BBF_SPR_WEIGHT', 'BBF_SPR_STEPS', 'BBF_PROJECTION', 'BBF_TRANSITION_WIDTH', 'BBF_DUELING', 'BBF_DOUBLE',
-)
+) + r2d2_knobs.R2D2_KNOBS
+
+# The recurrence knobs, for the other algorithms' refusal lists.
+PPO_RECURRENT_KNOBS = ('PPO_RECURRENT', 'PPO_RECURRENT_HIDDEN', 'PPO_SEQ_MINIBATCH')
+RECURRENT_KINDS = ('', 'gru', 'lstm')
 
 
 def _refuse_dqn_knobs():
@@ -143,7 +158,32 @@ def build_config(tuned):
         'ppo_gradient_clipping': tuned('PPO_GRADIENT_CLIPPING', 0.5),
         'ppo_normalize_adv': bool(int(tuned('PPO_NORMALIZE_ADV', 1, int))),
         'ppo_value_loss': str(tuned('PPO_VALUE_LOSS', 'huber', str)),
+        # Group E, row E1 (§3 above). '' is off; `gru` or `lstm` puts a cell in each tower.
+        'ppo_recurrent': str(tuned('PPO_RECURRENT', '', str)).strip().lower(),
+        'ppo_recurrent_hidden': int(tuned('PPO_RECURRENT_HIDDEN', 128, int)),
+        # Lanes a recurrent minibatch holds: 2 x b27's rollout of 256 = 512 transitions, the control's
+        # minibatch, so the update count per epoch is the control's (the plan's §2, decided 2026-09-30).
+        'ppo_seq_minibatch': int(tuned('PPO_SEQ_MINIBATCH', 2, int)),
     }
+    if config['ppo_recurrent'] not in RECURRENT_KINDS:
+        raise ValueError('SNEK_PPO_RECURRENT={0!r} is not one of {1} (empty is off)'.format(
+            config['ppo_recurrent'], [kind for kind in RECURRENT_KINDS if kind]))
+    if config['ppo_recurrent']:
+        if config['ppo_recurrent_hidden'] < 1:
+            raise ValueError('SNEK_PPO_RECURRENT_HIDDEN={0} must be at least 1; 0 would be a feed-forward '
+                             'arm wearing a recurrent label'.format(config['ppo_recurrent_hidden']))
+        if not 1 <= config['ppo_seq_minibatch'] <= config['collect_envs']:
+            raise ValueError('SNEK_PPO_SEQ_MINIBATCH={0} must be in [1, SNEK_COLLECT_ENVS={1}]: it is lanes '
+                             'per minibatch, each a whole rollout'.format(config['ppo_seq_minibatch'],
+                                                                           config['collect_envs']))
+        derived = config['ppo_seq_minibatch'] * config['ppo_rollout']
+        if os.environ.get('SNEK_PPO_MINIBATCH') is not None and config['ppo_minibatch'] != derived:
+            raise ValueError('SNEK_PPO_MINIBATCH={0} conflicts with a recurrent arm, whose minibatch is '
+                             'SNEK_PPO_SEQ_MINIBATCH x SNEK_PPO_ROLLOUT = {1} x {2} = {3} transitions of whole '
+                             'lanes. Drop it or set it to {3}.'.format(config['ppo_minibatch'],
+                                                                      config['ppo_seq_minibatch'],
+                                                                      config['ppo_rollout'], derived))
+        config['ppo_minibatch'] = derived
     if config['ppo_minibatch'] > config['collect_envs'] * config['ppo_rollout']:
         raise ValueError(
             'SNEK_PPO_MINIBATCH={0} is larger than a whole rollout ({1} lanes x {2} steps = {3}). '
@@ -211,6 +251,14 @@ def reportable(config):
     return out
 
 
+def arch_fields(config):
+    """The sidecar's `recurrent` block for a recurrent arm, nothing for the feed-forward one, so every
+    PPO sidecar written before group E reads unchanged."""
+    if not config.get('ppo_recurrent'):
+        return {}
+    return {'recurrent': {'type': config['ppo_recurrent'], 'hidden': int(config['ppo_recurrent_hidden'])}}
+
+
 def build(config, arch, device='cpu'):
     return PpoAlgo(config, arch, device=device)
 
@@ -224,7 +272,9 @@ class PpoAlgo(object):
         self.device = device
         self.agent = PpoAgent(arch, config, device=device)
         self.rollout = rollout_module.Rollout(config['ppo_rollout'], config['collect_envs'],
-                                              arch['obs_len'])
+                                              arch['obs_len'],
+                                              actor_state=self.agent.actor_state_width,
+                                              critic_state=self.agent.critic_state_width)
         # **`shaping_discount` is the agent's gamma, and passing it is not optional** — see
         # `algos/dqn/algo.py` for the full note and the 2.5e-4-a-step bias that leaving it at 1.0 caused.
         self.collector = collect.Collector(
@@ -253,11 +303,17 @@ class PpoAlgo(object):
         return self.agent.policy_fn
 
     def describe(self):
+        recurrent = ''
+        if self.agent.recurrent:
+            recurrent = ', {0} {1} in each tower, {2} whole lane(s) a minibatch'.format(
+                self.config['ppo_recurrent'].upper(), self.config['ppo_recurrent_hidden'],
+                self.config['ppo_seq_minibatch'])
         return ('{0} lane(s) x {1} rollout = {2:,} transitions, {3} epoch(s), minibatch {4}, '
-                'GAE horizon {5:.0f} steps'.format(
+                'GAE horizon {5:.0f} steps{6}'.format(
                     self.config['collect_envs'], self.config['ppo_rollout'], self.rollout.size,
                     self.config['ppo_epochs'], self.config['ppo_minibatch'],
-                    rollout_module.horizon(self.config['discount'], self.config['ppo_gae_lambda'])))
+                    rollout_module.horizon(self.config['discount'], self.config['ppo_gae_lambda']),
+                    recurrent))
 
     def prefill(self):
         """Nothing to pre-fill: the first rollout is the first batch."""

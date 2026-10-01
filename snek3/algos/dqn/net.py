@@ -17,6 +17,33 @@ import torch
 from torch import nn
 
 
+def he_init(linear, generator=None):
+    """snek2's hidden-layer initialiser: He-normal, truncated at 2 sigma, with Keras' truncation correction
+    (`QNet.reset_parameters` on why the 0.8796). Module-level so the recurrent towers (`algos/ppo/net.py`,
+    `algos/r2d2/net.py`) build their trunks with the same draw rather than a copy of these lines."""
+    fan_in = linear.weight.shape[1]
+    stddev = math.sqrt(2.0 / fan_in) / 0.87962566103423978
+    nn.init.trunc_normal_(linear.weight, std=stddev, a=-2 * stddev, b=2 * stddev, generator=generator)
+    nn.init.zeros_(linear.bias)
+
+
+def head_init(linear, generator=None):
+    """snek2's output-layer initialiser: uniform in [-0.03, 0.03], zero bias, so the opening policy is near
+    uniform."""
+    nn.init.uniform_(linear.weight, -0.03, 0.03, generator=generator)
+    nn.init.zeros_(linear.bias)
+
+
+def make_generator(seed, device='cpu'):
+    """A local `torch.Generator` at `seed`, or None for None. The reason it is local is in
+    `QNet.reset_parameters`."""
+    if seed is None:
+        return None
+    generator = torch.Generator(device=device)
+    generator.manual_seed(int(seed))
+    return generator
+
+
 class QNet(nn.Module):
     """`obs_len -> fc_layer_params (relu) -> num_actions`, with no activation on the head.
 
@@ -51,18 +78,10 @@ class QNet(nn.Module):
         have shown it. This is the same class of defect that disqualified cpprb, whose buffer
         silently ignored `seed=`.
         """
-        generator = None
-        if seed is not None:
-            generator = torch.Generator(device=self.head.weight.device)
-            generator.manual_seed(int(seed))
+        generator = make_generator(seed, self.head.weight.device)
         for layer in self.hidden:
-            fan_in = layer.weight.shape[1]
-            stddev = math.sqrt(2.0 / fan_in) / 0.87962566103423978
-            nn.init.trunc_normal_(layer.weight, std=stddev, a=-2 * stddev, b=2 * stddev,
-                                  generator=generator)
-            nn.init.zeros_(layer.bias)
-        nn.init.uniform_(self.head.weight, -0.03, 0.03, generator=generator)
-        nn.init.zeros_(self.head.bias)
+            he_init(layer, generator)
+        head_init(self.head, generator)
 
     def forward(self, observations):
         values = observations

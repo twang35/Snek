@@ -67,6 +67,8 @@ import argparse
 import random
 import time
 
+import numpy as np
+
 
 # `--tile` has to reach `env.render` before it is imported, so argv is read here rather than in
 # main(). Everything else is parsed normally below.
@@ -438,9 +440,16 @@ def play_episode(env, policy_fn):
     boards, meta = [grab(game)], [(0, 0)]
     done = False
     info = {'perfect': False, 'starved': False, 'score': 0, 'steps': 0}
+    # A recurrent policy (`algos/stateful.py`) is told before every step whether this is the episode's
+    # first move and what the last one paid; a plain policy has no `begin` and is called as before.
+    begin = getattr(policy_fn, 'begin', None)
+    fresh, reward = True, 0.0
     while not done:
+        if begin is not None:
+            begin(np.array([0]), np.array([fresh]), np.array([reward], dtype=np.float32))
         action = int(policy_fn(observation.reshape(1, -1))[0])
-        observation, _, done, info = env.step(action)
+        observation, reward, done, info = env.step(action)
+        fresh = False
         boards.append(grab(game))
         meta.append((game.current_score, game.current_step))
 

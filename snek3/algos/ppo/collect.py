@@ -46,6 +46,17 @@ class Collector(object):
         self.obs = vec.reset_all()
         if self.obs is None:
             self.obs = vec.observe()
+        # A recurrent agent (group E, row E1): each tower's state per lane, carried across steps and across
+        # rollouts, and a `fresh` flag that is True on a lane's first step and after every `done`. The
+        # feed-forward path below is untouched -- a fixture pins that a rollout and an update are
+        # byte-identical with the knob off.
+        self.recurrent = bool(getattr(agent, 'recurrent', False))
+        if self.recurrent:
+            if not rollout.recurrent:
+                raise ValueError('a recurrent agent needs a rollout with state buffers')
+            self.actor_state = np.zeros((vec.n, rollout.actor_state_width), dtype=np.float32)
+            self.critic_state = np.zeros((vec.n, rollout.critic_state_width), dtype=np.float32)
+            self.fresh = np.ones(vec.n, dtype=bool)
 
     def collect(self):
         """One full rollout. Returns the transitions banked, which is `steps * lanes` exactly.
@@ -55,18 +66,36 @@ class Collector(object):
         the same number.
         """
         for t in range(self.rollout.steps):
-            actions, log_probs, values = self.agent.act(self.obs)
-            previous = self.obs
-            self.obs, rewards, done, info = self.vec.step(actions)
-            self.rollout.add(t, previous, actions, log_probs, values, rewards, done)
+            if self.recurrent:
+                # The state stored with step t is the one carried *into* it, with the fresh flag beside it,
+                # so the update's replay zeroes exactly where the collection did.
+                actions, log_probs, values, actor_next, critic_next = self.agent.act(
+                    self.obs, self.actor_state, self.critic_state, self.fresh)
+                previous = self.obs
+                self.obs, rewards, done, info = self.vec.step(actions)
+                self.rollout.add(t, previous, actions, log_probs, values, rewards, done,
+                                 actor_state=self.actor_state, critic_state=self.critic_state,
+                                 fresh=self.fresh)
+                self.actor_state, self.critic_state = actor_next, critic_next
+                self.fresh = np.asarray(done, dtype=bool).copy()
+            else:
+                actions, log_probs, values = self.agent.act(self.obs)
+                previous = self.obs
+                self.obs, rewards, done, info = self.vec.step(actions)
+                self.rollout.add(t, previous, actions, log_probs, values, rewards, done)
             finished = int(np.count_nonzero(done))
             if finished:
                 self.counters['episodes'] += finished
                 self.counters['perfect_games'] += int(np.count_nonzero(info['perfect']))
         # `V` of the state every lane is in *now*, for the truncated rollout's bootstrap. Taken after
         # the loop rather than inside it, because the value of the state after the last stored step is
-        # the one GAE needs and it is not any state the loop already scored.
-        last_values = self.agent.values(self.obs)
+        # the one GAE needs and it is not any state the loop already scored. **A recurrent critic's
+        # bootstrap read does not advance the carried state** (`agent.values` returns the value alone):
+        # the next rollout's first step runs the cell from the state this loop left, exactly once.
+        if self.recurrent:
+            last_values = self.agent.values(self.obs, self.critic_state, self.fresh)
+        else:
+            last_values = self.agent.values(self.obs)
         self.rollout.finish(last_values, self.agent.discount, self.agent.gae_lambda)
         banked = self.rollout.size
         self.counters['transitions'] += banked

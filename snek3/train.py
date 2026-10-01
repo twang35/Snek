@@ -52,6 +52,7 @@ from algos.dist import iqn as iqn_algo
 from algos.dist import qrdqn as qrdqn_algo
 from algos.dqn import algo as dqn_algo
 from algos.ppo import algo as ppo_algo
+from algos.r2d2 import algo as r2d2_algo
 from algos.rainbow import btr as btr_algo
 from algos.rainbow import rainbow as rainbow_algo
 # For `trailing_mean` only, which is a plain windowed average over the eval rows and is not about
@@ -75,7 +76,7 @@ from vectorized import engine
 # value names itself in the error instead of falling through to a default.
 ALGOS = {module.NAME: module for module in
          (dqn_algo, ppo_algo, c51_algo, qrdqn_algo, iqn_algo, fqf_algo, sac_algo, sac2_algo,
-          rainbow_algo, btr_algo, bbf_algo)}
+          rainbow_algo, btr_algo, bbf_algo, r2d2_algo)}
 
 # ---------------------------------------------------------------- config
 

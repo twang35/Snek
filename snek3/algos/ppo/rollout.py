@@ -62,10 +62,17 @@ class Rollout(object):
     with the caller about where it is.
     """
 
-    def __init__(self, steps, lanes, obs_len):
+    def __init__(self, steps, lanes, obs_len, actor_state=0, critic_state=0):
         self.steps = int(steps)
         self.lanes = int(lanes)
         self.obs_len = int(obs_len)
+        # A recurrent arm (group E, row E1) stores beside each step the state each tower carried *into*
+        # it and whether the step began a new episode, so an update can replay the cell from the stored
+        # state over a whole lane's T steps. Zero widths -- the feed-forward arm -- allocate nothing and
+        # change nothing.
+        self.actor_state_width = int(actor_state)
+        self.critic_state_width = int(critic_state)
+        self.recurrent = self.actor_state_width > 0 or self.critic_state_width > 0
         if self.steps < 1 or self.lanes < 1:
             raise ValueError('a rollout needs at least 1 step and 1 lane, got {0}x{1}'.format(
                 self.steps, self.lanes))
@@ -78,6 +85,10 @@ class Rollout(object):
         self.dones = np.zeros(shape, dtype=bool)
         self.advantages = np.zeros(shape, dtype=np.float32)
         self.returns = np.zeros(shape, dtype=np.float32)
+        if self.recurrent:
+            self.actor_states = np.zeros(shape + (self.actor_state_width,), dtype=np.float32)
+            self.critic_states = np.zeros(shape + (self.critic_state_width,), dtype=np.float32)
+            self.fresh = np.zeros(shape, dtype=bool)
         self._finished = False
 
     @property
@@ -85,13 +96,21 @@ class Rollout(object):
         """Transitions in a full rollout. Also the arm's step increment — see `algos/ppo/algo.py`."""
         return self.steps * self.lanes
 
-    def add(self, t, obs, actions, log_probs, values, rewards, dones):
+    def add(self, t, obs, actions, log_probs, values, rewards, dones,
+            actor_state=None, critic_state=None, fresh=None):
         self.obs[t] = obs
         self.actions[t] = actions
         self.log_probs[t] = log_probs
         self.values[t] = values
         self.rewards[t] = rewards
         self.dones[t] = dones
+        if self.recurrent:
+            if actor_state is None or critic_state is None or fresh is None:
+                raise ValueError('a recurrent rollout stores both towers\' states and the fresh mask at '
+                                 'every step; step {0} came without them'.format(t))
+            self.actor_states[t] = actor_state
+            self.critic_states[t] = critic_state
+            self.fresh[t] = fresh
         self._finished = False
 
     def finish(self, last_values, discount, gae_lambda):
@@ -150,6 +169,32 @@ class Rollout(object):
         for start in range(0, self.size, step):
             index = order[start:start + step]
             yield {key: value[index] for key, value in flat.items()}
+
+
+    def sequence_minibatches(self, lanes_per_batch, rng):
+        """Yields minibatches of **whole lanes**, each lane's T steps in order, covering the rollout once.
+
+        The recurrent update's minibatch (`plans/algoExploration/e-memory.md` §2): a cell replayed from a
+        stored state needs the steps that followed it in order, so the unit of shuffling is the lane, not
+        the transition. Every array comes back `(T, n, ...)` with the state each tower carried into step 0 as
+        `actor_state` / `critic_state` `(n, width)`, and `fresh` `(T, n)` saying where the cell restarts. A
+        trailing partial batch is yielded, as `minibatches` yields its own, and for the same reason.
+
+        `rng` is the shuffle's own `numpy.Generator`.
+        """
+        if not self._finished:
+            raise ValueError('finish() has not run: advantages and returns are stale')
+        if not self.recurrent:
+            raise ValueError('sequence minibatches need a recurrent rollout (state widths above 0)')
+        order = rng.permutation(self.lanes)
+        step = max(1, int(lanes_per_batch))
+        for start in range(0, self.lanes, step):
+            index = order[start:start + step]
+            yield {'obs': self.obs[:, index], 'actions': self.actions[:, index],
+                   'log_probs': self.log_probs[:, index], 'values': self.values[:, index],
+                   'advantages': self.advantages[:, index], 'returns': self.returns[:, index],
+                   'fresh': self.fresh[:, index],
+                   'actor_state': self.actor_states[0, index], 'critic_state': self.critic_states[0, index]}
 
 
 def normalise(advantages):

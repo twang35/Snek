@@ -13,6 +13,9 @@ are in git history before 2026-09-10.
 
 ## Open
 
+- **Group E, memory** (b51, b52, queued 2026-09-30): E1 is recurrent PPO on b27's config at hist8 and hist0 (does memory add to
+  the window, can it replace it); E2 is R2D2 whole with its feed-forward control and a C51 head, budgeted by the update count
+  (200k). Open until both close: whether memory over the body moves the perfect rate at all on a 26-value observation.
 - **Group C, the value stacks** (b46-b49, closed 2026-09-29). Rainbow's paper cell (best30 97.45) is the value family's best; BTR's
   sits under it (96.58) and its trunk ablations two points under that (b49). Noisy nets are most of Rainbow's cell (b48). The value
   family's ceiling is 96-97.5 best30 across eight cells against PPO's 99.8, and no Rainbow-family work follows (the user, 2026-09-26).
@@ -72,6 +75,8 @@ are in git history before 2026-09-10.
 
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
+| [b52](#b52--r2d2-the-papers-recurrent-value-agent-its-feed-forward-control-and-its-c51-head) | the algorithm: R2D2 as its paper has it (`SNEK_ALGO=r2d2`: LSTM 512 with prev action and reward in, dueling 512 streams, 120-row windows = 40 burn-in + 80 loss, stride 40, n-step 5 double-Q under h(x), PER 0.9/0.6/η 0.9, Adam 1e-4, target copy 2,500, clip 40, the Ape-X ε ladder over 32 lanes) / the same with the LSTM replaced by a dense layer (`ffr2d2`) / the same with a C51 head and the rescaling off | none (paper): hist8, b2 reward, step penalty 0.01, shaping **off** | 3 × 4 | 1.3M steps = 41.6M moves, **130k updates** (shortfall against the 200k floor, stated) | paper 90%+ and holds, `ffr2d2` trails on the hold, c51 level; none at PPO's 99.8 | |
+| [b51](#b51--e1-recurrent-ppo-an-lstm-in-both-towers-on-b27s-config) | `SNEK_PPO_RECURRENT=lstm` (128, both towers, whole-lane minibatches of 2 x 256) at `SNEK_OBS_HISTORY` 8 / 0 | b27's hist8 config verbatim | 2 × 4 | 100M | `lstmhist0` well above hist0 and at or under hist8; `lstmhist8` level with hist8 | |
 | [b50](#b50--d1-anneal-wave-bbfs-within-cycle-n-step--γ-anneal-on-b43s-reset600k-cell) | BBF's within-cycle anneal on the reset cell: `SNEK_RESET_ANNEAL_N_STEP=10,3 SNEK_RESET_ANNEAL_GAMMA=0.97,0.997` over 10k gradient steps after each reset | b43a-d (resets every 600k on b40's M-QR-DQN cell) | 1 × 4 | 3M steps | **held** | D1 closes null: every reset still drops the cell to 0%, recovery to 55-69 within the cycle; tail 59-64 against b40e-h's 89-93 |
 | [b49](#b49--btr-paper-cell-ablations-the-trunk-and-its-norm) | BTR's trunk: `SNEK_BTR_RESIDUAL=0` / `SNEK_BTR_SPECTRAL_NORM=0` | b47a-d's paper cell | 2 × 4 | 1M steps | **held** | both about two points under the paper cell: best30 94.90 (plain trunk), 94.62 (no spectral norm) against 96.58; no `hof5000` candidate |
 | [b48](#b48--rainbow-paper-cell-with-noisy-nets-off) | noisy nets off, ε 1 → 0.01 over 62.5k moves | b46a-d's paper cell | 1 × 4 | 3M steps | **falsified** | best30 9.0-21.4 against the noisy cell's 96.9-98.1; no stage-B row. Noisy nets are most of this cell |
@@ -148,6 +153,40 @@ evals below 50% and 80%), then best30. `hof5000` re-measures the top rows at 5,0
 at complete separation (Mann-Whitney p=0.029). Details in [`protocol.md`](protocol.md).
 
 ---
+
+## b52 — R2D2: the paper's recurrent value agent, its feed-forward control and its C51 head
+
+| | |
+|---|---|
+| base | none: the paper cell (`e-memory.md` §2b). hist8, b2 reward, step penalty 0.01, shaping **off** (the paper-cell rule), `fc 320`, 32 lanes |
+| the config | `SNEK_ALGO=r2d2`: LSTM 512 after the trunk with the previous action one-hot and the raw previous reward as cell inputs, dueling 512-wide streams, scalar Q; windows of 120 stored rows = 40 burn-in prefix + 80 loss steps, a new loss block every 40 steps (the paper's m = 80, l = 40, overlap 40), cut per episode from its first step (0 burn-in at the start); burn-in on online and target from the stored `(h, c)`; squared TD on the 5-step double-Q target under h(x) ε 1e-3, summed over the block, IS-weighted (β 0.6, max-normalised), averaged over 64 windows; PER α 0.9, priority 0.9 max + 0.1 mean, new windows at max; Adam 1e-4 ε 1e-3, hard target copy every 2,500 updates, clip 40; ε ladder 0.4^(1 + 7i/31) over the lanes, held; replay 30,000 windows |
+| varies | **r2d2paper** (a-d) / **ffr2d2** (e-h, `SNEK_R2D2_RECURRENT=dense`: the paper's own §4 feed-forward ablation, same windows, loss positions, priorities, targets, moves, updates, batch) / **r2d2c51** (i-l, `SNEK_R2D2_HEAD=c51 SNEK_R2D2_RESCALE=0`: the categorical head on [−10, 110] under the memory; two recipes against the paper cell, not the distribution alone) |
+| cells × seeds | 3 × 4, seeds pinned to the letter |
+| cap | **the update count**: `SNEK_REPLAY_RATIO` 1/320 × 1.3M counted steps × 32 moves = 41.6M moves and **130,000 learner updates** — a stated **shortfall** against the 200k working floor and the paper's ~190k (5 updates/s over 10B frames), the longest wave that fits ~24 h on the desktop. 16 loss rows a move against the paper's 0.8 — a deliberate adaptation, the same in every cell. Benchmark 2026-09-30 (laptop solo, 1 thread, under load): LSTM update 517 ms at the 125-slot window, collector 1.5 ms a step, so 130k updates is ~19 h solo and ~24-27 h in a 4-arm desktop wave; the dense cell ~5x faster |
+| control | `ffr2d2` for the memory; b46a-d (Rainbow paper) and b35's DQN paper cell for shape; the paper cell for c51 |
+| predicted | registered 2026-09-30 by the agent: the paper cell reaches 90%+ perfect inside 41.6M moves and holds (the low-ε lanes and the 0.997 horizon suit the game); `ffr2d2` trails it on the hold (drawdowns, sef) but not on the peak; the c51 cell is level with the paper cell within noise; none reaches PPO's 99.8 `hof30k` row |
+
+**Why.** Group E's E2 (`e-memory.md`): recurrence on a value agent with the stored-state and burn-in
+machinery, so a gain can be attributed to the memory (paper minus `ffr2d2`, the only pair differing in
+the LSTM alone) rather than to the agent. Built 2026-09-30 whole in `algos/r2d2/` (`test_r2d2.py`,
+`mut_r2d2.json`); the paper's figures were read from the PDF the user supplied (§0: ~190k updates over 10B frames). The update count is the budget by decision; the move cap is what 200k updates buys in ~24 h.
+
+## b51 — E1: recurrent PPO, an LSTM in both towers on b27's config
+
+| | |
+|---|---|
+| base | b27's `hist8` config verbatim (rollout 256, 128 lanes, 4 epochs, lr 2.5e-4, clip 0.2, huber, adv norm, grad 0.5, Adam ε 1e-7, vf 0.5, b2 reward, step penalty 0.01, `fc 320`, the horizon anneal to 50% of the cap), 100M |
+| varies | `SNEK_PPO_RECURRENT=lstm` (hidden 128, **both** towers, the critic its own) with `SNEK_PPO_SEQ_MINIBATCH=2` whole lanes = 512 transitions, b27's minibatch; at **`SNEK_OBS_HISTORY=8`** (`lstmhist8`, a-d) and **`0`** (`lstmhist0`, e-h) |
+| cells × seeds | 2 × 4 |
+| control | b27's `hist8` cell (b27q-x) for `lstmhist8`; b27's `hist0` cell (b27a-h) and `hist8` for `lstmhist0` |
+| predicted | registered 2026-09-30 by the agent: `lstmhist0` lands well above `hist0` (49% density) and at or under `hist8` (95%); `lstmhist8` is level with `hist8` within noise — the window already carries what the body's recent path tells |
+
+**Why.** Group E's E1, **local-only by decision** (no paper; the question is memory against the incumbent).
+Does a recurrent policy add to the eight-move window, and can it replace it: `hist8` was the project's
+largest lever (49 → 95% density), and an LSTM can carry an arbitrarily long history without widening the
+observation. Cost: the two-lane minibatch is a 256-step recurrence run 256 times an update, 2,150
+transitions/s against 54,000 feed-forward solo (fused per-segment unroll, 2026-09-30), so ~13 h solo and
+~18 h a 4-arm desktop wave per 100M arm. A laptop wave of 8 mixes the two widths and runs stage A in-process.
 
 ## b50 — D1 anneal wave: BBF's within-cycle n-step / γ anneal on b43's reset600k cell
 

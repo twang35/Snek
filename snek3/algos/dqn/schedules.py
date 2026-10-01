@@ -23,6 +23,8 @@ The two do not overlap: bootstrap's last live rung is `initial/16` and refinemen
 `initial/32`, one halving below it, so the handover is a single step down and never a jump up.
 """
 
+import numpy as np
+
 # `avg_reward` thresholds the bootstrap phase halves on. Five rungs, so the phase hands over at
 # `initial_epsilon / 32` — 0.0125 for the default 0.4.
 #
@@ -166,3 +168,22 @@ def linear_epsilon(moves, initial_epsilon, min_epsilon, anneal_moves):
         return float(min_epsilon)
     fraction = float(moves) / float(anneal_moves)
     return float(initial_epsilon) + (float(min_epsilon) - float(initial_epsilon)) * fraction
+
+
+def apex_epsilons(lanes, base_epsilon, alpha):
+    """Ape-X's per-actor ladder (Horgan et al. 2018 §4; R2D2 keeps it): actor i of N holds
+    `base ** (1 + alpha * i / (N - 1))` for the whole run, so N lanes span `base` down to `base ** (1 + alpha)`
+    -- 0.4 to 0.4^8 = 6.5e-4 at the papers' 0.4 and 7. One lane holds `base`. The ladder is the exploration
+    of a lane, not of an eval, so it lives here beside `linear_epsilon` and is handed to a collector that
+    takes one epsilon per lane (`algos/r2d2/collect.py`). `SNEK_EPSILON_SCHEDULE=apex`."""
+    lanes = int(lanes)
+    if lanes < 1:
+        raise ValueError('the ladder needs at least one lane, got {0}'.format(lanes))
+    if not 0.0 < float(base_epsilon) <= 1.0:
+        raise ValueError('SNEK_INITIAL_EPSILON={0} must be in (0, 1] for the apex ladder'.format(base_epsilon))
+    if float(alpha) < 0.0:
+        raise ValueError('SNEK_APEX_ALPHA={0} must be at least 0'.format(alpha))
+    if lanes == 1:
+        return np.array([float(base_epsilon)], dtype=np.float64)
+    exponents = 1.0 + float(alpha) * np.arange(lanes, dtype=np.float64) / (lanes - 1)
+    return float(base_epsilon) ** exponents
