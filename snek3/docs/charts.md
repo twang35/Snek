@@ -39,6 +39,13 @@ on why the arms stopped opening it, and [`findings.md`](findings.md) on the thre
 
 <!-- reading -->
 
+D1 closes as a null. The anneal does not remove the dip: every reset still takes each seed to 0% perfect at the next eval, and the
+seed climbs back to its 55-69 plateau in 15k-100k counted steps (twice 200-440k). In the reset-free tail (from ~2.7M) the four seeds
+average 59-64% against b43a-d's 40-55 and b40e-h's 89-93, best30 65.8 against 60.4, no stage-B row. The prediction **held**: a
+recovery within the cycle rather than never, still far under b40e-h, stage B empty. Read with b43 and b44, BBF's resets cost this
+game's value cells their plateau at every cadence and with or without the anneal; the plan's re-open condition (holding at or above
+b40e-h) was not met, so nothing is offered to E2.
+
 <!-- /reading -->
 
 **knob resetanneal** — `b50a`-`b50d`:
@@ -100,10 +107,12 @@ question, not D1's; D1 still waits on b50.
 
 <!-- reading -->
 
-Four `btrplaintrunk` arms at 88% on the desktop, due about 12:30 today; `btrnospectral` (`b49e`-`h`) is the second wave and
-still unclaimed, so it reads about a day after that. Stage A so far: best30 94.15 (92.0-95.0) against b47a-d's 96.58, sef 34.8
-against 45.1 -- a plain `fc 320` trunk is a little below the residual stack so far, which is the registered prediction's
-"within noise" read at the edge. Stage B has not run yet, so the row count is not a reading.
+Both ablations sit about two points under the BTR paper cell: plain trunk best30 94.90 (94.0-96.0), no spectral norm 94.62
+(93.5-96.0), against b47a-d's 96.58, with a third to two thirds of its stage-B rows and no `hof5000` candidate where the paper
+cell had two. At n = 4 that is inside the ~10 pp the protocol resolves, so the prediction **held** as written (within noise for
+both), but the sign is the same for both changes and for every density column. The trunk is not where BTR's gap to Rainbow is
+(96.58 against 97.45), since removing it costs as much as the norm does. This closes Group C; no Rainbow-family work follows (the
+user, 2026-09-26).
 
 <!-- /reading -->
 

@@ -13,13 +13,12 @@ are in git history before 2026-09-10.
 
 ## Open
 
-- **Group C, the value stacks** (b46-b49, queued 2026-09-23): b46, b47 and b48 closed 2026-09-26. Rainbow's paper cell and BTR's
-  both hold at 90-96 with stage-B rows and no `hof5000` survivor; noisy nets are most of Rainbow's (b48); BTR's local cell learns ten
-  times faster than b40's and plateaus at the same height. Still live: b49, BTR's trunk ablations. The value family's ceiling is now
-  96-97.5 best30 across six cells against PPO's 99.8, and no Rainbow-family work is planned after b49 (the user, 2026-09-26).
-- **Group D, the late-plasticity probe** (b43 closed 2026-09-22, falsified; b44 closed 2026-09-27; b50 queued 2026-09-26): the reset
-  alone was worse everywhere, so D1 waits on b50, the same cell with BBF's within-cycle anneal. b44, BBF's recipe whole at the
-  paper's 100k moves, never learned: each cycle relearns to a score of 20-67 and each reset wipes it.
+- **Group C, the value stacks** (b46-b49, closed 2026-09-29). Rainbow's paper cell (best30 97.45) is the value family's best; BTR's
+  sits under it (96.58) and its trunk ablations two points under that (b49). Noisy nets are most of Rainbow's cell (b48). The value
+  family's ceiling is 96-97.5 best30 across eight cells against PPO's 99.8, and no Rainbow-family work follows (the user, 2026-09-26).
+- **Group D, the late-plasticity probe** (b43, b44, b50, closed 2026-09-29): D1 closes null. Resets cost the value cell its plateau
+  at both cadences and with BBF's anneal (b50: every reset to 0%, tail 59-64 against 89-93 without resets), and BBF's recipe whole
+  never learned at the paper's 100k moves (b44). Next in the series is Group E, memory.
 - **The quantile reads** (b45, closed 2026-09-24): `cvar:0.5` turns most of a cell's deaths into starves for +0.5-2.8 pp, and the
   starve (~5% of games on M-QR-DQN) is what is left. Not worth a `hof5000` pass; the starve is.
 - **Group A runs on the local plumbing** (decided 2026-09-17): b35 and b36 showed the papers' recipe does not reach
@@ -41,12 +40,6 @@ are in git history before 2026-09-10.
   cell at 0.1 gave the fastest onset in the project (best30 89-93 by 60k-78k steps) and then drifted to 67-72% by 1M -- the hold, not the
   onset, is Group B's question now, and b42 puts Zhou et al.'s two hold mechanisms on exactly that cell. Whether the target should track
   PPO's 0.001-0.009 nats instead, and whether the Q-clip binds at all at lr 1e-5 (0.8% of samples at most in the gate arm), stay open.
-- **Group D's anneal wave is due** (b43 closed 2026-09-22, falsified: the reset alone is harmful on b40's cell, both cadences far under
-  `b40e`-`h`, a climb only after the resets stop). By the plan's §5 the row does not close on this: the 600k cell with
-  `SNEK_RESET_ANNEAL_N_STEP=10,3 SNEK_RESET_ANNEAL_GAMMA=0.97,0.997` (built 2026-09-20) runs next, and only if that also fails to hold does
-  D1 close as "the reset is not the lever here". Not queued yet (the user's call, 2026-09-22). **b44** (written 2026-09-20, awaiting the go-ahead) is a
-  different question beside it: BBF's whole recipe as written (`algos/bbf/`), four seeds at the paper's 100k-move budget, to read how the
-  algorithm itself does on Snake.
 - **Queue what does not depend** (2026-09-20, the user's rule): a batch waits for another only when it reads that batch's numbers to be
   specified or judged. b42 and b43 were queued together with b41 still live for that reason; Groups C, E, F, G and H have nothing built yet
   and are the next implementation work, in the series' order.
@@ -79,8 +72,8 @@ are in git history before 2026-09-10.
 
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
-| [b50](#b50--d1-anneal-wave-bbfs-within-cycle-n-step--γ-anneal-on-b43s-reset600k-cell) | BBF's within-cycle anneal on the reset cell: `SNEK_RESET_ANNEAL_N_STEP=10,3 SNEK_RESET_ANNEAL_GAMMA=0.97,0.997` over 10k gradient steps after each reset | b43a-d (resets every 600k on b40's M-QR-DQN cell) | 1 × 4 | 3M steps | registered | — |
-| [b49](#b49--btr-paper-cell-ablations-the-trunk-and-its-norm) | BTR's trunk: `SNEK_BTR_RESIDUAL=0` / `SNEK_BTR_SPECTRAL_NORM=0` | b47a-d's paper cell | 2 × 4 | 1M steps | registered | — |
+| [b50](#b50--d1-anneal-wave-bbfs-within-cycle-n-step--γ-anneal-on-b43s-reset600k-cell) | BBF's within-cycle anneal on the reset cell: `SNEK_RESET_ANNEAL_N_STEP=10,3 SNEK_RESET_ANNEAL_GAMMA=0.97,0.997` over 10k gradient steps after each reset | b43a-d (resets every 600k on b40's M-QR-DQN cell) | 1 × 4 | 3M steps | **held** | D1 closes null: every reset still drops the cell to 0%, recovery to 55-69 within the cycle; tail 59-64 against b40e-h's 89-93 |
+| [b49](#b49--btr-paper-cell-ablations-the-trunk-and-its-norm) | BTR's trunk: `SNEK_BTR_RESIDUAL=0` / `SNEK_BTR_SPECTRAL_NORM=0` | b47a-d's paper cell | 2 × 4 | 1M steps | **held** | both about two points under the paper cell: best30 94.90 (plain trunk), 94.62 (no spectral norm) against 96.58; no `hof5000` candidate |
 | [b48](#b48--rainbow-paper-cell-with-noisy-nets-off) | noisy nets off, ε 1 → 0.01 over 62.5k moves | b46a-d's paper cell | 1 × 4 | 3M steps | **falsified** | best30 9.0-21.4 against the noisy cell's 96.9-98.1; no stage-B row. Noisy nets are most of this cell |
 | [b47](#b47--beyond-the-rainbow-paper-cell-beside-the-local-plumbing) | the algorithm: BTR as its code has it (IQN 8 + Munchausen, residual trunk with spectral norm, 512 noisy dueling streams, 64 lanes) / the same stack with QR-DQN N 32 on the local plumbing | none (paper) / b35's local cell | 2 × 4 | 1M steps (64M / 4M moves) | **falsified** | paper cell best30 96.2-96.7 (419 rows) below Rainbow's 97.45; local cell 90 by 0.11-0.17M, a tenth of b40's onset, and holds (sef 87). No `hof5000` survivor |
 | [b46](#b46--rainbow-paper-cell-beside-the-local-plumbing) | the algorithm: Rainbow as its paper has it (C51, double Q, 512 noisy dueling streams, PER, n-step 3, 1 lane) / the same on the fork/shield plumbing at the paper's update budget, batch 32, ratio 0.25 / 0.0625 | none (paper) / b46a-d | 3 × 4 | 3M steps | **falsified** | paper cell best30 96.9-98.1, 2,200 rows; `rainbowfork25` holds steadier (sef 92.5, best30 96.1-97.1), `rainbowfork0625` lower (94.5). No `hof5000` survivor |
@@ -165,7 +158,11 @@ at complete separation (Mann-Whitney p=0.029). Details in [`protocol.md`](protoc
 | cells × seeds | 1 × 4, seeds 1-4 matching b43a-d |
 | cap | 3M counted steps (~12M gradient steps), eval every 1,000, as b43 |
 | control | b43a-d (the reset without the anneal) and b40e-h (no resets) |
-| predicted | registered 2026-09-26 by the agent: the anneal shortens each reset's dip but not the plateau -- the cell recovers to b43a-d's 60-70 within a cycle rather than never, still under b40e-h's 89-93, and no seed reaches stage B. If it holds at or above b40e-h after the resets stop, reset plus anneal is the late-plasticity lever and the row re-opens on C's best cell |
+| predicted | registered 2026-09-26 by the agent: the anneal shortens each reset's dip but not the plateau -- the cell recovers to b43a-d's 60-70 within a cycle rather than never, still under b40e-h's 89-93, and no seed reaches stage B. If it holds at or above b40e-h after the resets stop, reset plus anneal is the late-plasticity lever and the row re-opens on C's best cell -- **held**: every reset still takes the cell to 0%, recovery in 15k-100k steps to 55-69, reset-free tail 59-64 against b40e-h's 89-93, no stage-B row |
+
+**Learned (closed 2026-09-29).** The anneal shortens nothing that matters: every reset still drops each seed to 0% perfect, and it
+climbs back to a 55-69 plateau in 15k-100k counted steps. The reset-free tail reaches 59-64 against b43a-d's 40-55, so the anneal
+helps a little, and b40e-h without resets holds 89-93. D1 closes null: resets are not the late-plasticity lever on this game.
 
 **Why.** `d-data-efficiency.md` §5's "worse everywhere" branch: b43's reset alone never held, but b43 lacked the piece BBF's own
 ablations put among the most important in the reset regime -- a freshly reset head relearning from a shorter, more myopic target -- so
@@ -180,7 +177,11 @@ no b43 result closes D1. Built 2026-09-20 (`resets.CycleSchedule`, `mut_resets.j
 | cells × seeds | 2 × 4, seeds 1-8 pinned to the letter |
 | cap | 1M counted steps (64M moves), eval every 1,000, as b47 |
 | control | b47a-d |
-| predicted | registered 2026-09-23 by the agent: the plain trunk is within noise of b47a-d (a 26-value observation needs no deep encoder); without spectral norm, within noise or slightly worse late |
+| predicted | registered 2026-09-23 by the agent: the plain trunk is within noise of b47a-d (a 26-value observation needs no deep encoder); without spectral norm, within noise or slightly worse late -- **held** within the protocol's noise, both about two points under: best30 94.90 and 94.62 against 96.58, no `hof5000` candidate |
+
+**Learned (closed 2026-09-29).** Neither BTR change matters much on a 26-value observation. The plain `fc 320` trunk and the residual
+stack without spectral norm both land about two points under the paper cell (best30 94.90 and 94.62 against 96.58), inside n = 4's
+noise but on the same side, with fewer stage-B rows and no `hof5000` candidate. BTR's gap to Rainbow is not its trunk. Group C closes.
 
 **Why.** `c-value-stack.md` §3's C2 ablation: without it, C2 minus C1 is one number with four changes behind it. Queued beside
 b47 rather than after it (2026-09-23, the user's call to queue the group): the paper cell's settings are the paper's, so there is

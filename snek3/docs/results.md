@@ -22,6 +22,75 @@ whose published artifacts are history, and the daemon's ledger, whose keys are t
 waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
 
 
+<!-- progress_update: batch b50 -->
+## Batch b50 — the `knob` sweep, 1 values x 4 seeds, 3M, closed 2026-09-30
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b43a-reset600k-seed1, b43b-reset600k-seed2, b43c-reset600k-seed3, b43d-reset600k-seed4`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| knob | rows | ≥98%/500 | per-seed share | ≥99.2 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| resetanneal | 0 | – | – – – – | 0 | – | 65.80 (60.8-67.8) | 0.0 | 0.46% | 99.54% | 0.0% |
+| **reset600k** (reference) | 0 | – | – – – – | 0 | – | 60.42 (58.0-63.0) | 0.0 | – | – | 0.0% |
+
+<!-- reading -->
+
+D1 closes as a null. The anneal does not remove the dip: every reset still takes each seed to 0% perfect at the next eval, and the
+seed climbs back to its 55-69 plateau in 15k-100k counted steps (twice 200-440k). In the reset-free tail (from ~2.7M) the four seeds
+average 59-64% against b43a-d's 40-55 and b40e-h's 89-93, best30 65.8 against 60.4, no stage-B row. The prediction **held**: a
+recovery within the cycle rather than never, still far under b40e-h, stage B empty. Read with b43 and b44, BBF's resets cost this
+game's value cells their plateau at every cadence and with or without the anneal; the plan's re-open condition (holding at or above
+b40e-h) was not met, so nothing is offered to E2.
+
+<!-- /reading -->
+
+### Every arm
+
+| arm | knob | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b50a-resetanneal-seed1` | resetanneal | 0 | – | – | – | 67.5 @2.9M | 0.0 | – |
+| `b50b-resetanneal-seed2` | resetanneal | 0 | – | – | – | 67.1 @2.9M | 0.0 | – |
+| `b50c-resetanneal-seed3` | resetanneal | 0 | – | – | – | 67.8 @2.8M | 0.0 | 0.46% |
+| `b50d-resetanneal-seed4` | resetanneal | 0 | – | – | – | 60.8 @2.8M | 0.0 | – |
+
+<!-- /progress_update: batch b50 -->
+
+<!-- progress_update: batch b49 -->
+## Batch b49 — the `knob` sweep, 2 values x 4 seeds, 1M, closed 2026-09-30
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b47a-btrpaper-seed1, b47b-btrpaper-seed2, b47c-btrpaper-seed3, b47d-btrpaper-seed4`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| knob | rows | ≥98%/500 | per-seed share | ≥99.2 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| btrplaintrunk | 146 | 2.0% | 3.5 0.0 0.0 0.0 | 0 | 98.6 | 94.90 (94.0-96.0) | 42.4 | 0.0% | 3.41% | 1.3% |
+| btrnospectral | 266 | 4.9% | 0.0 2.8 9.4 3.8 | 0 | 98.8 | 94.62 (93.5-96.0) | 45.8 | 0.0% | 4.27% | 3.6% |
+| **btrpaper** (reference) | 419 | 10.7% | 7.3 11.8 17.1 4.5 | 2 | 99.2 | 96.58 (96.2-96.7) | 45.1 | 0.0% | 3.61% | 5.3% |
+
+<!-- reading -->
+
+Both ablations sit about two points under the BTR paper cell: plain trunk best30 94.90 (94.0-96.0), no spectral norm 94.62
+(93.5-96.0), against b47a-d's 96.58, with a third to two thirds of its stage-B rows and no `hof5000` candidate where the paper
+cell had two. At n = 4 that is inside the ~10 pp the protocol resolves, so the prediction **held** as written (within noise for
+both), but the sign is the same for both changes and for every density column. The trunk is not where BTR's gap to Rainbow is
+(96.58 against 97.45), since removing it costs as much as the norm does. This closes Group C; no Rainbow-family work follows (the
+user, 2026-09-26).
+
+<!-- /reading -->
+
+### Every arm
+
+| arm | knob | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b49a-btrplaintrunk-seed1` | btrplaintrunk | 85 | 3.5% | 0 | 98.6 | 96.0 @0.9M | 42.6 | 0.0% |
+| `b49b-btrplaintrunk-seed2` | btrplaintrunk | 20 | 0.0% | 0 | 97.2 | 95.0 @0.6M | 41.5 | 0.0% |
+| `b49c-btrplaintrunk-seed3` | btrplaintrunk | 31 | 0.0% | 0 | 97.6 | 94.6 @0.6M | 43.1 | 0.0% |
+| `b49d-btrplaintrunk-seed4` | btrplaintrunk | 10 | 0.0% | 0 | 96.8 | 94.0 @1.0M | 42.5 | 0.0% |
+| `b49e-btrnospectral-seed5` | btrnospectral | 45 | 0.0% | 0 | 97.6 | 93.5 @0.9M | 46.4 | 0.0% |
+| `b49f-btrnospectral-seed6` | btrnospectral | 72 | 2.8% | 0 | 98.0 | 94.9 @0.9M | 46.8 | 0.0% |
+| `b49g-btrnospectral-seed7` | btrnospectral | 96 | 9.4% | 0 | 98.8 | 96.0 @0.9M | 44.9 | 0.0% |
+| `b49h-btrnospectral-seed8` | btrnospectral | 53 | 3.8% | 0 | 98.2 | 94.1 @1.0M | 45.3 | 0.42% |
+
+<!-- /progress_update: batch b49 -->
+
 <!-- progress_update: batch b44 -->
 ## Batch b44 — the `knob` sweep, 1 values x 4 seeds, 0M, closed 2026-09-27
 

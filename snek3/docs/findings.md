@@ -55,6 +55,14 @@ to 67-82 (late evals below 80: 4-17% against 33-76%), with entropy pinned at the
 was the implementation, not the maximum-entropy idea. Neither cell reaches 99.2 (`hof5000` empty in both) and the paper cell's 2.5% ≥98/500 is a
 fortieth of PPO's 95.4%: SAC holds the plateau PPO holds, two to three points lower.
 
+### BBF's resets cost a value cell its plateau with or without the within-cycle anneal, and BBF's recipe does not learn Snake in 100k moves: Group D closes null
+
+b50, b44 (closed 2026-09-29 and 2026-09-27, `docs/results.md`). b43's 600k cell plus the n-step 10 -> 3, γ 0.97 -> 0.997 anneal still drops
+to 0% perfect at every reset and climbs back to 55-69 within the cycle; the reset-free tail reads 59-64 against b43's 40-55 and the
+reset-free cell's 89-93. BBF as written, at the paper's 100k moves, relearns to a score of 20-67 each cycle and is wiped by each reset,
+with no climb across twenty cycles and best perfect rate 3%. **The reset is not the late-plasticity lever on this game**, at either
+cadence, with or without the anneal; this supersedes the scoping on the b43 entry below.
+
 ### Shrink-and-perturb resets alone, on a tuned value cell, are harmful; the reset-free tail recovers, so the plateau is suppressed rather than lost
 
 b43 (closed 2026-09-22). On b40's M-QR-DQN cell, resets every 600k gradient steps (twenty cycles) hold the perfect rate at 30-60% for the
