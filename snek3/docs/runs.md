@@ -186,7 +186,7 @@ Does a recurrent policy add to the eight-move window, and can it replace it: `hi
 largest lever (49 → 95% density), and an LSTM can carry an arbitrarily long history without widening the
 observation. Cost: the two-lane minibatch is a 256-step recurrence run 256 times an update, 2,150
 transitions/s against 54,000 feed-forward solo (fused per-segment unroll, 2026-09-30), so ~13 h solo and
-~18 h a 4-arm desktop wave per 100M arm. A laptop wave of 8 mixes the two widths and runs stage A in-process.
+~18 h a 4-arm desktop wave per 100M arm. Both cells run on the desktop: the laptop's wave (e-h) was stopped 12 minutes in on 2026-09-30 at the user's request, cleared and released, and the laptop takes no new work.
 
 ## b50 — D1 anneal wave: BBF's within-cycle n-step / γ anneal on b43's reset600k cell
 

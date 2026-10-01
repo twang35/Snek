@@ -39,7 +39,7 @@ on why the arms stopped opening it, and [`findings.md`](findings.md) on the thre
 | **hist8** (reference) | 22,192 | 95.4% | 95.7 94.3 95.6 95.6 95.5 95.6 95.1 95.7 | 12479 | 100.0 | 99.79 (99.7-99.9) | 95.5 | 0.0% | 0.68% | 85.4% |
 
 <!-- reading -->
-Queued 2026-09-30, nothing to read yet: b51a-d (`lstmhist8`) train on the desktop and b51e-h (`lstmhist0`) on the laptop, read against b27's hist8 (b27q-x) and hist0 (b27a-h) cells once rows exist.
+Queued 2026-09-30, nothing to read yet: b51a-d (`lstmhist8`) train on the desktop; b51e-h (`lstmhist0`) started on the laptop and were stopped 12 minutes in at the user's request, their files cleared and the wave released to the pool, so they train from scratch on the desktop after wave 1. Read against b27's hist8 (b27q-x) and hist0 (b27a-h) cells once rows exist.
 <!-- /reading -->
 
 **knob lstmhist8** — `b51a`-`b51d`:
