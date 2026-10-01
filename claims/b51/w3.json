@@ -1,0 +1,14 @@
+{
+ "arms": [
+  "b51e-lstmhist0-seed5",
+  "b51f-lstmhist0-seed6",
+  "b51g-lstmhist0-seed7",
+  "b51h-lstmhist0-seed8"
+ ],
+ "batch": "b51",
+ "box": "desktop",
+ "claimed_iso": "2026-10-01T03:40:54",
+ "claimed_ts": 1790851254.63855,
+ "kind": "wave",
+ "wave": 3
+}
