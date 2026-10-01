@@ -1,0 +1,18 @@
+{
+  "iso": "2026-09-30T20:09:00",
+  "ts": 1790824140.3296351,
+  "box": "laptop",
+  "project": "snek3",
+  "pid": 21485,
+  "at_a_glance": {
+    "running": [],
+    "queued": [],
+    "attention": [],
+    "remaining": null,
+    "pool": []
+  },
+  "running": [],
+  "queued_ids": [],
+  "panels": [],
+  "window_pid": null
+}
