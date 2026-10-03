@@ -41,8 +41,9 @@ on why the arms stopped opening it, and [`findings.md`](findings.md) on the thre
 Wave 1 (`r2d2paper`, b52a-d) trained to its 130k updates and is in stage B; read it against b46's Rainbow paper cell. On stage A
 alone it is already the value family's best: best30 98.17 (97.1-99.0) against Rainbow's 97.45, and 18.1% of post-competence evals at
 ≥98% against 10.4%. The hold is worse (11.3% of evals under 80% against 4.4%), which is the half of the prediction ("90%+ and
-holds") to watch in stage B. The wave took ~2.5 h on the desktop, not the 24-27 h the spec's benchmark estimated -- worth knowing
-before sizing any further R2D2 wave. `ffr2d2` (e-h) and `r2d2c51` (i-l) are unclaimed, ~19:20 by the wave cadence.
+holds") to watch in stage B. Each arm took ~51 h on the desktop (2026-10-01 12:48 to 10-03 15:53-16:45), double the spec's 24-27 h estimate. `ffr2d2` (e-h)
+and `r2d2c51` (i-l) are unclaimed and go as one 8-arm wave; at the first wave's pace that is ~2026-10-05 21:00, though the dense
+cell should be faster and 8 arms on the box run slower per arm than 4.
 <!-- /reading -->
 
 **knob r2d2paper** — `b52a`-`b52d`:
