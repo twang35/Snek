@@ -170,13 +170,29 @@ def test_batch_counts_span_both_boxes_and_count_the_unclaimed_as_queued():
     assert dict(arms) == {'done': 2, 'running': 1, 'queued': 1} and dict(waves) == {'done': 1, 'queued': 1}
 
 
-def test_eta_uses_the_fallback_cadence_when_no_wave_has_closed(monkeypatch):
+def test_eta_uses_the_fallback_cadence_when_nothing_is_measured(monkeypatch, tmp_path):
     monkeypatch.setattr(pu, 'wave_close_times', lambda batch: [])
     now = datetime.datetime(2026, 9, 3, 12, 0)
-    remaining, per_wave, finish = pu.eta(VIEW, 'b20', now=now, fallback_seconds=3600)
+    remaining, per_wave, finish, source = pu.eta(VIEW, 'b20', now=now, fallback_seconds=3600, runs_dir=str(tmp_path))
     assert remaining == 1 and per_wave == 3600 and finish == now + datetime.timedelta(hours=1)
+    assert source.startswith('default')
     monkeypatch.setattr(pu, 'wave_close_times', lambda batch: [0, 7200, 14400])
-    assert pu.eta(VIEW, 'b20', now=now)[1] == 7200
+    assert pu.eta(VIEW, 'b20', now=now, runs_dir=str(tmp_path))[1:4:2] == (7200, 'wave cadence')
+
+
+def test_eta_with_one_wave_closed_uses_its_longest_arm_not_the_default(monkeypatch, tmp_path):
+    """b52, 2026-10-03: one wave closed, no gap to measure, and the ETA said 2.5 h a wave while the arms had taken 51 h."""
+    monkeypatch.setattr(pu, 'wave_close_times', lambda batch: [1000])
+    live = tmp_path / '.live' / 'desktop'
+    live.mkdir(parents=True)
+    for folder, arm, wall in ((tmp_path, 'b20a-x-seed1', 183869), (live, 'b20b-x-seed2', 187005)):
+        (folder / (arm + '_evals.json')).write_text(json.dumps(
+            {'summary': {'finished': '2026-10-03T16:45:32', 'wall_seconds': wall}}))
+    (tmp_path / 'b20c-x-seed3_evals.json').write_text(json.dumps({'summary': {'wall_seconds': 999999}}))  # unfinished
+    (tmp_path / 'b200a-x-seed1_evals.json').write_text(json.dumps(
+        {'summary': {'finished': 'x', 'wall_seconds': 999999}}))  # another batch
+    remaining, per_wave, _, source = pu.eta(VIEW, 'b20', fallback_seconds=3600, runs_dir=str(tmp_path))
+    assert per_wave == 187005 and source == "first wave's arms"
 
 
 def test_live_batches_are_those_with_anything_left_on_either_box():
