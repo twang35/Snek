@@ -13,9 +13,10 @@ are in git history before 2026-09-10.
 
 ## Open
 
-- **Group E, memory** (b51, b52, queued 2026-09-30): E1 is recurrent PPO on b27's config at hist8 and hist0 (does memory add to
-  the window, can it replace it); E2 is R2D2 whole with its feed-forward control and a C51 head, budgeted by the update count
-  (200k). Open until both close: whether memory over the body moves the perfect rate at all on a 26-value observation.
+- **Group E, memory** (b51 closed 2026-10-03, b52 in flight). E1 (b51): an LSTM in PPO replaces the window (hist0 49 → 89%
+  density) but subtracts from it at hist8 (95.4 → 74.4%), and moves no ceiling. E2 (b52) is R2D2 whole with its feed-forward
+  control and a C51 head; its paper cell's stage A (best30 98.17) already tops Rainbow's 97.45. Open until b52 closes: whether
+  memory helps a value agent (paper minus `ffr2d2`).
 - **Group C, the value stacks** (b46-b49, closed 2026-09-29). Rainbow's paper cell (best30 97.45) is the value family's best; BTR's
   sits under it (96.58) and its trunk ablations two points under that (b49). Noisy nets are most of Rainbow's cell (b48). The value
   family's ceiling is 96-97.5 best30 across eight cells against PPO's 99.8, and no Rainbow-family work follows (the user, 2026-09-26).
@@ -76,7 +77,7 @@ are in git history before 2026-09-10.
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
 | [b52](#b52--r2d2-the-papers-recurrent-value-agent-its-feed-forward-control-and-its-c51-head) | the algorithm: R2D2 as its paper has it (`SNEK_ALGO=r2d2`: LSTM 512 with prev action and reward in, dueling 512 streams, 120-row windows = 40 burn-in + 80 loss, stride 40, n-step 5 double-Q under h(x), PER 0.9/0.6/η 0.9, Adam 1e-4, target copy 2,500, clip 40, the Ape-X ε ladder over 32 lanes) / the same with the LSTM replaced by a dense layer (`ffr2d2`) / the same with a C51 head and the rescaling off | none (paper): hist8, b2 reward, step penalty 0.01, shaping **off** | 3 × 4 | 1.3M steps = 41.6M moves, **130k updates** (shortfall against the 200k floor, stated) | paper 90%+ and holds, `ffr2d2` trails on the hold, c51 level; none at PPO's 99.8 | |
-| [b51](#b51--e1-recurrent-ppo-an-lstm-in-both-towers-on-b27s-config) | `SNEK_PPO_RECURRENT=lstm` (128, both towers, whole-lane minibatches of 2 x 256) at `SNEK_OBS_HISTORY` 8 / 0 | b27's hist8 config verbatim | 2 × 4 | 100M | `lstmhist0` well above hist0 and at or under hist8; `lstmhist8` level with hist8 | |
+| [b51](#b51--e1-recurrent-ppo-an-lstm-in-both-towers-on-b27s-config) | `SNEK_PPO_RECURRENT=lstm` (128, both towers, whole-lane minibatches of 2 x 256) at `SNEK_OBS_HISTORY` 8 / 0 | b27's hist8 config verbatim | 2 × 4 | 100M | `lstmhist0` well above hist0 and at or under hist8; `lstmhist8` level with hist8 | **half held**: `lstmhist0` 89.0% density (hist0 49, hist8 95.4); `lstmhist8` 74.4%, under hist8 on every seed; best30 99.55 both, no `hof30k` row at 99.8 |
 | [b50](#b50--d1-anneal-wave-bbfs-within-cycle-n-step--γ-anneal-on-b43s-reset600k-cell) | BBF's within-cycle anneal on the reset cell: `SNEK_RESET_ANNEAL_N_STEP=10,3 SNEK_RESET_ANNEAL_GAMMA=0.97,0.997` over 10k gradient steps after each reset | b43a-d (resets every 600k on b40's M-QR-DQN cell) | 1 × 4 | 3M steps | **held** | D1 closes null: every reset still drops the cell to 0%, recovery to 55-69 within the cycle; tail 59-64 against b40e-h's 89-93 |
 | [b49](#b49--btr-paper-cell-ablations-the-trunk-and-its-norm) | BTR's trunk: `SNEK_BTR_RESIDUAL=0` / `SNEK_BTR_SPECTRAL_NORM=0` | b47a-d's paper cell | 2 × 4 | 1M steps | **held** | both about two points under the paper cell: best30 94.90 (plain trunk), 94.62 (no spectral norm) against 96.58; no `hof5000` candidate |
 | [b48](#b48--rainbow-paper-cell-with-noisy-nets-off) | noisy nets off, ε 1 → 0.01 over 62.5k moves | b46a-d's paper cell | 1 × 4 | 3M steps | **falsified** | best30 9.0-21.4 against the noisy cell's 96.9-98.1; no stage-B row. Noisy nets are most of this cell |
@@ -179,7 +180,7 @@ the LSTM alone) rather than to the agent. Built 2026-09-30 whole in `algos/r2d2/
 | varies | `SNEK_PPO_RECURRENT=lstm` (hidden 128, **both** towers, the critic its own) with `SNEK_PPO_SEQ_MINIBATCH=2` whole lanes = 512 transitions, b27's minibatch; at **`SNEK_OBS_HISTORY=8`** (`lstmhist8`, a-d) and **`0`** (`lstmhist0`, e-h) |
 | cells × seeds | 2 × 4 |
 | control | b27's `hist8` cell (b27q-x) for `lstmhist8`; b27's `hist0` cell (b27a-h) and `hist8` for `lstmhist0` |
-| predicted | registered 2026-09-30 by the agent: `lstmhist0` lands well above `hist0` (49% density) and at or under `hist8` (95%); `lstmhist8` is level with `hist8` within noise — the window already carries what the body's recent path tells |
+| predicted | registered 2026-09-30 by the agent: `lstmhist0` lands well above `hist0` (49% density) and at or under `hist8` (95%); `lstmhist8` is level with `hist8` within noise — the window already carries what the body's recent path tells -- **half held**: `lstmhist0` 89.0% (held); `lstmhist8` 74.4%, every seed under hist8's worst (**falsified**) |
 
 **Why.** Group E's E1, **local-only by decision** (no paper; the question is memory against the incumbent).
 Does a recurrent policy add to the eight-move window, and can it replace it: `hist8` was the project's
@@ -187,6 +188,11 @@ largest lever (49 → 95% density), and an LSTM can carry an arbitrarily long hi
 observation. Cost: the two-lane minibatch is a 256-step recurrence run 256 times an update, 2,150
 transitions/s against 54,000 feed-forward solo (fused per-segment unroll, 2026-09-30), so ~13 h solo and
 ~18 h a 4-arm desktop wave per 100M arm. Both cells run on the desktop: the laptop's wave (e-h) was stopped 12 minutes in on 2026-09-30 at the user's request, cleared and released, and the laptop takes no new work.
+
+**Learned (closed 2026-10-03).** Memory replaces the window but does not add to it. The LSTM lifts hist0 from 49% to 89% density,
+most of the way to hist8's 95.4%; stacked on hist8 it costs 21 points, every seed below hist8's worst. Neither cell moves the
+ceiling: best30 99.55 against 99.79, and every `hof30k` row abandoned under 99.8. At ~25x the cost per transition, hist8 feed-forward
+stays the incumbent; the open half of Group E is whether memory helps a value agent (b52).
 
 ## b50 — D1 anneal wave: BBF's within-cycle n-step / γ anneal on b43's reset600k cell
 

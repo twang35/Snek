@@ -17,6 +17,13 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### An LSTM replaces the eight-move window but does not add to it, and moves no ceiling
+
+b51 (closed 2026-10-03, `docs/results.md`). Recurrent PPO (LSTM 128 in both towers) on b27's config: at hist0 it reaches 89.0%
+record density against the feed-forward hist0's 49% and hist8's 95.4%; at hist8 it falls to 74.4%, every seed under hist8's worst.
+best30 99.55 in both against 99.79, and no `hof30k` row reached the 99.8 stop target (partials 99.5-99.7). At ~25x the cost per
+transition, the window is the cheaper and better carrier of the recent path on the 26-value observation.
+
 ### The value stacks hold at 90-96 and top out at 96-97.5 best30: Rainbow and BTR reach stage B, none survives `hof5000`, and BTR's local cell learns ten times faster than M-QR-DQN without rising higher
 
 b46, b47 (closed 2026-09-26, `docs/results.md`). Six Group C cells, best30 and stage-B rows: Rainbow paper 96.9-98.1 / 2,200, Rainbow on

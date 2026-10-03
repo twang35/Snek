@@ -22,6 +22,40 @@ whose published artifacts are history, and the daemon's ledger, whose keys are t
 waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
 
 
+<!-- progress_update: batch b51 -->
+## Batch b51 — the `knob` sweep, 2 values x 4 seeds, 100M, closed 2026-10-03
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b27q-hist8-seed17, b27r-hist8-seed18, b27s-hist8-seed19, b27t-hist8-seed20, b27u-hist8-seed21, b27v-hist8-seed22, b27w-hist8-seed23, b27x-hist8-seed24`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| knob | rows | ≥98%/500 | per-seed share | ≥99.2 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| lstmhist8 | 9,167 | 74.4% | 87.9 82.6 55.3 63.1 | 2319 | 100.0 | 99.55 (99.5-99.6) | 97.2 | 0.0% | 0.49% | 63.0% |
+| lstmhist0 | 10,807 | 89.0% | 84.9 89.7 88.5 92.8 | 3678 | 100.0 | 99.55 (99.5-99.7) | 96.0 | 0.0% | 0.57% | 79.2% |
+| **hist8** (reference) | 22,192 | 95.4% | 95.7 94.3 95.6 95.6 95.5 95.6 95.1 95.7 | 12479 | 100.0 | 99.79 (99.7-99.9) | 95.5 | 0.0% | 0.68% | 85.4% |
+
+<!-- reading -->
+**Memory replaces the window but does not add to it, and neither moves the ceiling.** `lstmhist0` 89.0% density against hist0's
+49% (b27a-h) and hist8's 95.4%: **held** (well above hist0, under hist8). `lstmhist8` 74.4%, every seed under hist8's worst seed:
+**falsified** (predicted level; it is lower). best30 99.55 in both cells against 99.79; every `hof30k` row abandoned under the 99.8
+target (partials 99.5-99.7). No checkpoint for the Hall of Fame. The LSTM costs ~25x the feed-forward throughput, so on this
+observation the eight-move window stays the cheaper and better way to carry the recent path.
+<!-- /reading -->
+
+### Every arm
+
+| arm | knob | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b51a-lstmhist8-seed1` | lstmhist8 | 2693 | 87.9% | 937 | 100.0 | 99.5 @29.4M | 96.7 | 0.0% |
+| `b51b-lstmhist8-seed2` | lstmhist8 | 2650 | 82.6% | 669 | 100.0 | 99.5 @33.4M | 97.2 | 0.0% |
+| `b51c-lstmhist8-seed3` | lstmhist8 | 1883 | 55.3% | 338 | 100.0 | 99.6 @33.2M | 97.7 | 0.0% |
+| `b51d-lstmhist8-seed4` | lstmhist8 | 1941 | 63.1% | 375 | 100.0 | 99.6 @22.4M | 97.3 | 0.0% |
+| `b51e-lstmhist0-seed5` | lstmhist0 | 2664 | 84.9% | 720 | 100.0 | 99.5 @54.1M | 96.7 | 0.0% |
+| `b51f-lstmhist0-seed6` | lstmhist0 | 2671 | 89.7% | 981 | 100.0 | 99.7 @54.2M | 95.2 | 0.0% |
+| `b51g-lstmhist0-seed7` | lstmhist0 | 2714 | 88.5% | 862 | 100.0 | 99.5 @41.4M | 96.0 | 0.0% |
+| `b51h-lstmhist0-seed8` | lstmhist0 | 2758 | 92.8% | 1115 | 100.0 | 99.5 @65.2M | 96.2 | 0.0% |
+
+<!-- /progress_update: batch b51 -->
+
 <!-- progress_update: batch b50 -->
 ## Batch b50 — the `knob` sweep, 1 values x 4 seeds, 3M, closed 2026-09-30
 
