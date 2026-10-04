@@ -1,0 +1,14 @@
+{
+ "arms": [
+  "b52e-ffr2d2-seed5",
+  "b52f-ffr2d2-seed6",
+  "b52g-ffr2d2-seed7",
+  "b52h-ffr2d2-seed8"
+ ],
+ "batch": "b52",
+ "box": "desktop",
+ "claimed_iso": "2026-10-03T20:10:46",
+ "claimed_ts": 1791083446.2692714,
+ "kind": "wave",
+ "wave": 2
+}
