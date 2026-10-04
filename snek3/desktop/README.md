@@ -358,17 +358,20 @@ one is in effect. A DDNS name that `dig` resolves but `ssh` does not is the Mac'
 **A `deploy` job type covers the commonest off-LAN need without ssh at all** — `queue_action` above.
 Named actions only (deploy, restart), never arbitrary shell: anything on that branch runs as `claw` on the box.
 
-## Chrome Remote Desktop runs XFCE, not GNOME
+## Chrome Remote Desktop shares the monitor's screen
 
-A graphical login to the box through Chrome Remote Desktop runs **XFCE**, named in
-`~/.chrome-remote-desktop-session` (`exec /usr/bin/startxfce4`), while the console stays GNOME. The reason is
-that gdm auto-logs `claw` into GNOME on the console so the chart window has a display, and GNOME refuses a
-second session for the same user: picking "Launch the default XSession" in CRD's chooser started a second
-`gnome-session`, which exited at once with `Session manager already running!` and CRD dropped the
-connection (2026-10-03, Ubuntu 24.04, CRD 155). The session file replaces the chooser. The 2022 Kubuntu
-recipe (display `:20`, no lock-file scan) is built into the current CRD package and was not the problem. If
-the remote session fails again: `journalctl --user -g gnome-session` and `~/.xsession-errors` on the box,
-and `sudo systemctl restart chrome-remote-desktop@claw` after editing the session file.
+A Chrome Remote Desktop login to the box shows **the same screen as the monitor**, GNOME on display `:0`,
+chart window included. Stock CRD on Linux never does that: its host script starts its own Xorg on a spare
+display and a desktop session inside it, so a remote login lands on a screen nobody can see, and on this
+box that session died anyway, because gdm auto-logs `claw` into GNOME on the console and GNOME refuses a
+second session for the same user (`Session manager already running!`, 2026-10-03). The fix is the user's
+2023 recipe carried forward: `snek3/desktop/crd_attach_console.py` comments out the server and session
+launch in `/opt/google/chrome-remote-desktop/chrome-remote-desktop`, points `DISPLAY` at `:0` with gdm's
+`Xauthority`, and lets the host launch without a server of its own. The original is kept beside it as
+`.orig`. **A package upgrade rewrites the script**, so after one: run the patch again as root and
+restart `chrome-remote-desktop@claw`. `~/.chrome-remote-desktop-session` (`startxfce4`) is left in place as
+the fallback a reverted script would use. If the remote screen is black or the connection drops:
+`journalctl -u chrome-remote-desktop@claw` and `~/.xsession-errors` on the box.
 
 ## What the port changed, and why each one is an incident
 
