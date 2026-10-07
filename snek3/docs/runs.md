@@ -172,6 +172,14 @@ machinery, so a gain can be attributed to the memory (paper minus `ffr2d2`, the 
 the LSTM alone) rather than to the agent. Built 2026-09-30 whole in `algos/r2d2/` (`test_r2d2.py`,
 `mut_r2d2.json`); the paper's figures were read from the PDF the user supplied (§0: ~190k updates over 10B frames). The update count is the budget by decision; the move cap is what 200k updates buys in ~24 h.
 
+**Cap raised for the c51 cell (2026-10-07).** At ~1.17M steps (90% of the 1.3M budget) the four `r2d2c51` arms were still
+climbing, so their cap was raised to **1.8M steps = 57.6M moves, 180k updates** to find the plateau: the specs on `ops` were
+edited, the scheduler and the four trainers killed, and the daemon's new scheduler resumed them from `resume.pt` and `replay.npz`
+at 1.17M-1.18M (at most 10k steps lost; buffer restored). Their stage B runs once, at 1.8M, over every checkpoint. The paper (a-d)
+and `ffr2d2` (e-h) cells stay at 1.3M: their `replay.npz` was pruned after stage B, so an extension would refill the buffer from
+empty — a confound to read against if they are extended later. The cross-cell comparisons therefore read at 1.3M; the c51 cell's
+1.3M-1.8M stretch is a plateau reading, not part of the within-batch budget.
+
 ## b51 — E1: recurrent PPO, an LSTM in both towers on b27's config
 
 | | |
