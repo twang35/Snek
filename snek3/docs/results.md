@@ -22,6 +22,57 @@ whose published artifacts are history, and the daemon's ledger, whose keys are t
 waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
 
 
+<!-- progress_update: batch b52 -->
+## Batch b52 — the `knob` sweep, 3 values x 4 seeds, 2M, closed 2026-10-09
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b46a-rainbowpaper-seed1, b46b-rainbowpaper-seed2, b46c-rainbowpaper-seed3, b46d-rainbowpaper-seed4`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| knob | rows | ≥98%/500 | per-seed share | ≥99.2 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| r2d2paper | 1,238 | 50.4% | 62.8 6.2 61.9 10.3 | 113 | 100.0 | 98.17 (97.1-99.0) | 56.4 | 0.06% | 11.29% | 18.1% |
+| ffr2d2 | 1,354 | 16.1% | 18.7 9.7 21.2 14.0 | 10 | 100.0 | 97.72 (97.5-97.9) | 72.8 | 0.0% | 2.08% | 16.6% |
+| r2d2c51 | 1,669 | 79.0% | 65.1 50.6 93.6 75.2 | 673 | 100.0 | 99.15 (98.5-99.8) | 38.5 | 1.86% | 12.96% | 20.1% |
+| **rainbowpaper** (reference) | 2,200 | 9.0% | 16.8 4.6 3.2 5.8 | 3 | 99.6 | 97.45 (96.9-98.1) | 61.6 | 0.0% | 4.44% | 10.4% |
+
+<!-- reading -->
+Read the c51 cell (i-l) first, against the paper cell (a-d) and then against the hall of fame. It is the value family's best on
+every column -- 79.0% of stage-B rows at ≥98% against the paper cell's 50.4%, 673 `hof5000` candidates against 113, best30 99.15
+against 98.17 -- and **b52k is the first value agent at the PPO record**: 66 full `hof30k` rows (the pass's own seed-7 measurement),
+median 29,950 /30,000, 51 of them at or above `b27t`'s admitted 29,944, four at or above the record's 29,967, and two at **29,970
+(99.900%)**, at 1.779M and 1.800M. b52l abandoned every 30k row at 99.3-99.5; i and j never reached one. The budget is the caveat:
+this cell ran to 1.8M steps / 180k updates (raised from 1.3M on 2026-10-07 when i-l were still climbing) and 427 of b52k's 484 ≥99.2
+rows are after 1.3M, where a-h stopped -- so "c51 beats the paper cell" is read at unequal budgets, and the paper cell's ceiling at
+180k updates is unknown. What the cap raise showed is that the cell is not one plateau: k and l were flat at 99.0-99.7 from 1.2M,
+while i and j went from 45-72% in the 1.2-1.3M bin to 98.1-98.7 in the 1.7-1.8M bin and were still rising at the cap.
+The memory reading, the batch's question, is the paper cell minus `ffr2d2` at the same 1.3M: 50.4% against 16.1% at ≥98%, 113 against
+10 candidates, best30 98.17 against 97.72 -- the LSTM is most of the paper cell's edge over a dense layer in the same place, the opposite
+of b51's PPO result; `ffr2d2` holds better (2.1% of evals under 80% against 11.3%). Against b46's Rainbow paper cell (97.45, 3 candidates),
+every R2D2 cell is ahead on the peak and the paper cell behind on the hold. Verdicts: paper cell 90%+ and holds -- **half held**, it
+reached 100/500 and 99.5 /5,000 but seeds b and d never reached `hof5000` and no arm reached a 30k row; `ffr2d2` trails on the hold only --
+**falsified in part**, it trails on the peak too; c51 level with the paper cell -- **falsified upward**; none at PPO's 99.8 -- **falsified**.
+Next: a fresh-seed confirmation of b52k @1.779M / @1.800M for the hall of fame (`hof-promote`), and the budget question -- the paper cell
+at 1.8M, which needs a retrain since a-h's replay was pruned.
+<!-- /reading -->
+
+### Every arm
+
+| arm | knob | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b52a-r2d2paper-seed1` | r2d2paper | 535 | 62.8% | 73 | 100.0 | 99.0 @1.0M | 65.8 | 0.43% |
+| `b52b-r2d2paper-seed2` | r2d2paper | 130 | 6.2% | 0 | 98.8 | 97.1 @1.3M | 55.8 | 0.11% |
+| `b52c-r2d2paper-seed3` | r2d2paper | 428 | 61.9% | 40 | 99.8 | 98.8 @1.1M | 60.2 | 0.0% |
+| `b52d-r2d2paper-seed4` | r2d2paper | 145 | 10.3% | 0 | 99.0 | 97.8 @1.2M | 43.9 | 0.0% |
+| `b52e-ffr2d2-seed5` | ffr2d2 | 477 | 18.7% | 5 | 100.0 | 97.9 @1.2M | 76.2 | 0.0% |
+| `b52f-ffr2d2-seed6` | ffr2d2 | 339 | 9.7% | 0 | 98.8 | 97.5 @0.9M | 74.7 | 0.0% |
+| `b52g-ffr2d2-seed7` | ffr2d2 | 288 | 21.2% | 4 | 99.4 | 97.9 @1.2M | 63.8 | 0.67% |
+| `b52h-ffr2d2-seed8` | ffr2d2 | 250 | 14.0% | 1 | 99.4 | 97.6 @1.2M | 76.7 | 0.0% |
+| `b52i-r2d2c51-seed9` | r2d2c51 | 192 | 65.1% | 49 | 100.0 | 99.1 @1.7M | 28.2 | 3.1% |
+| `b52j-r2d2c51-seed10` | r2d2c51 | 162 | 50.6% | 15 | 99.8 | 98.5 @1.8M | 23.6 | 1.41% |
+| `b52k-r2d2c51-seed11` | r2d2c51 | 669 | 93.6% | 484 | 100.0 | 99.8 @1.6M | 48.5 | 1.72% |
+| `b52l-r2d2c51-seed12` | r2d2c51 | 646 | 75.2% | 125 | 100.0 | 99.2 @1.5M | 53.8 | 2.01% |
+
+<!-- /progress_update: batch b52 -->
+
 <!-- progress_update: batch b51 -->
 ## Batch b51 — the `knob` sweep, 2 values x 4 seeds, 100M, closed 2026-10-03
 

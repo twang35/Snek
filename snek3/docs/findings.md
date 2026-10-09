@@ -17,6 +17,15 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### R2D2 with a C51 head reaches the PPO record, and its memory is most of its edge over a dense control
+
+b52 (closed 2026-10-09, `docs/results.md`). R2D2 as its paper has it (LSTM 512, burn-in 40, 80-step loss windows, PER, Ape-X ladder,
+hist8, shaping off) tops Rainbow's paper cell on the peak (best30 98.17 against 97.45; 100/500 and 99.5 /5,000) but not the hold, and
+has three times its feed-forward control's share of stage-B rows at ≥98% (50.4% against 16.1%) and eleven times its `hof5000` candidates
+(113 against 10) -- the LSTM the only difference, the opposite sign to b51's PPO result. The same agent with a C51 head, run to 1.8M
+steps / 180k updates, is the first value agent with any `hof30k` row and it lands at the record: b52k has 66 full rows, median 29,950
+/30,000, two at 29,970 (99.900%, the record's count), pending a fresh-seed confirmation; two of its four seeds were still climbing at the cap.
+
 ### An LSTM replaces the eight-move window but does not add to it, and moves no ceiling
 
 b51 (closed 2026-10-03, `docs/results.md`). Recurrent PPO (LSTM 128 in both towers) on b27's config: at hist0 it reaches 89.0%
