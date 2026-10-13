@@ -25,10 +25,12 @@ first time. A publish that fails never stops the scheduler -- it is logged and t
 and a local-only commit is pushed by the next successful publish's `--force-with-lease`.
 """
 
+import datetime
 import json
 import os
 import sys
 import time
+import zoneinfo
 
 # `desktop/` shells out and imports nothing from this project; this direction -- a tool importing
 # the daemon's pure helpers -- is the one the "one implementation for both boxes" rule wants, rather
@@ -55,6 +57,13 @@ def host(repo=REPO, worktree=WORKTREE, branch=BRANCH, remote=REMOTE):
             'GIT_REMOTE': remote}
 
 
+
+def pacific_iso(ts):
+    """The stamp the desktop's daemon folds in as `laptop_iso`, in Pacific time like the desktop's own
+    (its clock is Pacific; the laptop travels, and read HST on 2026-10-12). Every time the project
+    publishes is PT (root CLAUDE.md, 2026-10-12)."""
+    return datetime.datetime.fromtimestamp(ts, zoneinfo.ZoneInfo('America/Los_Angeles')).strftime('%Y-%m-%dT%H:%M:%S')
+
 def build(running, queued, now=None, panels=(), window_pid=None, attention=(), box=None, pool=()):
     """The scheduler's `status.json`: the daemon's `at_a_glance` shape over the scheduler's job dicts,
     plus what the window needs.
@@ -70,7 +79,7 @@ def build(running, queued, now=None, panels=(), window_pid=None, attention=(), b
     # of this scheduler's last sync. The same on both boxes, so the reader sees one pool.
     glance['pool'] = list(pool)
     return {
-        'iso': time.strftime('%Y-%m-%dT%H:%M:%S', time.localtime(now)),
+        'iso': pacific_iso(now),
         'ts': now,
         'box': box or os.environ.get('SNEK_BOX') or 'laptop',
         'project': 'snek3',
