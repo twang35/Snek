@@ -123,6 +123,8 @@ result in this project came from an unrequested suggestion to diff `snek2` again
 investigation has overturned several of its own findings and each retraction was worth more than
 the section it replaced.
 
+**Report every time in Pacific time, labelled `PT`** (the user, 2026-10-12): in replies, in the docs and in the tools' output. The desktop `the-claw-den` keeps a Pacific clock, so its `status.json` iso stamps are already PT; the laptop travels, so never read its clock or a `date` on it as Pacific -- convert (`tools/progress_update.py`'s `pacific_now()`), and label a laptop-clock stamp as such when it cannot be converted.
+
 **Be succinct in the docs.** Detail belongs in the summary at the end of a reply; the docs should
 be scannable. Lead a section covering a *set* of things with a compact table, then explain
 underneath.
