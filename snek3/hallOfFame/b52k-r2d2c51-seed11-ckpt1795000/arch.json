@@ -1,0 +1,21 @@
+{
+  "algo": "r2d2",
+  "fc_layer_params": [
+    320
+  ],
+  "head": {
+    "atoms": 51,
+    "type": "c51",
+    "v_max": 110.0,
+    "v_min": -10.0
+  },
+  "num_actions": 3,
+  "obs_era": "obs26-20260907-hist8",
+  "obs_len": 42,
+  "recurrent": {
+    "hidden": 512,
+    "prev_input": true,
+    "stream_width": 512,
+    "type": "lstm"
+  }
+}

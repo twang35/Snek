@@ -41,7 +41,8 @@ on why the arms stopped opening it, and [`findings.md`](findings.md) on the thre
 
 <!-- reading -->
 Closed 2026-10-09 (`docs/results.md` has the full reading). The c51 wave (i-l) trained to its raised 1.8M cap and its `hof30k` is in:
-b52k has 66 full rows, median 29,950 /30k, two at 29,970 (99.900%) -- at the PPO record, pending a fresh-seed confirmation. Read it first, against the paper cell: it is now the best cell in the value family on every column -- 79.0% of stage-B rows at
+b52k has 66 full rows, median 29,950 /30k, two at 29,970 (99.900%) -- at the PPO record, and **confirmed 2026-10-12**: its five best rows
+re-measured on seed 13 read 29,936-29,960, @1795000 (29,967 / 29,960) is in the hall of fame tied with `b32g`. The c51 arms run on to 2.4M. Read it first, against the paper cell: it is now the best cell in the value family on every column -- 79.0% of stage-B rows at
 ≥98% against 50.4%, 673 `hof5000` candidates against 113, best30 99.15 against 98.17 -- and **b52k is the first value-agent arm to
 measure 100.0 over 5,000 episodes**, at three checkpoints (1.763M, 1.784M, 1.787M) with 329 full `hof5000` rows; b52l has 99.6 at depth.
 Almost all of that lies past the old 1.3M cap: 427 of b52k's 484 rows at ≥99.2 are after 1.3M. The cap raise was decisive and the
@@ -51,7 +52,7 @@ c51 cell is 2 of 4 seeds plateaued and 2 still arriving, and the paper cell (a-d
 Memory still reads as the paper cell minus `ffr2d2` (50.4% against 16.1% at ≥98%, 113 against 10 candidates). Predictions: the paper cell
 reached 90%+ and did not hold (half held; no `hof30k` row); `ffr2d2` trails on the peak as well as the hold (falsified in part); "c51 level with
 the paper cell" is **falsified upward** -- c51 is clearly better, with the caveat that it had 180k updates to the paper cell's 130k.
-Open: whether `hof30k` confirms b52k at 99.8+ (PPO's bar), and whether a-h would reach the same place with the same 1.8M.
+Open: whether the 1.8M-2.4M stretch (running since 2026-10-12) lifts k above the tie or brings i and j to it; a-h stay at 1.3M by decision.
 <!-- /reading -->
 
 **knob r2d2paper** — `b52a`-`b52d`:

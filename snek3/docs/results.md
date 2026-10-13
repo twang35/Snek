@@ -50,9 +50,11 @@ of b51's PPO result; `ffr2d2` holds better (2.1% of evals under 80% against 11.3
 every R2D2 cell is ahead on the peak and the paper cell behind on the hold. Verdicts: paper cell 90%+ and holds -- **half held**, it
 reached 100/500 and 99.5 /5,000 but seeds b and d never reached `hof5000` and no arm reached a 30k row; `ffr2d2` trails on the hold only --
 **falsified in part**, it trails on the peak too; c51 level with the paper cell -- **falsified upward**; none at PPO's 99.8 -- **falsified**.
-Next (2026-10-12): b52k's five best 30k rows re-measured on seed 13 for the hall of fame (`hof-promote`, desktop), and the c51 cell
-run on to 2.4M / 240k updates -- does k go higher, do i and j arrive. The paper cell is not extended, by decision (user): it did well
-without pushing at the limit.
+Confirmed 2026-10-12 (`hof-promote`, desktop): b52k's five best seed-7 rows re-measured at 30,000 on seed 13 read 29,954 / 29,942 /
+29,954 / **29,960** / 29,936 (@1779000, @1800000, @1793000, @1795000, @1711000) -- the two 29,970s fell 16 and 28 games, the selected
+high behaving as one. @1795000 is in the hall of fame at 29,967 / 29,960, **tied with `b32g`** (29,967 / 29,957, z = 0 and 0.3), not
+above it; the first value-based entry. The c51 cell runs on to 2.4M / 240k updates (does k go higher, do i and j arrive); the paper
+cell is not extended, by decision (user): it did well without pushing at the limit.
 <!-- /reading -->
 
 ### Every arm
