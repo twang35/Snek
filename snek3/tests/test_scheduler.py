@@ -1451,3 +1451,39 @@ def test_an_arm_training_here_that_no_claim_covers_is_named_and_left_alone(tmp_p
     assert shared.lines() == ['b21 training | 1/2 arms', 'laptop holds b21-w1 (1 arm)'], \
         'the pool lines this box publishes read the statuses and the feeds, or every holding reads as open'
     assert os.path.exists(os.path.join(box['runs'], '.live', 'b21b-x-seed2')), 'a sync never kills a trainer'
+
+
+def test_a_pass_file_from_before_a_raised_cap_does_not_count_as_done(box):
+    """b52 i-l (2026-10-12): the cap went 1.8M -> 2.4M after every pass had merged. `pass_done` must read
+    the merged file's `through_step` against the arm's step -- and, for a file from before the field
+    existed, its `finished` stamp against the arm's: a pass merged after the arm last finished covers it."""
+    s = spec('b52k-r2d2c51-seed11')
+    runs = box['runs']
+
+    def arm_at(step, finished):
+        with open(os.path.join(runs, s['policy'] + '_evals.json'), 'w') as handle:
+            json.dump({'summary': {'step': step, 'finished': finished}, 'evals': []}, handle)
+
+    def pass_file(pass_name, payload):
+        with open(scheduler.pass_file(s['policy'], pass_name, runs), 'w') as handle:
+            json.dump(payload, handle)
+
+    arm_at(1800000, '2026-10-08T11:40:34')
+    pass_file('stageb', {'finished': '2026-10-08T13:42:47', 'rows': [{'step': 1700000}, {'step': 1800000}]})   # legacy
+    pass_file('hof5000', {'finished': '2026-10-08T20:45:03', 'rows': []})                                        # legacy, empty
+    pass_file('hof30k', {'rows': []})                                                                            # no stamps at all
+    assert all(scheduler.pass_done([s], name, runs) for name in ('stageb', 'hof5000', 'hof30k'))
+    arm_at(2400000, '2026-10-14T03:00:00')                                     # the cap was raised and reached
+    assert not scheduler.pass_done([s], 'stageb', runs), 'merged before the arm trained on'
+    assert not scheduler.pass_done([s], 'hof5000', runs)
+    assert scheduler.pass_done([s], 'hof30k', runs), 'a file with neither stamp is taken at its word'
+    pass_file('stageb', {'through_step': 2400000, 'finished': '2026-10-14T05:00:00', 'rows': [{'step': 1800000}, {'step': 2350000}]})
+    assert scheduler.pass_done([s], 'stageb', runs)
+    pass_file('hof5000', {'through_step': 1800000, 'finished': '2026-10-14T06:00:00', 'rows': []})
+    assert not scheduler.pass_done([s], 'hof5000', runs), 'the step field wins over the stamps'
+    pass_file('hof5000', {'through_step': 2400000, 'rows': []})
+    assert scheduler.pass_done([s], 'hof5000', runs)
+    os.remove(os.path.join(runs, s['policy'] + '_evals.json'))
+    assert scheduler.pass_done([s], 'hof5000', runs), 'no stage-A file: the merged file is taken at its word'
+    os.remove(scheduler.pass_file(s['policy'], 'hof30k', runs))
+    assert not scheduler.pass_done([s], 'hof30k', runs), 'no file is still no file'

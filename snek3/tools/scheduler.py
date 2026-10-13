@@ -230,10 +230,54 @@ def pass_file(policy, pass_name, runs_dir=None):
     return os.path.join(runs_dir or constants.RUNS_DIR, name)
 
 
+def pass_covers(spec, pass_name, runs_dir=None):
+    """Whether the arm's merged file for the pass exists and was written when the arm had trained as far
+    as it has now. An empty file counts: an arm with no candidates gets one, and the next pass reads it
+    and selects nothing. A file from before the arm's cap was raised does not (b52 i-l, 1.8M -> 2.4M,
+    2026-10-12): its header's `through_step` (`tools/results.merge`) is short of the arm's step, so the
+    pass runs again and measures the new checkpoints only. A file without the field predates it and is
+    judged by time instead -- a pass merged after the arm's stage A last finished covers it (both stamps
+    are `results.iso_now()` on the same box) -- and one with neither stamp is taken at its word."""
+    path = pass_file(spec['policy'], pass_name, runs_dir)
+    if not os.path.exists(path):
+        return False
+    header = _header(path)
+    stage_a = _stage_a_summary(spec, runs_dir)
+    try:
+        through, step = int(header['through_step']), int(stage_a['step'])
+    except (KeyError, TypeError, ValueError):
+        pass
+    else:
+        return through >= step
+    merged_at, trained_to = header.get('finished'), stage_a.get('finished')
+    if merged_at and trained_to:
+        return str(merged_at) >= str(trained_to)
+    return True
+
+
+def _header(path):
+    try:
+        with open(path) as handle:
+            payload = json.load(handle)
+        return payload if isinstance(payload, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _stage_a_summary(spec, runs_dir=None):
+    path = os.path.join(runs_dir or constants.RUNS_DIR, '{0}_evals.json'.format(spec['policy']))
+    try:
+        with open(path) as handle:
+            summary = json.load(handle)['summary']
+        return summary if isinstance(summary, dict) else {}
+    except (OSError, KeyError, TypeError, ValueError):
+        return {}
+
+
 def pass_done(arms, pass_name, runs_dir=None):
-    """Whether every arm of a wave already has the pass's merged file. An empty file counts: an arm
-    with no candidates gets one, and the next pass reads it and selects nothing."""
-    return all(os.path.exists(pass_file(spec['policy'], pass_name, runs_dir)) for spec in arms)
+    """Whether every arm of a wave already has the pass's merged file, written at the arm's current step
+    (`pass_covers`)."""
+    return all(pass_covers(spec, pass_name, runs_dir) for spec in arms)
 
 
 def current_step(spec, runs_dir=None):

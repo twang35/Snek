@@ -24,6 +24,7 @@ Definitions are `tools/viewer_manifest.py`'s, so the page and the docs cannot di
 import argparse
 import collections
 import datetime
+import zoneinfo
 import glob
 import json
 import os
@@ -34,6 +35,7 @@ import sys
 
 from env import constants
 from tools import batch_state
+from tools import results
 from tools.eta import HOF_THRESHOLD
 from tools import claims
 from tools import publish_pages
@@ -54,6 +56,16 @@ END_MARK = '<!-- /progress_update: batch {0} -->'
 SHARD = re.compile(r'-s\d+of\d+\.json$|\.partial$')
 READING = '<!-- reading -->'
 END_READING = '<!-- /reading -->'
+
+PACIFIC = zoneinfo.ZoneInfo('America/Los_Angeles')
+
+
+def pacific_now():
+    """The project reports every wall-clock time in Pacific time, labelled PT (the user, 2026-10-12): the desktop
+    box's clock is Pacific, so its `status.json` iso stamps are already PT, while the laptop travels and its own
+    clock is not a time zone the reader can assume."""
+    return datetime.datetime.now(PACIFIC)
+
 
 
 # ------------------------------------------------------------------------------------------ git/ssh
@@ -88,13 +100,36 @@ def feed_trees():
     return out
 
 
-def import_closed_waves(trees, runs_dir=None):
+ARM_OF_FILE = re.compile(r'^(b\d+[a-z]+-[^_.]+)')      # `b52k-r2d2c51-seed11` out of any of the arm's files
+
+
+def extended_arms(view):
+    """`arm -> max_steps` for every training spec on `ops` whose cap is above the step `runs/` has for it
+    and that no box is running right now: an arm whose close-out files here predate a raised cap (b52 i-l,
+    2026-10-12). What `import_closed_waves` is allowed to overwrite."""
+    out = {}
+    for spec in (view or {}).get('specs', {}).values():
+        if spec.get('type', 'train') != 'train' or spec.get('policy') in (view.get('running') or {}):
+            continue
+        try:
+            cap = int(spec['max_steps'])
+        except (KeyError, TypeError, ValueError):
+            continue
+        have = results.stage_a_step(spec['policy'])
+        if have is not None and have < cap:
+            out[spec['policy']] = cap
+    return out
+
+
+def import_closed_waves(trees, runs_dir=None, extended=None):
     """Copies every published job's files that `runs/` does not have yet -- an arm's at its cap, a pass's
     merged files, an eval spec's -- from either feed. Returns the count. A job on a feed is finished by
     construction: the scheduler publishes an arm at its cap and a pass with its merged files, nothing
     earlier. Pre-rename jobs (`p2-hof5000` is b5's) stay on `results` by design -- results.md, "Where the
-    raw rows are"."""
+    raw rows are". `extended` (`extended_arms`) names the arms whose files here are from before a raised
+    cap; theirs are taken again, since the feed's copy is the newer close-out."""
     runs_dir = runs_dir or constants.RUNS_DIR
+    extended = extended or {}
     copied = 0
     for feed, path in trees:
         parts = path.split('/')
@@ -103,7 +138,8 @@ def import_closed_waves(trees, runs_dir=None):
         if SHARD.search(parts[2]):          # a shard's partial rows; the merged file is what runs/ keeps
             continue
         target = os.path.join(runs_dir, parts[2])
-        if os.path.exists(target):
+        arm = ARM_OF_FILE.match(parts[2])
+        if os.path.exists(target) and not (arm and arm.group(1) in extended):
             continue
         with open(target, 'wb') as handle:
             handle.write(subprocess.run(['git', 'show', 'origin/{0}:{1}'.format(feed, path)], cwd=REPO,
@@ -570,7 +606,7 @@ def eta(view, batch, now=None, fallback_seconds=DEFAULT_WAVE_SECONDS, runs_dir=N
             per_wave, source = walls[-1], 'first wave\'s arms'
         else:
             per_wave, source = fallback_seconds, 'default, nothing measured'
-    now = now or datetime.datetime.now()
+    now = now or pacific_now()
     return remaining, per_wave, now + datetime.timedelta(seconds=remaining * per_wave), source
 
 
@@ -585,7 +621,7 @@ def state_line(view, batch, status=None):
         arms, _ = batch_counts(view, batch)
         if arms['queued'] or arms['running']:
             remaining, per_wave, finish, source = eta(view, batch)
-            text += '; {0} training wave(s) left at ~{1:.1f} h each ({3}) -> ~{2:%Y-%m-%d %H:%M}'.format(
+            text += '; {0} training wave(s) left at ~{1:.1f} h each ({3}) -> ~{2:%Y-%m-%d %H:%M} PT'.format(
                 remaining, per_wave / 3600, finish, source)
     return text
 
@@ -624,7 +660,7 @@ def main(argv=None):
         bus = read_bus()
         status, view = bus['status'], bus['view']
         save_desktop_status(status, view=view)
-        copied = import_closed_waves(feed_trees())
+        copied = import_closed_waves(feed_trees(), extended=extended_arms(view))
         ok, msg = pull_live_charts(desktop_live_batches(view))
         dropped = drop_superseded_snapshots()
         say('sync: {0} finished-job files imported, {1} live snapshots superseded; {2}'.format(copied, dropped, msg))
@@ -648,7 +684,7 @@ def main(argv=None):
 
     if status:
         say('')
-        say('desktop {0}: {1}'.format(status['iso'], '; '.join(status['at_a_glance'].get('desktop_running') or []) or 'idle'))
+        say('desktop {0} PT: {1}'.format(status['iso'], '; '.join(status['at_a_glance'].get('desktop_running') or []) or 'idle'))
         for job, step, cap, elapsed in running_arms(status):
             if cap:
                 say('  {0} {1:.1f}M/{2:.1f}M {3:.0f}% {4:.0f} min'.format(job, step / 1e6, cap / 1e6,
@@ -656,7 +692,7 @@ def main(argv=None):
             else:
                 say('  {0} {1:.0f} min'.format(job, elapsed / 60))
         glance = status['at_a_glance']
-        say('laptop {0}: {1}'.format(glance.get('laptop_iso'), '; '.join(glance.get('laptop_running') or []) or 'idle'))
+        say('laptop {0} (laptop clock): {1}'.format(glance.get('laptop_iso'), '; '.join(glance.get('laptop_running') or []) or 'idle'))
         for line in glance.get('pool') or []:
             say('  pool: ' + line)
         if glance.get('attention'):
@@ -689,14 +725,14 @@ def main(argv=None):
                     title += ' ({0} of {1} arms in)'.format(arm_states['done'], sum(arm_states.values()))
             status_line = ('**{0}** as of {1}. Reference group marked. Regenerated by `tools/progress_update.py`; '
                            'only the reading block is hand-written.').format(
-                               where, datetime.datetime.now().strftime('%Y-%m-%d %H:%M'))
+                               where, pacific_now().strftime('%Y-%m-%d %H:%M PT'))
             charts = update_charts_md(charts, table, 'Batch ' + title, status_line, adopt=batch in adopt)
             if closed:
                 facts = ('Closed on both boxes\' feeds; every arm has its stage-B measurement. One knob off the reference cell '
                          '(`{0}`, marked in the table). Numbers by `tools/progress_update.py`.').format(
                              ', '.join(ref.get('arms', [])) or 'none named')
                 results, added = insert_results_skeleton(results, table, 'Batch ' + title + ', closed {0}'.format(
-                    datetime.date.today().isoformat()), facts)
+                    pacific_now().date().isoformat()), facts)
                 if added:
                     say('results.md: skeleton inserted for {0} — write its reading'.format(batch))
             for g in table['groups']:

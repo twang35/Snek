@@ -40,7 +40,9 @@ def test_a_merged_file_missing_a_selected_step_does_not_count(monkeypatch):
     _arm(monkeypatch, [100, 200, 300])
     _merged('b1a-x', None, [100, 200])                  # a new checkpoint qualified since the merge
     wave = eval_wave.ArmWave('b1a-x', shards=4)
-    assert not wave.already_merged and wave.shards == 3
+    # Until 2026-10-12 every step was measured again here (3 shards); now the two merged rows are kept
+    # and one shard measures the new step -- the merge folds the file back in.
+    assert not wave.already_merged and wave.shards == 1 and wave.todo == [300]
 
 
 def test_no_resume_measures_afresh_and_a_torn_file_is_not_a_reason_to_skip(monkeypatch):
@@ -65,3 +67,17 @@ def test_the_shard_command_carries_the_stop_target_only_when_there_is_one():
     assert '--stop' not in plain
     stopped = eval_wave.shard_command('b1a', 'above:99.2', 5000, 'hof5000', 0, 4, None, 0, True, 99.6)
     assert stopped[stopped.index('--stop') + 1] == '99.6'
+
+
+def test_a_merged_file_covering_part_of_the_selection_runs_shards_over_the_rest_only(monkeypatch, capsys):
+    """2026-10-12: b52 i-l extended 1.8M -> 2.4M after their passes had merged. The merged rows are kept,
+    the shards are sized to the new checkpoints, and the row-count guard at the merge counts those."""
+    _arm(monkeypatch, [100, 200, 300, 400, 500])
+    _merged('b1a-x', None, [100, 200, 300])
+    wave = eval_wave.ArmWave('b1a-x', shards=4)
+    assert not wave.already_merged and wave.todo == [400, 500] and wave.shards == 2
+    wave.announce(requested=4)
+    out = capsys.readouterr().out
+    assert '3 already merged, kept' in out and '1000 episodes total' in out
+    fresh = eval_wave.ArmWave('b1a-x', shards=4, resume=False)
+    assert fresh.todo == [100, 200, 300, 400, 500] and fresh.shards == 4, '--no-resume measures afresh'

@@ -148,3 +148,27 @@ def test_a_shard_writes_after_every_row(tmp_path, policy):
     # `on_row` fires after the flush, so by the first callback there is already a row on disk.
     assert seen and seen[0] >= 1
     assert seen == sorted(seen)
+
+
+def test_a_shard_skips_the_steps_already_in_the_pass_merged_file(tmp_path, policy, monkeypatch, capsys):
+    """An arm extended past its close-out (2026-10-12): the merged file's rows are kept by the merge, so
+    the shards measure only the checkpoints it lacks. `--no-resume` still measures everything."""
+    from env import constants
+    from tools import results
+    runs = tmp_path / 'runs'
+    runs.mkdir()
+    monkeypatch.setattr(constants, 'RUNS_DIR', str(runs))
+    monkeypatch.setattr(shard.restore, 'policy_dir', lambda name: policy)
+    results.write(results.stage_b_path('p', None),
+                  {'policy': 'p', 'rows': [{'step': s, 'episodes': 2, 'perfect_percent': 0.0} for s in (1000, 2000, 3000, 4000)]})
+    measured = set()
+    for index in (0, 1):
+        assert shard.main(['p', '--selector', 'all', '--episodes', '2', '--shard', str(index), '--shards', '2']) == 0
+        out = capsys.readouterr().out
+        assert 'of 2 step(s)' in out and '4 already merged, skipped' in out
+        measured |= {row['step'] for row in results.rows_of(results.read(results.stage_b_path('p', None, shard=index, shards=2)))}
+    assert measured == {5000, 6000}
+    path, rows = results.merge('p', None, delete_shards=True)
+    assert [row['step'] for row in rows] == [1000, 2000, 3000, 4000, 5000, 6000], 'the merge keeps the old rows'
+    assert shard.main(['p', '--selector', 'all', '--episodes', '2', '--no-resume', '--shard', '0', '--shards', '1']) == 0
+    assert '6 of 6 step(s)' in capsys.readouterr().out

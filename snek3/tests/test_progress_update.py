@@ -338,3 +338,35 @@ def test_a_batch_off_the_bus_is_closed_when_every_arm_has_its_three_pass_files(t
         (tmp_path / (arm + progress_update.PASS_SUFFIXES[2])).write_text('{}')
     assert progress_update.files_closed(arms, str(tmp_path))
     assert not progress_update.files_closed([], str(tmp_path)), 'no arms is not a closed batch'
+
+
+def test_an_arm_whose_cap_was_raised_has_its_files_imported_again(tmp_path, monkeypatch):
+    """b52 i-l, 2026-10-12: `runs/` held the 1.8M close-out when the cap went to 2.4M. Once the box publishes
+    the arm again, its files are re-taken -- but not while a box is still training it, and never for an arm
+    whose files already reach its cap."""
+    from tools import results
+    monkeypatch.setattr(results.constants, 'RUNS_DIR', str(tmp_path))
+    calls = []
+
+    def run(argv, **kw):
+        calls.append(argv)
+        return type('R', (), {'stdout': b'{"summary": {"step": 2400000}}', 'returncode': 0})()
+    monkeypatch.setattr(pu.subprocess, 'run', run)
+    (tmp_path / 'b52k-r2d2c51-seed11_evals.json').write_text('{"summary": {"step": 1800000}}')
+    (tmp_path / 'b52k-r2d2c51-seed11_checkpoint_evals_hof30k.json').write_text('{"rows": []}')
+    (tmp_path / 'b52a-r2d2paper-seed1_evals.json').write_text('{"summary": {"step": 1300000}}')
+    view = {'specs': {'b52k-r2d2c51-seed11': {'policy': 'b52k-r2d2c51-seed11', 'max_steps': 2400000},
+                      'b52a-r2d2paper-seed1': {'policy': 'b52a-r2d2paper-seed1', 'max_steps': 1300000},
+                      'b52l-r2d2c51-seed12': {'policy': 'b52l-r2d2c51-seed12', 'max_steps': 2400000}},
+            'running': {'b52l-r2d2c51-seed12': 'desktop'}}
+    (tmp_path / 'b52l-r2d2c51-seed12_evals.json').write_text('{"summary": {"step": 1800000}}')
+    extended = pu.extended_arms(view)
+    assert extended == {'b52k-r2d2c51-seed11': 2400000}, 'not the arm at its cap, not the one still training'
+    tree = [('results', 'results/b52k-r2d2c51-seed11/b52k-r2d2c51-seed11_evals.json'),
+            ('results', 'results/b52-hof30k-w3/b52k-r2d2c51-seed11_checkpoint_evals_hof30k.json'),
+            ('results', 'results/b52a-r2d2paper-seed1/b52a-r2d2paper-seed1_evals.json'),
+            ('results', 'results/b52l-r2d2c51-seed12/b52l-r2d2c51-seed12_evals.json')]
+    assert pu.import_closed_waves(tree, str(tmp_path), extended=extended) == 2
+    assert json.loads((tmp_path / 'b52k-r2d2c51-seed11_evals.json').read_text())['summary']['step'] == 2400000
+    assert (tmp_path / 'b52a-r2d2paper-seed1_evals.json').read_text() == '{"summary": {"step": 1300000}}'
+    assert pu.import_closed_waves(tree, str(tmp_path)) == 0, 'without the list, an existing file is kept as before'

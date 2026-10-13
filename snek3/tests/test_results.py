@@ -221,3 +221,36 @@ def test_a_merge_stamps_the_pass_from_the_first_shard_start_to_the_last_shard_wr
 def test_seconds_between_tolerates_a_missing_stamp():
     assert results.seconds_between(None, '2026-09-11T10:00:00') is None
     assert results.seconds_between('2026-09-11T10:00:00', '2026-09-11T10:00:30') == 30
+
+
+# ------------------------------------------------ an arm extended past its close-out (2026-10-12)
+
+def test_a_merge_folds_the_existing_pass_file_in_and_stamps_the_arms_step(runs):
+    """b52 i-l had their cap raised 1.8M -> 2.4M after their stage B, hof5000 and hof30k had run. A
+    re-run of each pass measures only the new checkpoints (`tools/shard.py` skips `merged_steps`), so
+    the merge must keep the rows the file already holds -- and say how far the arm had trained."""
+    results.write(results.stage_a_path('b1a'), {'summary': {'step': 2400000}, 'evals': []})
+    results.write(results.stage_b_path('b1a', 'hof5000'),
+                  {'policy': 'b1a', 'stop_target': 99.6, 'started': '2026-10-08T15:15:23', 'finished': '2026-10-08T20:45:03',
+                   'rows': [{'step': 1700000, 'episodes': 5000, 'perfect_percent': 99.5}]})
+    results.write(results.stage_b_path('b1a', 'hof5000', shard=0, shards=2),
+                  {'policy': 'b1a', 'stop_target': 99.6, 'started': '2026-10-14T01:00:00', 'finished': '2026-10-14T02:00:00',
+                   'rows': [{'step': 2100000, 'episodes': 5000, 'perfect_percent': 99.7}]})
+    results.write(results.stage_b_path('b1a', 'hof5000', shard=1, shards=2),
+                  {'policy': 'b1a', 'stop_target': 99.6, 'rows': [{'step': 2300000, 'episodes': 5000, 'perfect_percent': 99.8}]})
+    path, rows = results.merge('b1a', 'hof5000', delete_shards=True)
+    assert [row['step'] for row in rows] == [1700000, 2100000, 2300000], 'the old row survives the re-run'
+    merged = results.read(path)
+    assert merged['through_step'] == 2400000
+    assert merged['started'] == '2026-10-08T15:15:23' and merged['finished'] == '2026-10-14T02:00:00', \
+        'the pass ran from its first shard start to its last shard write, both runs included'
+    assert results.merged_steps('b1a', 'hof5000') == {1700000, 2100000, 2300000}
+
+
+def test_merged_steps_is_empty_for_a_missing_or_torn_file_and_through_step_is_none_without_an_arm(runs):
+    assert results.merged_steps('b1a', 'hof5000') == set()
+    with open(results.stage_b_path('b1a', 'hof5000'), 'w') as handle:
+        handle.write('{"rows": [')
+    assert results.merged_steps('b1a', 'hof5000') == set()
+    results.write(results.stage_b_path('b1b', None, shard=0, shards=1), {'policy': 'b1b', 'rows': [{'step': 5, 'episodes': 1}]})
+    assert results.read(results.merge('b1b')[0])['through_step'] is None, 'no stage-A file: unknown, not a guess'

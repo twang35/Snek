@@ -66,13 +66,8 @@ def shard_command(policy, selector, episodes, label, shard, shards, width, seed,
 
 
 def merged_steps(policy, label):
-    """The steps already in the arm's merged pass file, or an empty set if there is none or it is
-    unreadable (a torn file is not a reason to skip the measurement)."""
-    try:
-        payload = results.read(results.stage_b_path(policy, label))
-    except (OSError, ValueError):
-        return set()
-    return {int(row['step']) for row in results.rows_of(payload) if 'step' in row}
+    """`tools.results.merged_steps`: the steps already in the arm's merged pass file, or an empty set."""
+    return results.merged_steps(policy, label)
 
 
 def rows_done(policy, label, shards):
@@ -116,9 +111,13 @@ class ArmWave(object):
         # there is nothing to resume from and it would start over (2026-09-05: two finished arms of
         # b16's wave 5 were re-measured for want of this). Every selected step must be in the file;
         # `--no-resume` measures afresh regardless.
-        self.already_merged = bool(resume and merge and self.steps
-                                   and set(self.steps) <= merged_steps(policy, label))
-        self.shards = 0 if self.already_merged else min(int(shards), len(self.steps))
+        # Since 2026-10-12 the merged file need not cover every step to count: the steps it holds are
+        # kept, the shards measure the rest (`tools/shard.py` skips them too) and the merge folds the
+        # file back in -- an arm trained on past its close-out re-measures only its new checkpoints.
+        self.merged = merged_steps(policy, label) if (resume and merge) else set()
+        self.todo = [step for step in self.steps if step not in self.merged]
+        self.already_merged = bool(self.steps) and not self.todo
+        self.shards = 0 if self.already_merged else min(int(shards), len(self.todo))
         self.pending = list(range(self.shards))
         self.processes, self.logs = [], []
         self.started = None
@@ -136,9 +135,11 @@ class ArmWave(object):
         if requested is not None and requested > self.shards:
             print('note: {0} shards for {1} step(s); {2} will run'.format(
                 requested, len(self.steps), self.shards))
-        print('{0}: {1} step(s) — {2}'.format(self.name, len(self.steps), self.description))
+        kept = len(self.steps) - len(self.todo)
+        print('{0}: {1} step(s) — {2}{3}'.format(self.name, len(self.steps), self.description,
+                                                 '; {0} already merged, kept'.format(kept) if kept else ''))
         print('{0} episodes each, {1} shard(s) = {2} episodes total{3}'.format(
-            self.episodes, self.shards, len(self.steps) * self.episodes,
+            self.episodes, self.shards, len(self.todo) * self.episodes,
             '' if self.stop_target is None
             else '; a checkpoint stops once {0:g}% is out of reach'.format(self.stop_target)))
 
@@ -204,9 +205,9 @@ class ArmWave(object):
             print('refusing to merge with {0} failed shard(s). Fix and rerun; the surviving rows '
                   'resume.'.format(len(failed)))
             return 1
-        if sum(counts) != len(self.steps):
-            print('refusing to merge: {0} row(s) on disk for {1} selected step(s)'.format(
-                sum(counts), len(self.steps)))
+        if sum(counts) != len(self.todo):
+            print('refusing to merge: {0} row(s) on disk for {1} selected step(s) not yet merged'.format(
+                sum(counts), len(self.todo)))
             return 1
         if self.merge and self.shards > 1:
             # `delete_shards=True` because by here every shard has been checked for failure and the

@@ -186,6 +186,24 @@ def rows_of(payload):
     return list(payload.get('rows', ())) if payload else []
 
 
+def stage_a_step(policy):
+    """The arm's last evaluated step from its `_evals.json` summary, or None (no file, or not an arm)."""
+    try:
+        return int(read(stage_a_path(policy))['summary']['step'])
+    except (OSError, KeyError, TypeError, ValueError):
+        return None
+
+
+def merged_steps(policy, label=None):
+    """The steps already in the arm's merged pass file, or an empty set if there is none or it is
+    unreadable (a torn file is not a reason to skip the measurement)."""
+    try:
+        payload = read(stage_b_path(policy, label))
+    except (OSError, ValueError):
+        return set()
+    return {int(row['step']) for row in rows_of(payload) if 'step' in row}
+
+
 def merge(policy, label=None, delete_shards=False):
     """Combines every shard of a pass into the pass's own file. Returns `(path, rows)`.
 
@@ -193,23 +211,34 @@ def merge(policy, label=None, delete_shards=False):
     the same checkpoint — which should not happen, and did in snek2 when a re-dispatched shard
     overlapped the slice it was replacing.
 
+    **The pass's existing merged file is folded in**, so a pass re-run over an arm that trained on past
+    its close-out (a cap raised after stage B: b52 i-l, 1.8M -> 2.4M, 2026-10-12) keeps the rows it has
+    and the shards measure only the new checkpoints (`tools/shard.py` skips `merged_steps`). The header
+    records `through_step`, the arm's stage-A step at the merge, which is how `tools/scheduler.pass_done`
+    tells a pass that covered the arm from one that predates its extension.
+
     **Shards measured under different `stop_target`s are refused when any row was stopped.** A stopped
     row means something only against the target it was stopped under (`plans/archive/early-stop.md`), and a
     merged file has one header, so one file cannot hold two targets' stopped rows. snek2's result files
     had four gate eras that every reader had to know about; here the merge refuses instead. Full rows
     are full under any target, so files with none stopped merge whatever their headers say.
     """
-    by_step = {}
-    targets, any_stopped = set(), False
+    by_step = {}                            # step -> (row, the stop target it was measured under)
     payloads = [read(path) or {} for path in shard_paths(policy, label)]
-    for payload in payloads:
-        targets.add(payload.get('stop_target'))
+    try:
+        previous = read(stage_b_path(policy, label)) or {}
+    except ValueError:
+        previous = {}                       # a torn merged file holds nothing worth keeping
+    for payload in payloads + ([previous] if previous else []):
         for row in rows_of(payload):
-            any_stopped = any_stopped or bool(row.get('abandoned'))
             existing = by_step.get(row['step'])
-            if existing is None or row['episodes'] > existing['episodes']:
-                by_step[row['step']] = row
-    rows = [by_step[step] for step in sorted(by_step)]
+            if existing is None or row['episodes'] > existing[0]['episodes']:
+                by_step[row['step']] = (row, payload.get('stop_target'))
+    rows = [by_step[step][0] for step in sorted(by_step)]
+    # Judged over the rows the file will hold: a stopped row a longer re-measurement replaced is gone,
+    # and so is its target.
+    any_stopped = any(bool(row.get('abandoned')) for row in rows)
+    targets = {target for _, target in by_step.values()}
     if any_stopped and len(targets) > 1:
         raise ValueError(
             '{0}: shards were measured under different stop targets {1} and some rows were stopped; '
@@ -218,17 +247,19 @@ def merge(policy, label=None, delete_shards=False):
 
     header = {}
     paths = shard_paths(policy, label)
-    if payloads:
-        header = {key: value for key, value in payloads[0].items() if key != 'rows'}
+    base = payloads[0] if payloads else previous
+    if base:
+        header = {key: value for key, value in base.items() if key not in ('rows', 'through_step')}
     # When the pass ran: the earliest shard start to the latest shard write (2026-09-11), so a batch's
     # measuring time is on the file rather than in a scheduler log.
-    starts = [p['started'] for p in payloads if p.get('started')]
-    ends = [p['finished'] for p in payloads if p.get('finished')]
+    spans = payloads + ([previous] if previous else [])
+    starts = [p['started'] for p in spans if p.get('started')]
+    ends = [p['finished'] for p in spans if p.get('finished')]
     if starts and ends:
         header.update({'started': min(starts), 'finished': max(ends),
                        'wall_seconds': seconds_between(min(starts), max(ends))})
     header.update({'policy': run_name(policy), 'label': label, 'shards': len(paths),
-                   'rows': rows})
+                   'through_step': stage_a_step(policy), 'rows': rows})
     written = write(stage_b_path(policy, label), header)
     if delete_shards:
         for path in paths:

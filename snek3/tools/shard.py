@@ -169,12 +169,18 @@ def main(argv=None):
 
     directory = restore.policy_dir(args.policy)
     steps, description = selectors.resolve(directory, args.selector, policy=args.policy)
-    mine = selectors.slice_for(steps, args.shard, args.shards)
+    # The pass's merged file holds rows the merge will keep (`tools/results.merge` folds it in), so a
+    # resumed shard measures only the steps not already in it: an arm extended past its close-out
+    # costs its new checkpoints, not a second pass over the old ones (2026-10-12).
+    merged = results.merged_steps(args.policy, args.label) if not args.no_resume else set()
+    unmeasured = [step for step in steps if step not in merged]
+    mine = selectors.slice_for(unmeasured, args.shard, args.shards)
     out_path = results.stage_b_path(args.policy, args.label,
                                     shard=args.shard if args.shards > 1 else None,
                                     shards=args.shards)
-    print('shard {0}/{1}: {2} of {3} step(s) — {4}'.format(
-        args.shard + 1, args.shards, len(mine), len(steps), description))
+    print('shard {0}/{1}: {2} of {3} step(s) — {4}{5}'.format(
+        args.shard + 1, args.shards, len(mine), len(unmeasured), description,
+        '; {0} already merged, skipped'.format(len(steps) - len(unmeasured)) if len(unmeasured) < len(steps) else ''))
     if not mine:
         print('nothing for this shard')
         return 0
