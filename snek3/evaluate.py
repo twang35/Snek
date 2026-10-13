@@ -34,6 +34,13 @@ from vectorized import engine
 
 def measure_one(policy, step=None, episodes=500, lanes=None, seed=0, out=None, variant=None):
     """One checkpoint, in this process. Prints the row and optionally writes it."""
+    # One thread, as `tools/shard.py` does. Torch defaults to a thread per core, and the hof-promote
+    # step runs several of these side by side: five unpinned copies on the-claw-den thrashed for two
+    # hours with no row, and pinned took ~44 min each (2026-10-12). The matmul here is small enough
+    # that one thread saturates it anyway.
+    import torch
+    torch.set_num_threads(1)
+
     directory = restore.policy_dir(policy)
     policy_fn, arch, resolved = restore.restore(directory, step, variant=variant)
 
