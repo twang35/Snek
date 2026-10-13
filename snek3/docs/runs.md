@@ -15,8 +15,10 @@ are in git history before 2026-09-10.
 
 - **Group E, memory** (b51 closed 2026-10-03, b52 closed 2026-10-09). Memory subtracts from PPO's window (b51) and is most of
   R2D2's edge over its dense control (b52). b52's c51 cell at 180k updates is at the PPO record (b52k 29,970 /30k twice). Open now:
-  a fresh-seed `hof-promote` of b52k @1.779M / @1.800M; whether the paper cell (a-d, stopped at 130k updates) reaches the same place
-  at 180k, which needs a retrain; and whether c51's two late seeds (i, j) go higher past 1.8M.
+  the `hof-promote` of b52k (its five best 30k rows re-measured on seed 13, 2026-10-12, desktop); and the c51 cell run on to
+  **2.4M steps / 240k updates** (cap raised again 2026-10-12): whether k goes higher and whether i and j arrive. The paper cell
+  (a-d) is **not** extended, by decision (user, 2026-10-12): it did well without pushing at the limit, so the budget question for it
+  is closed here.
 - **Group C, the value stacks** (b46-b49, closed 2026-09-29). Rainbow's paper cell (best30 97.45) is the value family's best; BTR's
   sits under it (96.58) and its trunk ablations two points under that (b49). Noisy nets are most of Rainbow's cell (b48). The value
   family's ceiling is 96-97.5 best30 across eight cells against PPO's 99.8, and no Rainbow-family work follows (the user, 2026-09-26).
@@ -76,7 +78,7 @@ are in git history before 2026-09-10.
 
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
-| [b52](#b52--r2d2-the-papers-recurrent-value-agent-its-feed-forward-control-and-its-c51-head) | the algorithm: R2D2 as its paper has it (`SNEK_ALGO=r2d2`: LSTM 512 with prev action and reward in, dueling 512 streams, 120-row windows = 40 burn-in + 80 loss, stride 40, n-step 5 double-Q under h(x), PER 0.9/0.6/η 0.9, Adam 1e-4, target copy 2,500, clip 40, the Ape-X ε ladder over 32 lanes) / the same with the LSTM replaced by a dense layer (`ffr2d2`) / the same with a C51 head and the rescaling off | none (paper): hist8, b2 reward, step penalty 0.01, shaping **off** | 3 × 4 | 1.3M steps = 41.6M moves, **130k updates** (shortfall against the 200k floor, stated) | paper 90%+ and holds, `ffr2d2` trails on the hold, c51 level; none at PPO's 99.8 | **closed 2026-10-09.** Memory is most of R2D2's edge (paper 50.4% vs `ffr2d2` 16.1% at ≥98%); the paper cell tops Rainbow on the peak, not the hold. The c51 cell, run on to 1.8M / 180k updates, is the value family's first arm at the PPO record: b52k 29,970 /30,000 (99.900%) twice, median of 66 full 30k rows 29,950 — pending fresh-seed confirmation |
+| [b52](#b52--r2d2-the-papers-recurrent-value-agent-its-feed-forward-control-and-its-c51-head) | the algorithm: R2D2 as its paper has it (`SNEK_ALGO=r2d2`: LSTM 512 with prev action and reward in, dueling 512 streams, 120-row windows = 40 burn-in + 80 loss, stride 40, n-step 5 double-Q under h(x), PER 0.9/0.6/η 0.9, Adam 1e-4, target copy 2,500, clip 40, the Ape-X ε ladder over 32 lanes) / the same with the LSTM replaced by a dense layer (`ffr2d2`) / the same with a C51 head and the rescaling off | none (paper): hist8, b2 reward, step penalty 0.01, shaping **off** | 3 × 4 | 1.3M steps = 41.6M moves, **130k updates** (shortfall against the 200k floor, stated); the c51 cell on to 1.8M (2026-10-07) and **2.4M = 240k updates** (2026-10-12) | paper 90%+ and holds, `ffr2d2` trails on the hold, c51 level; none at PPO's 99.8 | **closed 2026-10-09.** Memory is most of R2D2's edge (paper 50.4% vs `ffr2d2` 16.1% at ≥98%); the paper cell tops Rainbow on the peak, not the hold. The c51 cell, run on to 1.8M / 180k updates, is the value family's first arm at the PPO record: b52k 29,970 /30,000 (99.900%) twice, median of 66 full 30k rows 29,950 — fresh-seed confirmation and the 2.4M extension running (2026-10-12) |
 | [b51](#b51--e1-recurrent-ppo-an-lstm-in-both-towers-on-b27s-config) | `SNEK_PPO_RECURRENT=lstm` (128, both towers, whole-lane minibatches of 2 x 256) at `SNEK_OBS_HISTORY` 8 / 0 | b27's hist8 config verbatim | 2 × 4 | 100M | `lstmhist0` well above hist0 and at or under hist8; `lstmhist8` level with hist8 | **half held**: `lstmhist0` 89.0% density (hist0 49, hist8 95.4); `lstmhist8` 74.4%, under hist8 on every seed; best30 99.55 both, no `hof30k` row at 99.8 |
 | [b50](#b50--d1-anneal-wave-bbfs-within-cycle-n-step--γ-anneal-on-b43s-reset600k-cell) | BBF's within-cycle anneal on the reset cell: `SNEK_RESET_ANNEAL_N_STEP=10,3 SNEK_RESET_ANNEAL_GAMMA=0.97,0.997` over 10k gradient steps after each reset | b43a-d (resets every 600k on b40's M-QR-DQN cell) | 1 × 4 | 3M steps | **held** | D1 closes null: every reset still drops the cell to 0%, recovery to 55-69 within the cycle; tail 59-64 against b40e-h's 89-93 |
 | [b49](#b49--btr-paper-cell-ablations-the-trunk-and-its-norm) | BTR's trunk: `SNEK_BTR_RESIDUAL=0` / `SNEK_BTR_SPECTRAL_NORM=0` | b47a-d's paper cell | 2 × 4 | 1M steps | **held** | both about two points under the paper cell: best30 94.90 (plain trunk), 94.62 (no spectral norm) against 96.58; no `hof5000` candidate |
@@ -179,6 +181,13 @@ at 1.17M-1.18M (at most 10k steps lost; buffer restored). Their stage B runs onc
 and `ffr2d2` (e-h) cells stay at 1.3M: their `replay.npz` was pruned after stage B, so an extension would refill the buffer from
 empty — a confound to read against if they are extended later. The cross-cell comparisons therefore read at 1.3M; the c51 cell's
 1.3M-1.8M stretch is a plateau reading, not part of the within-batch budget.
+
+**Cap raised again, to 2.4M (2026-10-12, user).** b52k sat at the PPO record and i, j were still rising at 1.8M, so the four c51
+arms go on to **2.4M steps = 76.8M moves, 240k updates**, resumed from `resume.pt` and `replay.npz` (both intact; the box was idle).
+Their 1.8M stage-B chain had already closed, so the passes run again at 2.4M over the **new checkpoints only** -- the merged files
+keep their rows and record `through_step` (`tools/results.merge`, `tools/scheduler.pass_done`, 2026-10-12). The paper cell is not
+extended: it did well but was not pushing at the limit (user). Read the 1.8M-2.4M stretch as b52k's plateau and i/j's arrival, not as
+a cross-cell comparison.
 
 **Learned (closed 2026-10-09).** Memory helps a value agent where it hurt PPO: the paper cell has three times `ffr2d2`'s share of
 stage-B rows at ≥98% and eleven times its `hof5000` candidates, with the LSTM the only difference. The surprise is the C51 head run
