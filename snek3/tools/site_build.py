@@ -12,7 +12,7 @@ on the box is the same writer with the same worktree and lease. Pages serves bra
 | this box | every file in `SNEK_RUNS_DIR` newer than the build directory's copy is copied over it: the box's own live pictures and measurements win over the feeds' |
 | status | `origin/ops-status:status.json` lands at `.live/desktop/status.json`, so the manifest knows which pass is running or queued |
 | site | `viewer_manifest.build(build_dir)` and `publish_pages.publish(...)` into the `site` worktree: `index.html`, `manifest.js`, `charts/*.png`, `.nojekyll` |
-| push | one commit, **amended** each build so the branch is a snapshot with no history, `--force-with-lease` (`gitbus.push`) |
+| push | `gitbus.commit_and_push`: a commit on the remote's tip (the delta only), `--force-with-lease`, the chain collapsed to a root daily |
 
 Nothing here is a source of truth: the build directory and the worktree are rebuilt from the feeds and
 the branch is rewritten every time. `SNEK_SITE_BRANCH` (default `site`) and `SNEK_SITE_WORKTREE`
@@ -208,12 +208,13 @@ def build(repo=REPO, remote=REMOTE, branch=BRANCH, worktree=WORKTREE, feeds=FEED
     gitbus.clear_stale_locks(worktree)
     _git(['add', '-A'], cwd=worktree)
     changed = bool(_git(['status', '--porcelain'], cwd=worktree).strip())
-    if changed:
-        _git(['commit', '-q', '--amend', '-m', 'site {0}: {1} arms, {2} charts'.format(
-            time.strftime('%Y-%m-%dT%H:%M:%S'), len(manifest['arms']), total)], cwd=worktree)
+    message = 'site {0}: {1} arms, {2} charts'.format(time.strftime('%Y-%m-%dT%H:%M:%S'), len(manifest['arms']), total)
     pushed = None
     if push and (changed or _rev(repo, '{0}/{1}'.format(remote, branch)) != _rev(worktree, 'HEAD')):
-        pushed = gitbus.push(worktree, branch, {'GIT_REMOTE': remote})
+        # The same path as the feeds: fetch, commit on the remote's tip, push the delta, collapse daily.
+        pushed = gitbus.commit_and_push(worktree, branch, {'GIT_REMOTE': remote}, message)
+    elif changed:
+        gitbus.snapshot_commit(worktree, message)
     log('site: {0} arms, {1} charts ({2} copied, {3} removed); {4} feed file(s) flattened, {5} local file(s) '
         'overlaid; {6}'.format(len(manifest['arms']), total, copied, removed, flattened, overlaid,
                                'pushed' if pushed else ('push FAILED (commit is local)' if pushed is False else 'nothing to push')))

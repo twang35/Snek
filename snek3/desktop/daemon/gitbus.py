@@ -28,20 +28,29 @@ remote. The daemon calls the second on every network cycle, so a push that fails
 reboot lands on the next pass without anything being lost or double-counted — the commit is already
 made, so a retry is idempotent.
 
-## Every written branch is one parentless commit, rewritten each publish (2026-09-10)
+## Every written branch is a snapshot: a short chain on the remote's tip, collapsed to a root periodically
 
-`_commit_and_push` used to append a commit per publish. Nothing read the history -- `site_build`,
-`progress_update` and `claims.published_ids` all read the tip's tree, `push_unpushed` only asks whether
-HEAD is ahead of the remote -- and the history was the cost: the `results` pack reached 372 MB, and a
-live picture per arm per ten minutes on top would have been ~30 MB a day. So each publish now writes the
-staged tree as a **new root commit** (`write-tree`, `commit-tree` with no parent, `reset --soft`) and
-force-pushes it with a lease, as `site` always was. The worktree is persistent and a publish stages only
-the directories it touched, so the tree still carries every earlier job; only the commit chain goes.
-The first publish after this change collapses a branch's existing history the same way.
+`commit_and_push` used to append a commit per publish (the `results` pack reached 372 MB), then from
+2026-09-10 wrote every publish as a **new parentless root commit**. Nothing read the history, and the tree
+still carried every earlier job, so the branch stayed one commit. The cost showed on 2026-10-13: **git only
+skips the objects reachable from the parents of what it pushes**, and an unrelated root on the remote
+excludes nothing, so every push re-uploaded the whole 345 MB feed (`rev-list --objects HEAD ^<remote>`
+listed all 7,645 objects for a six-file change). At the box's usual 8 Mbit/s that was six minutes a push;
+the day the uplink fell to 1 Mbit/s the daemon sat inside one push for over an hour, consumed no triggers
+and looked dead.
+
+So a publish now (1) fetches the branch, so the remote's tip is current -- it is the commit's parent and the
+lease, and a push that landed server-side while the client died no longer leaves the lease stale forever;
+(2) writes the staged tree as a commit **whose parent is that tip**, so the pack is the delta; (3) once the
+chain is `CHAIN_COLLAPSE_AFTER` commits long, writes a root instead -- one full upload a day, bounded growth
+on the remote, the earlier chain left for its gc; and (4) if the tree already equals the tip's, pushes nothing.
+`push` has a timeout and kills the whole push process group when it fires, so a slow link costs the daemon
+`PUSH_TIMEOUT_SECONDS`, not an afternoon.
 """
 
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -62,6 +71,16 @@ LOCK_NAMES = ('index.lock', 'HEAD.lock')
 # runs on the daemon's single thread and a job cannot be dispatched while it waits.
 PUSH_ATTEMPTS = 3
 PUSH_BACKOFF_SECONDS = 2.0
+
+# A push that runs longer than this is killed, process group and all (`git push` forks `ssh` and
+# `pack-objects`, and `subprocess.run`'s own timeout kills only the parent). Twenty minutes carries a
+# full collapse upload of the 345 MB `results` feed at 8 Mbit/s with headroom; a routine delta push is
+# seconds. The daemon runs this on its single thread, which is why it is bounded at all (2026-10-13).
+PUSH_TIMEOUT_SECONDS = 1200
+
+# How many commits a feed's chain may reach before the next publish writes a root instead. 144 live
+# publishes is a day at ten minutes; the collapse is the one full upload, so this is "once a day".
+CHAIN_COLLAPSE_AFTER = 144
 
 
 def clear_stale_locks(worktree, max_age=LOCK_MAX_AGE_SECONDS):
@@ -299,27 +318,43 @@ def push_unpushed(host):
     return stuck
 
 
-def _commit_and_push(worktree, branch, host, message):
-    """Writes whatever is staged as the branch's one parentless commit and pushes. Returns True if the
-    *push* landed. Nothing is committed when nothing changed and the tip is already a root, so an
-    unchanged republish is a no-op push.
+def commit_and_push(worktree, branch, host, message):
+    """Writes whatever is staged as the branch's next snapshot commit and pushes. Returns True if the
+    *push* landed, or if the remote already holds exactly this tree (nothing to push).
 
-    A missing git identity is the one failure worth raising for, because it makes every publish fail
-    forever and no retry can fix it — so the commit uses `check=True` while the push does not.
+    The branch is fetched first so the remote's tip is current: the new commit's parent (the push then
+    carries only the delta) and the lease. The chain collapses to a root every `CHAIN_COLLAPSE_AFTER`
+    commits. A missing git identity is the one failure worth raising for, because it makes every publish
+    fail forever and no retry can fix it -- so the commit uses `check=True` while the push does not.
     """
-    if _git(['status', '--porcelain'], cwd=worktree).strip() or _has_parent(worktree):
-        snapshot_commit(worktree, message)
+    remote = host['GIT_REMOTE']
+    fetch_branch(worktree, remote, branch)                 # may fail offline: the last fetched tip is used
+    tip = _git(['rev-parse', '--verify', '--quiet', '{0}/{1}'.format(remote, branch)], cwd=worktree).strip() or None
+    tree = _git(['write-tree'], cwd=worktree, check=True).strip()
+    if tip and _git(['rev-parse', '--verify', '--quiet', tip + '^{tree}'], cwd=worktree).strip() == tree:
+        _git(['reset', '-q', '--soft', tip], cwd=worktree, check=True)   # the remote has it; align HEAD
+        return True
+    parent = tip if tip and chain_length(worktree, tip) < CHAIN_COLLAPSE_AFTER else None
+    snapshot_commit(worktree, message, parent=parent, tree=tree)
     return push(worktree, branch, host)
 
 
-def _has_parent(worktree):
-    return bool(_git(['rev-parse', '--verify', '--quiet', 'HEAD^'], cwd=worktree).strip())
+_commit_and_push = commit_and_push      # the name the callers and docs used until 2026-10-14
 
 
-def snapshot_commit(worktree, message):
-    """Replaces HEAD with a new root commit of the index: the branch is a snapshot, never a history."""
-    tree = _git(['write-tree'], cwd=worktree, check=True).strip()
-    commit = _git(['commit-tree', tree, '-m', message], cwd=worktree, check=True).strip()
+def chain_length(worktree, tip):
+    """Commits on the branch since its last root, as the remote has it."""
+    try:
+        return int(_git(['rev-list', '--count', tip], cwd=worktree).strip() or '0')
+    except ValueError:
+        return 0
+
+
+def snapshot_commit(worktree, message, parent=None, tree=None):
+    """Replaces HEAD with a commit of the index: on `parent` when given, else a new root."""
+    tree = tree or _git(['write-tree'], cwd=worktree, check=True).strip()
+    args = ['commit-tree', tree, '-m', message] + (['-p', parent] if parent else [])
+    commit = _git(args, cwd=worktree, check=True).strip()
     _git(['reset', '-q', '--soft', commit], cwd=worktree, check=True)
     return commit
 
@@ -346,15 +381,43 @@ def push_fast_forward(worktree, branch, remote):
 
 
 def push(worktree, branch, host):
-    """`--force-with-lease` because there is exactly one writer. Returns True on success."""
+    """`--force-with-lease` because there is exactly one writer. Returns True on success.
+
+    Bounded by `PUSH_TIMEOUT_SECONDS`: the push runs in its own process group and the whole group is
+    killed when the clock runs out, because `git push` does its work in `ssh` and `pack-objects` children
+    that would otherwise go on uploading. A timeout is an outage, not a blip, so it is not retried here;
+    `push_unpushed` carries the commit on a later cycle.
+    """
+    stderr = ''
     for attempt in range(PUSH_ATTEMPTS):
-        result = subprocess.run(
-            ['git', 'push', '--force-with-lease', host['GIT_REMOTE'], 'HEAD:' + branch],
-            cwd=worktree, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if result.returncode == 0:
+        proc = _start_push(['git', 'push', '--force-with-lease', host['GIT_REMOTE'], 'HEAD:' + branch], worktree)
+        try:
+            _, stderr = proc.communicate(timeout=PUSH_TIMEOUT_SECONDS)
+        except subprocess.TimeoutExpired:
+            _kill_group(proc)
+            stderr = 'timed out after {0:.0f} s and was killed'.format(PUSH_TIMEOUT_SECONDS)
+            break
+        if proc.returncode == 0:
             return True
         if attempt + 1 < PUSH_ATTEMPTS:
             time.sleep(PUSH_BACKOFF_SECONDS * (attempt + 1))
     sys.stderr.write('push to {0} failed after {1} attempt(s); the commit is local and will be '
-                     'retried: {2}\n'.format(branch, PUSH_ATTEMPTS, result.stderr.strip()))
+                     'retried: {2}\n'.format(branch, PUSH_ATTEMPTS, (stderr or '').strip()))
     return False
+
+
+def _start_push(command, cwd):
+    """The push process, in its own group so a timeout can take its children with it. Replaced by tests."""
+    return subprocess.Popen(command, cwd=cwd, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            start_new_session=True)
+
+
+def _kill_group(proc):
+    try:
+        os.killpg(proc.pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError):
+        proc.kill()
+    try:
+        proc.communicate(timeout=10)
+    except subprocess.TimeoutExpired:
+        pass

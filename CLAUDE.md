@@ -15,9 +15,9 @@ describing snek2's version of the same thing; carry it across rather than editin
 
 **The GitHub-Pages chart viewer is the `site` branch, and the desktop builds it.** Each box's scheduler
 publishes every finished arm and pass, and every live arm's picture every ten minutes, to its own results
-branch (`results`, `laptop-results`; `snek3/tools/results_feed.py`, one snapshot commit rewritten per
-publish), and the desktop daemon rebuilds the site from both feeds plus its own
-live charts on every network cycle (`snek3/tools/site_build.py`), pushing one snapshot commit to `site`
+branch (`results`, `laptop-results`; `snek3/tools/results_feed.py`, a snapshot: each publish a commit on
+the remote's tip, the chain collapsed to a root daily), and the desktop daemon rebuilds the site from both feeds plus its own
+live charts on every network cycle (`snek3/tools/site_build.py`), pushing the `site` snapshot the same way
 — so the page is current within ten minutes of a wave closing on either box, and
 `ssh the-claw-den 'Snek/snek3/desktop/trigger'` rebuilds it now. There is no local build of the site
 (the root `docs/` one was removed 2026-09-06); the pictures live only on `site` (every one redraws from

@@ -7,7 +7,7 @@ reader (`tools/site_build.py`, and `tools/progress_update.py`'s importer) serves
 publishes at the three moments a picture becomes final (and, below, every ten minutes while one is not) -- an arm reaching its cap, a pass writing its
 merged files, an eval spec finishing -- through `Publisher.publish`, which never raises: the run is the
 arms, a github outage is a line in the log, and the commit is local until the next publish's push
-carries it (`gitbus._commit_and_push` pushes `HEAD`, earlier commits included).
+carries it (`gitbus.commit_and_push` pushes `HEAD`, which holds the whole tree).
 
 | moment | job id | files |
 |---|---|---|
@@ -30,8 +30,8 @@ site from its own `runs/`. Now every scheduler publishes each live arm's `.png` 
 final files land in later -- the final simply overwrites the live picture at the same path, and the
 desktop's own pictures on `results` make the bus complete rather than a shortcut. Never `_evals.json`:
 3.6 MB per arm per ten minutes, and the site only draws the `.png`. What keeps this cheap is that the
-branch is a snapshot: `gitbus._commit_and_push` writes one parentless commit per publish (a picture per
-arm per ten minutes on a branch with history would have been ~30 MB a day).
+branch is a snapshot: `gitbus.commit_and_push` writes each publish on the remote's tip and collapses the chain
+to a root daily, so a push carries the delta and the remote's growth is bounded (2026-10-14).
 """
 
 import os
