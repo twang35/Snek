@@ -57,6 +57,11 @@ above it; the first value-based entry. The c51 cell runs on to 2.4M / 240k updat
 cell is not extended, by decision (user): it did well without pushing at the limit.
 <!-- /reading -->
 
+The 2.4M stretch (1.8M-2.4M, 2026-10-12 to 2026-10-14): 583-596 new stage-B rows per arm. i and j arrived -- 97% and 93% of their new
+rows at ≥98 /500 against 45-72% in the 1.2-1.3M bin -- and k and l held at 99%; every arm has 100.0 /500 rows past 1.8M (i 19, j 25, k 54,
+l 35), the cell's best30 is 99.72, and nothing is still climbing (bin means 1.8-2.1M → 2.1-2.4M: 99.0→99.3, 98.9→99.1, 99.5→99.3,
+99.4→99.3). Whether the stretch moves b52k above the tie is the `hof30k` pass's question, in progress.
+
 ### Every arm
 
 | arm | knob | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
