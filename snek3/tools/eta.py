@@ -266,21 +266,28 @@ def selected_checkpoints(kind, policy, runs_dir=None):
 
 def known_checkpoints(kind, policies, runs_dir=None, pending=()):
     """`(checkpoints, unknown_arms)`: the checkpoints the pass over `policies` will measure for the arms
-    whose count is knowable -- an arm's merged file counts exactly when it already exists, else its
-    selector's input file -- and how many arms have neither yet. An arm in `pending` is still
-    training: its stage-A file holds only the rows so far, so its count is unknown rather than an
-    undercount (at launch it would read 0)."""
+    whose count is knowable, and how many arms have no count yet. An arm's count is the larger of
+    its selector's pick and the rows its merged file already holds: the merged file alone is exact
+    only when the selector's input is gone, because a pass that re-runs over an arm extends that
+    file -- b52's 2.4M hof30k found k's 266-row file and i's zero-row stub from the 1.8M pass and
+    read itself as finished at launch, "~1m left" for hours (2026-10-14). An arm in `pending` is
+    still training: its stage-A file holds only the rows so far, so its count is unknown rather than
+    an undercount (at launch it would read 0)."""
     total, unknown = 0, 0
     for policy in policies:
-        merged = stage_b_path(policy, _pass_label(kind), runs_dir)
-        if policy not in pending and os.path.exists(merged):
-            total += len(_pass_rows(merged))
-            continue
-        count = None if policy in pending else selected_checkpoints(kind, policy, runs_dir)
-        if count is None:
+        if policy in pending:
             unknown += 1
+            continue
+        merged = stage_b_path(policy, _pass_label(kind), runs_dir)
+        measured = len(_pass_rows(merged)) if os.path.exists(merged) else 0
+        count = selected_checkpoints(kind, policy, runs_dir)
+        if count is None:
+            if measured:
+                total += measured
+            else:
+                unknown += 1
         else:
-            total += count
+            total += max(count, measured)
     return total, unknown
 
 
@@ -297,18 +304,18 @@ def _pass_label(kind):
 
 
 def pass_progress(kind, policies, runs_dir=None):
-    """`(done, total)` checkpoints of a pass in flight: an arm's merged file when it has one, its shard
-    files' rows while it is being measured, nothing before its turn. None when `total` is unknown."""
+    """`(done, total)` checkpoints of a pass in flight: the rows of an arm's merged file plus its shard
+    files' rows while it is being measured, nothing before its turn. Both, not either: a re-run over
+    an arm has the old merged file and live shards at once (b52's 2.4M hof30k). None when `total`
+    is unknown."""
     total = pass_checkpoints(kind, policies, runs_dir)
     if total is None:
         return None
     done = 0
     for policy in policies:
         merged = stage_b_path(policy, _pass_label(kind), runs_dir)
-        if os.path.exists(merged):
-            done += len(_pass_rows(merged))
-        else:
-            done += sum(len(_pass_rows(path)) for path in _shard_paths(policy, _pass_label(kind), runs_dir))
+        done += len(_pass_rows(merged)) if os.path.exists(merged) else 0
+        done += sum(len(_pass_rows(path)) for path in _shard_paths(policy, _pass_label(kind), runs_dir))
     return done, total
 
 

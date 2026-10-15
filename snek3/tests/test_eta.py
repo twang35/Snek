@@ -246,6 +246,27 @@ def test_a_running_pass_is_estimated_from_its_own_progress(tmp_path):
     assert eta.running_pass_seconds('stageb', 1, 0.0, runs, policies=['e']) == 55 * 60 / 8.0
 
 
+def test_a_pass_rerun_over_an_arm_counts_the_selector_not_the_old_merged_file(tmp_path):
+    """b52's 2.4M hof30k (2026-10-14): i and j had zero-row merged stubs and k a 266-row file from the
+    1.8M pass, so the merged files read as the exact total and as all done -- 60 s left for hours while
+    i's shards were a third through 38 rows. A merged file is exact only when the selector's input is
+    gone; otherwise the count is the larger of the pick and the rows already there."""
+    runs = str(tmp_path)
+    _stage_b(runs, 'i', 'hof5000', [99.6] * 6)                              # the pass will pick 6
+    _stage_b(runs, 'i', 'hof30k', [])                                        # the 1.8M pass's empty stub
+    _stage_b(runs, 'i', 'hof30k', [99.9] * 2, shard=1)                       # being measured now
+    _stage_b(runs, 'k', 'hof5000', [99.6] * 5)                              # the pass will pick 5 ...
+    _stage_b(runs, 'k', 'hof30k', [99.9] * 2)                                # ... 2 measured at 1.8M
+    assert eta.known_checkpoints('hof30k', ['i', 'k'], runs) == (11, 0)
+    assert eta.pass_progress('hof30k', ['i', 'k'], runs) == (4, 11)
+    live_runs.record_duration('hof30k', 100.0, runs, arms=4, checkpoints=100)
+    assert eta.running_pass_seconds('hof30k', 2, 400.0, runs, policies=['i', 'k']) == 700.0
+    # The merged file still counts exactly when nothing else can: its selector's input is gone.
+    os.remove(os.path.join(runs, 'k_checkpoint_evals_hof5000.json'))
+    assert eta.known_checkpoints('hof30k', ['k'], runs) == (2, 0)
+    assert eta.known_checkpoints('hof30k', ['i', 'j'], runs) == (6, 1)       # j: no file of either kind
+
+
 def test_the_ledger_keeps_the_last_entries_per_kind_and_shrugs_at_a_bad_file(tmp_path):
     runs = str(tmp_path)
     for i in range(live_runs.DURATIONS_KEEP + 3):
