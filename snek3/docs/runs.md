@@ -17,7 +17,9 @@ are in git history before 2026-09-10.
   R2D2's edge over its dense control (b52). b52's c51 cell at 180k updates is at the PPO record (b52k 29,970 /30k twice). Open now:
   done 2026-10-12 -- b52k @1795000 promoted, tied with `b32g` (29,967 / 29,960 against 29,967 / 29,957 on seeds 7 / 13), the first
   value-based entry; and the c51 cell run on to
-  **2.4M steps / 240k updates** (cap raised again 2026-10-12): whether k goes higher and whether i and j arrive. The paper cell
+  **2.4M steps / 240k updates** (cap raised again 2026-10-12): **landed 2026-10-15, nothing moved** -- k's 17 new full 30k rows median
+  29,949, best 29,965, under its 29,970 pair; l one row at 29,941; i and j arrived on stage A but abandoned every 30k row. The record is
+  one seed deep, so the next question for the cell is seeds, not steps. The paper cell
   (a-d) is **not** extended, by decision (user, 2026-10-12): it did well without pushing at the limit, so the budget question for it
   is closed here.
 - **Group C, the value stacks** (b46-b49, closed 2026-09-29). Rainbow's paper cell (best30 97.45) is the value family's best; BTR's
@@ -79,7 +81,7 @@ are in git history before 2026-09-10.
 
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
-| [b52](#b52--r2d2-the-papers-recurrent-value-agent-its-feed-forward-control-and-its-c51-head) | the algorithm: R2D2 as its paper has it (`SNEK_ALGO=r2d2`: LSTM 512 with prev action and reward in, dueling 512 streams, 120-row windows = 40 burn-in + 80 loss, stride 40, n-step 5 double-Q under h(x), PER 0.9/0.6/η 0.9, Adam 1e-4, target copy 2,500, clip 40, the Ape-X ε ladder over 32 lanes) / the same with the LSTM replaced by a dense layer (`ffr2d2`) / the same with a C51 head and the rescaling off | none (paper): hist8, b2 reward, step penalty 0.01, shaping **off** | 3 × 4 | 1.3M steps = 41.6M moves, **130k updates** (shortfall against the 200k floor, stated); the c51 cell on to 1.8M (2026-10-07) and **2.4M = 240k updates** (2026-10-12) | paper 90%+ and holds, `ffr2d2` trails on the hold, c51 level; none at PPO's 99.8 | **closed 2026-10-09.** Memory is most of R2D2's edge (paper 50.4% vs `ffr2d2` 16.1% at ≥98%); the paper cell tops Rainbow on the peak, not the hold. The c51 cell, run on to 1.8M / 180k updates, is the value family's first arm at the PPO record: b52k 29,970 /30,000 (99.900%) twice, median of 66 full 30k rows 29,950; **confirmed on seed 13 2026-10-12** (29,960 /30k @1795000, tied with the `b32g` record, in the hall of fame); **2.4M extension landed 2026-10-14**: i and j arrived (97% / 93% of new rows ≥98), k and l held, 100.0 rows in all four, best30 99.72; hof passes running |
+| [b52](#b52--r2d2-the-papers-recurrent-value-agent-its-feed-forward-control-and-its-c51-head) | the algorithm: R2D2 as its paper has it (`SNEK_ALGO=r2d2`: LSTM 512 with prev action and reward in, dueling 512 streams, 120-row windows = 40 burn-in + 80 loss, stride 40, n-step 5 double-Q under h(x), PER 0.9/0.6/η 0.9, Adam 1e-4, target copy 2,500, clip 40, the Ape-X ε ladder over 32 lanes) / the same with the LSTM replaced by a dense layer (`ffr2d2`) / the same with a C51 head and the rescaling off | none (paper): hist8, b2 reward, step penalty 0.01, shaping **off** | 3 × 4 | 1.3M steps = 41.6M moves, **130k updates** (shortfall against the 200k floor, stated); the c51 cell on to 1.8M (2026-10-07) and **2.4M = 240k updates** (2026-10-12) | paper 90%+ and holds, `ffr2d2` trails on the hold, c51 level; none at PPO's 99.8 | **closed 2026-10-09.** Memory is most of R2D2's edge (paper 50.4% vs `ffr2d2` 16.1% at ≥98%); the paper cell tops Rainbow on the peak, not the hold. The c51 cell, run on to 1.8M / 180k updates, is the value family's first arm at the PPO record: b52k 29,970 /30,000 (99.900%) twice, median of 66 full 30k rows 29,950; **confirmed on seed 13 2026-10-12** (29,960 /30k @1795000, tied with the `b32g` record, in the hall of fame); **2.4M extension landed 2026-10-14**: i and j arrived (97% / 93% of new rows ≥98), k and l held, 100.0 rows in all four, best30 99.72; **`hof30k` 2026-10-15: nothing above the tie** (k's new full rows median 29,949, best 29,965; l 29,941; i, j none) |
 | [b51](#b51--e1-recurrent-ppo-an-lstm-in-both-towers-on-b27s-config) | `SNEK_PPO_RECURRENT=lstm` (128, both towers, whole-lane minibatches of 2 x 256) at `SNEK_OBS_HISTORY` 8 / 0 | b27's hist8 config verbatim | 2 × 4 | 100M | `lstmhist0` well above hist0 and at or under hist8; `lstmhist8` level with hist8 | **half held**: `lstmhist0` 89.0% density (hist0 49, hist8 95.4); `lstmhist8` 74.4%, under hist8 on every seed; best30 99.55 both, no `hof30k` row at 99.8 |
 | [b50](#b50--d1-anneal-wave-bbfs-within-cycle-n-step--γ-anneal-on-b43s-reset600k-cell) | BBF's within-cycle anneal on the reset cell: `SNEK_RESET_ANNEAL_N_STEP=10,3 SNEK_RESET_ANNEAL_GAMMA=0.97,0.997` over 10k gradient steps after each reset | b43a-d (resets every 600k on b40's M-QR-DQN cell) | 1 × 4 | 3M steps | **held** | D1 closes null: every reset still drops the cell to 0%, recovery to 55-69 within the cycle; tail 59-64 against b40e-h's 89-93 |
 | [b49](#b49--btr-paper-cell-ablations-the-trunk-and-its-norm) | BTR's trunk: `SNEK_BTR_RESIDUAL=0` / `SNEK_BTR_SPECTRAL_NORM=0` | b47a-d's paper cell | 2 × 4 | 1M steps | **held** | both about two points under the paper cell: best30 94.90 (plain trunk), 94.62 (no spectral norm) against 96.58; no `hof5000` candidate |
@@ -194,14 +196,16 @@ a cross-cell comparison.
 00:13 PT; the merge kept the 162-669 old rows). It read as predicted: i and j arrived (97% and 93% of their new rows at ≥98 /500, from
 45-72% in the 1.2-1.3M bin), k and l held (99%), and all four posted 100.0 /500 rows past 1.8M (19 / 25 / 54 / 35). The cell's best30 is
 99.72 (from 99.15). No arm is still rising: bin means 1.8-2.1M against 2.1-2.4M are 99.0→99.3, 98.9→99.1, 99.5→99.3, 99.4→99.3. The
-`hof5000` and `hof30k` passes over the new rows are running on the desktop.
+`hof30k` pass over the new rows (landed 12:28 PT 2026-10-15) found nothing above the tie: k 17 full rows of 224 (median 29,949, best
+29,965 @1.835M), l one (29,941 @2.055M), i and j none of 61 and 41. The stage-A arrival of i and j does not carry to 30,000 episodes.
 
 **Learned (closed 2026-10-09).** Memory helps a value agent where it hurt PPO: the paper cell has three times `ffr2d2`'s share of
 stage-B rows at ≥98% and eleven times its `hof5000` candidates, with the LSTM the only difference. The surprise is the C51 head run
 on to 180k updates: b52k posts 66 full 30k rows with a median of 29,950 and two at 29,970 (99.900%), the record's count, where no
 value agent before had a 30k row at all. Two of its four seeds were still climbing at 1.8M. It changes the plan: the value family is
 no longer behind PPO on the ceiling, and the next question is budget, not algorithm. Confirmed 2026-10-12: @1795000 re-measured 29,960
-/30,000 on seed 13 and sits in the hall of fame tied with `b32g`, not above it.
+/30,000 on seed 13 and sits in the hall of fame tied with `b32g`, not above it. The 2.4M extension (landed 2026-10-15) added
+nothing at 30k: k held at the tie, l reached one full row, i and j none -- the record is one seed deep, and seeds are the next lever.
 
 ## b51 — E1: recurrent PPO, an LSTM in both towers on b27's config
 

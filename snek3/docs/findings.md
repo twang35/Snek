@@ -27,7 +27,9 @@ steps / 180k updates, is the first value agent with any `hof30k` row and it land
 /30,000, two at 29,970 (99.900%, the record's count); two of its four seeds were still climbing at the cap. **Confirmed 2026-10-12**: the five
 best seed-7 rows re-measured at 30,000 on seed 13 read 29,936-29,960 (the two 29,970s fell to 29,954 and 29,942), and @1795000 -- 29,967 on
 seed 7, 29,960 on seed 13 -- is in the hall of fame, **tied with the PPO record `b32g`** (29,967 / 29,957; z = 0 and 0.3) rather than above it.
-The ceiling the PPO lineage reached is reachable by a value agent with memory (`hallOfFame/HOF.md`). The cell runs on to 2.4M.
+The ceiling the PPO lineage reached is reachable by a value agent with memory (`hallOfFame/HOF.md`). Run on to 2.4M / 240k updates
+(landed 2026-10-15), the cell moved nothing at 30k: k's 17 new full rows read a median of 29,949 and a best of 29,965, l one row at
+29,941, and i and j -- at ≥98 /500 on stage A by then -- abandoned every 30k row. The record is one seed in four at both budgets.
 
 ### An LSTM replaces the eight-move window but does not add to it, and moves no ceiling
 

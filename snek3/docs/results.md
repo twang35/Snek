@@ -31,7 +31,7 @@ Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off
 |---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
 | r2d2paper | 1,238 | 50.4% | 62.8 6.2 61.9 10.3 | 113 | 100.0 | 98.17 (97.1-99.0) | 56.4 | 0.06% | 11.29% | 18.1% |
 | ffr2d2 | 1,354 | 16.1% | 18.7 9.7 21.2 14.0 | 10 | 100.0 | 97.72 (97.5-97.9) | 72.8 | 0.0% | 2.08% | 16.6% |
-| r2d2c51 | 1,669 | 79.0% | 65.1 50.6 93.6 75.2 | 673 | 100.0 | 99.15 (98.5-99.8) | 38.5 | 1.86% | 12.96% | 20.1% |
+| r2d2c51 | 4,029 | 89.7% | 89.0 84.0 96.4 86.6 | 2259 | 100.0 | 99.72 (99.6-99.8) | 53.9 | 1.19% | 7.33% | 38.6% |
 | **rainbowpaper** (reference) | 2,200 | 9.0% | 16.8 4.6 3.2 5.8 | 3 | 99.6 | 97.45 (96.9-98.1) | 61.6 | 0.0% | 4.44% | 10.4% |
 
 <!-- reading -->
@@ -53,14 +53,19 @@ reached 100/500 and 99.5 /5,000 but seeds b and d never reached `hof5000` and no
 Confirmed 2026-10-12 (`hof-promote`, desktop): b52k's five best seed-7 rows re-measured at 30,000 on seed 13 read 29,954 / 29,942 /
 29,954 / **29,960** / 29,936 (@1779000, @1800000, @1793000, @1795000, @1711000) -- the two 29,970s fell 16 and 28 games, the selected
 high behaving as one. @1795000 is in the hall of fame at 29,967 / 29,960, **tied with `b32g`** (29,967 / 29,957, z = 0 and 0.3), not
-above it; the first value-based entry. The c51 cell runs on to 2.4M / 240k updates (does k go higher, do i and j arrive); the paper
-cell is not extended, by decision (user): it did well without pushing at the limit.
+above it; the first value-based entry. The c51 cell ran on to 2.4M / 240k updates; the paper cell is not extended, by decision (user): it did well without pushing at the
+limit. **The 2.4M stretch holds k at the tie and lifts nothing** (`hof30k` landed 2026-10-15): of k's 224 new 30k rows 207 were
+abandoned and the 17 full ones read a median of 29,949 (the 1.8M rows: 29,950) with a best of 29,965 @1.835M, under the 29,970 pair;
+l has its first full row, 29,941 @2.055M; i and j, which arrived at ≥98 /500 on stage A, abandoned every one of their 61 and 41 rows.
+So the cell's record is one seed deep at both budgets, the stage-A arrival of i and j does not carry to 30,000 episodes, and the
+table above (now the 2.4M numbers: 89.7%, 2,259 candidates, best30 99.72) overstates the cell's depth by the same token.
 <!-- /reading -->
 
 The 2.4M stretch (1.8M-2.4M, 2026-10-12 to 2026-10-14): 583-596 new stage-B rows per arm. i and j arrived -- 97% and 93% of their new
 rows at ≥98 /500 against 45-72% in the 1.2-1.3M bin -- and k and l held at 99%; every arm has 100.0 /500 rows past 1.8M (i 19, j 25, k 54,
 l 35), the cell's best30 is 99.72, and nothing is still climbing (bin means 1.8-2.1M → 2.1-2.4M: 99.0→99.3, 98.9→99.1, 99.5→99.3,
-99.4→99.3). Whether the stretch moves b52k above the tie is the `hof30k` pass's question, in progress.
+99.4→99.3). The `hof30k` pass over the stretch (landed 12:28 PT 2026-10-15, 20 h on the desktop) moved nothing: k 17 full rows of 224, median
+29,949, best 29,965; l one, 29,941; i and j none. The hall-of-fame entry stays @1795000, tied with `b32g`.
 
 ### Every arm
 
