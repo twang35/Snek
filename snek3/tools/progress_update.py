@@ -92,12 +92,35 @@ def read_bus():
 
 
 def feed_trees():
-    """`[(feed, path)]` for every file on either results feed."""
+    """`[(feed, path, blob)]` for every file on either results feed, `blob` its git object id, so a file
+    already in `runs/` can be told from a newer publish of the same name without a fetch of its content."""
     out = []
     for feed in FEEDS.values():
-        for path in git('ls-tree', '-r', '--name-only', 'origin/' + feed, check=False).splitlines():
-            out.append((feed, path))
+        for line in git('ls-tree', '-r', 'origin/' + feed, check=False).splitlines():
+            meta, _, path = line.partition('\t')
+            fields = meta.split()
+            out.append((feed, path, fields[2] if len(fields) >= 3 else None))
     return out
+
+
+IMPORTED_BLOBS = os.path.join('.live', 'imported_blobs.json')   # under runs/, gitignored; not in the snapshot dir
+
+
+def imported_blobs(runs_dir):
+    """`feed/path -> blob` of every feed file `runs/` holds, as of its import (or its first sighting)."""
+    try:
+        with open(os.path.join(runs_dir, IMPORTED_BLOBS)) as handle:
+            loaded = json.load(handle)
+        return loaded if isinstance(loaded, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_imported_blobs(runs_dir, blobs):
+    path = os.path.join(runs_dir, IMPORTED_BLOBS)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w') as handle:
+        json.dump(blobs, handle, sort_keys=True)
 
 
 ARM_OF_FILE = re.compile(r'^(b\d+[a-z]+-[^_.]+)')      # `b52k-r2d2c51-seed11` out of any of the arm's files
@@ -127,11 +150,21 @@ def import_closed_waves(trees, runs_dir=None, extended=None):
     construction: the scheduler publishes an arm at its cap and a pass with its merged files, nothing
     earlier. Pre-rename jobs (`p2-hof5000` is b5's) stay on `results` by design -- results.md, "Where the
     raw rows are". `extended` (`extended_arms`) names the arms whose files here are from before a raised
-    cap; theirs are taken again, since the feed's copy is the newer close-out."""
+    cap; theirs are taken again, since the feed's copy is the newer close-out. Every other file here is
+    taken again when the feed's blob has moved since it was imported (`runs/.live/imported_blobs.json`,
+    written here): a pass re-run over an arm publishes a newer merged file under the same name -- b52's 2.4M
+    hof30k landed 2026-10-15 and only the two arms with no file yet were imported, k's 490-row file and
+    l's left behind the 1.8M copies. A file seen for the first time with a copy already here is recorded
+    as current, not fetched: `runs/` keeps its JSON in the compact column form, so bytes never match."""
     runs_dir = runs_dir or constants.RUNS_DIR
     extended = extended or {}
+    recorded = imported_blobs(runs_dir)
+    changed = False
     copied = 0
-    for feed, path in trees:
+    for entry in trees:
+        feed, path = entry[0], entry[1]
+        blob = entry[2] if len(entry) > 2 else None
+        key = feed + '/' + path
         parts = path.split('/')
         if len(parts) != 3 or parts[0] != 'results' or re.match(r'p\d+-', parts[1]) or not re.match(r'^b\d+', parts[1]):
             continue
@@ -140,11 +173,19 @@ def import_closed_waves(trees, runs_dir=None, extended=None):
         target = os.path.join(runs_dir, parts[2])
         arm = ARM_OF_FILE.match(parts[2])
         if os.path.exists(target) and not (arm and arm.group(1) in extended):
-            continue
+            moved = blob is not None and recorded.get(key) is not None and recorded[key] != blob
+            if not moved:
+                if blob is not None and key not in recorded:
+                    recorded[key], changed = blob, True
+                continue
         with open(target, 'wb') as handle:
             handle.write(subprocess.run(['git', 'show', 'origin/{0}:{1}'.format(feed, path)], cwd=REPO,
                                         capture_output=True, check=True).stdout)
+        if blob is not None:
+            recorded[key], changed = blob, True
         copied += 1
+    if changed:
+        save_imported_blobs(runs_dir, recorded)
     return copied
 
 

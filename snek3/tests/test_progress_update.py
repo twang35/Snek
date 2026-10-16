@@ -238,6 +238,29 @@ def test_import_takes_a_done_hof_pass_too(tmp_path, monkeypatch):
     assert not (tmp_path / 'p2a-ep8-seed1_checkpoint_evals_hof5000.json').exists()
 
 
+def test_a_feed_file_that_moved_since_its_import_is_taken_again(tmp_path, monkeypatch):
+    """b52's 2.4M hof30k landed 2026-10-15 over the 1.8M pass's files of the same names: i and j (no file
+    here) were imported, k's 490-row file and l's were not, since a file that exists is kept. The blob of
+    every imported file is recorded; one whose feed blob has moved since is taken again. A file first seen
+    with a copy already here is recorded as current and not fetched (the JSON here is in column form, so
+    bytes never match), and an arm's own file still follows `extended` when its blob is unrecorded."""
+    monkeypatch.setattr(pu.subprocess, 'run', lambda argv, **kw: type('R', (), {'stdout': b'NEW', 'returncode': 0})())
+    k = tmp_path / 'b52k-r2d2c51-seed11_checkpoint_evals_hof30k.json'
+    k.write_bytes(b'{"rows": []}')
+    path = 'results/b52-hof30k-w3/b52k-r2d2c51-seed11_checkpoint_evals_hof30k.json'
+    assert pu.import_closed_waves([('results', path, 'a' * 40)], str(tmp_path)) == 0
+    assert k.read_bytes() == b'{"rows": []}', 'first sighting with a copy here: recorded, not fetched'
+    assert pu.imported_blobs(str(tmp_path)) == {'results/' + path: 'a' * 40}
+    assert pu.import_closed_waves([('results', path, 'a' * 40)], str(tmp_path)) == 0, 'unchanged blob: kept'
+    assert pu.import_closed_waves([('results', path, 'b' * 40)], str(tmp_path)) == 1, 'the feed moved: taken again'
+    assert k.read_bytes() == b'NEW' and pu.imported_blobs(str(tmp_path))['results/' + path] == 'b' * 40
+    new = 'results/b52-hof30k-w3/b52l-r2d2c51-seed12_checkpoint_evals_hof30k.png'
+    assert pu.import_closed_waves([('results', new, 'c' * 40)], str(tmp_path)) == 1, 'a missing file is imported'
+    assert pu.imported_blobs(str(tmp_path))['results/' + new] == 'c' * 40, 'and recorded on import'
+    assert pu.import_closed_waves([('results', 'results/b52-hof30k-w3/x_checkpoint_evals_hof30k.json')], str(tmp_path)) == 1, \
+        'a 2-tuple (no blob) still imports a missing file'
+
+
 def test_superseded_snapshots_are_dropped_once_the_close_out_file_is_in_runs(tmp_path):
     live = tmp_path / '.live' / 'desktop'
     live.mkdir(parents=True)
