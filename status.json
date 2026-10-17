@@ -1,6 +1,6 @@
 {
-  "iso": "2026-10-17T11:49:21",
-  "ts": 1792262961.3425848,
+  "iso": "2026-10-17T11:59:35",
+  "ts": 1792263575.7414222,
   "project": "snek3",
   "at_a_glance": {
     "pool": [],
@@ -3567,8 +3567,8 @@
       ]
     },
     "status_ages": {
-      "desktop": 578.825501203537,
-      "laptop": 1438816.0695841312
+      "desktop": 609.2079153060913,
+      "laptop": 1439430.2208650112
     },
     "heads": {
       "claims": "58021eef1b2a57c96ad92f4e46f7ced5bbc42827",
@@ -3578,15 +3578,15 @@
   "disk_free_gb": 53.8,
   "head": "9108ef0ef33e",
   "site": {
-    "iso": "2026-10-17T11:49:21",
+    "iso": "2026-10-17T11:59:35",
     "ok": true,
-    "seconds": 2.9,
+    "seconds": 3.2,
     "note": "site: nothing moved since the last build; skipped",
     "forced": false
   },
   "load_avg": [
-    0.0,
-    0.02587890625,
-    0.0
+    0.2607421875,
+    0.09375,
+    0.03076171875
   ]
 }
