@@ -84,6 +84,26 @@ for p in sorted(glob.glob('$OPS/snek3/desktop/queue/pending/*.json')):
 "
 ```
 
+## 1b. A gate run on the desktop -- a bench or smoke wave -- gets a `b9xx` number and a `-bench-` / `-smoke` id
+
+A plan's gate sometimes needs the box itself: the per-arm rate and RSS of N arms under a wave's contention, with the
+stage-A workers up (F1's b99, 2026-10-25). Such a run is **throwaway**, and its naming has to say so twice:
+
+- **its own batch number from the reserved range `b900`-`b999`**, never the real batch's. The scheduler, the viewer
+  and the progress tables group arms by the `b<n>` prefix, so a bench arm named `b53x-...` would be counted into
+  b53's waves, table and chart row. A prefix that is not `b<n>` is no good either: every arm becomes its own
+  batch with its own wave and the arms run one after another instead of together. Take the next unused number
+  in the range (`b99` was the first, before the range existed; `b901` is next);
+- **`-bench-` or `-smoke` in the id** (`b901a-f2-bench-agent57-seed1`), which is what puts its files under the
+  standing deletion authorization (root `CLAUDE.md`, "Smoke and benchmark files need no approval to delete").
+
+A `train` spec at a short cap (~40k steps is an hour for a recurrent arm) is the right type when the measurement
+wants stage A running beside the arms; `benchmark` turns stage A off. Pin it `"box": "desktop"`, give it a priority
+below the real batch's so it runs first, and no `runs.md` entry or `references.json` line -- the plan's gate
+section takes the numbers. **Clean it up as soon as the numbers are in the plan**: on the box, `savedPolicies/<arm>/`
+and `desktop/runs/<arm>*` for each arm (`prune_runs` or `rm` by name over ssh), and the specs can stay on `ops` in
+`done/` as the record (the user, 2026-10-25).
+
 ## 1c. Name the batch's reference cell for the chart viewer
 
 Every one-knob batch is read against an earlier cell, and the GitHub-Pages viewer shows that cell at the
