@@ -238,7 +238,10 @@ unasked: never start a laptop scheduler, never pin a spec `"box": "laptop"`, nev
 or a hand eval here. An unpinned spec on `ops` is safe to push -- the laptop claims only while its scheduler
 runs, so with none up the desktop takes every wave. When a batch would go faster with both boxes, say so as a
 recommendation and wait for the word; "run it on the laptop too" or "train X here" is the go-ahead, and it
-covers that batch only.
+covers that batch only. **Smoke tests and benchmarks are development, not training, and run on the laptop without
+asking** (the user, 2026-10-25): a `smoke` policy, a `-smoke` or `-bench-` gate run, the 2,000-step solo benchmark a plan's
+gate names. The line is what the output is for -- a number for a plan or a check that the code runs, never a row anyone
+will read as a result.
 
 **A progress update commits a closed batch's `runs/` files — JSON, `.md` and `.png` — and nothing for a
 live one.** The pictures of a live arm are on the `site` branch, rebuilt by the desktop from both boxes'
