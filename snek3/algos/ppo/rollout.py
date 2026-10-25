@@ -174,7 +174,7 @@ class Rollout(object):
     def sequence_minibatches(self, lanes_per_batch, rng):
         """Yields minibatches of **whole lanes**, each lane's T steps in order, covering the rollout once.
 
-        The recurrent update's minibatch (`plans/algoExploration/e-memory.md` §2): a cell replayed from a
+        The recurrent update's minibatch (`plans/algoExploration/e-r2d2.md` §2): a cell replayed from a
         stored state needs the steps that followed it in order, so the unit of shuffling is the lane, not
         the transition. Every array comes back `(T, n, ...)` with the state each tower carried into step 0 as
         `actor_state` / `critic_state` `(n, width)`, and `fresh` `(T, n)` saying where the cell restarts. A

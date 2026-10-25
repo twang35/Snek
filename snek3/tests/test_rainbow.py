@@ -1,5 +1,5 @@
 """Group C: `algos/rainbow/` -- the noisy layer, the dueling and residual network, the agent's noise
-discipline, the two names' defaults, the epsilon floor and the sidecar's trunk. `c-value-stack.md`."""
+discipline, the two names' defaults, the epsilon floor and the sidecar's trunk. `c-rainbow-btr.md`."""
 
 import numpy as np
 import pytest
@@ -343,7 +343,7 @@ def test_btrs_defaults_are_the_papers(monkeypatch):
 
 
 def test_btr_at_rainbows_flags_is_rainbow_weight_for_weight(monkeypatch):
-    """Gate 2 of `c-value-stack.md` §4: the C2 ablations are exact because the two names build one net."""
+    """Gate 2 of `c-rainbow-btr.md` §4: the C2 ablations are exact because the two names build one net."""
     rainbow_config = small_config(monkeypatch, 'rainbow')
     rainbow_fields = train.ALGOS['rainbow'].arch_fields(rainbow_config)
     btr_config = small_config(monkeypatch, 'btr', RAINBOW_HEAD='c51', BTR_RESIDUAL=0, RAINBOW_DOUBLE=1,

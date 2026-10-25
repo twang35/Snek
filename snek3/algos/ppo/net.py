@@ -77,7 +77,7 @@ def recurrent_of(arch):
 
 class RecurrentTower(nn.Module):
     """`obs_len -> fc_layer_params (relu) -> GRU | LSTM (hidden) -> outputs`: E1's actor and E1's critic
-    (`plans/algoExploration/e-memory.md` §2), each its own tower as the feed-forward pair is.
+    (`plans/algoExploration/e-r2d2.md` §2), each its own tower as the feed-forward pair is.
 
     The trunk is `QNet`'s hidden stack to the initialiser, so a recurrent arm differs from b27's in the cell
     and nothing else. The cell's parameters take torch's own uniform `(-1/sqrt(hidden), 1/sqrt(hidden))`,

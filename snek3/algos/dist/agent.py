@@ -81,7 +81,7 @@ class DistAgent(DdqnAgent):
     def policy_fn(self):
         """The greedy policy the trainer's stage A measures: always the mean read. The risk-sensitive
         *training* policy (`risk_train`) is a property of collection, and the eval's own risk read is a
-        pass's `--policy-variant` (`a-return-tail.md` §5)."""
+        pass's `--policy-variant` (`a-dqn-distributional.md` §5)."""
         return network.greedy_policy_fn(self.net, self.device)
 
     def greedy_actions(self, observations):

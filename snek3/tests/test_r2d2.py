@@ -1,5 +1,5 @@
 """R2D2 (`algos/r2d2/`): the sequence replay's grid, the collector's loss-block rule, the learner's burn-in
-and targets, the ladder, and the seam (`plans/algoExploration/e-memory.md` §0 and §2).
+and targets, the ladder, and the seam (`plans/algoExploration/e-r2d2.md` §0 and §2).
 
 What would be silent without these:
 

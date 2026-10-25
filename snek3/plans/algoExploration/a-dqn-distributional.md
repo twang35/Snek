@@ -195,7 +195,7 @@ more departures from the papers apply to every quantile rung: the loss averages 
 where the papers sum them (`1/N` of theirs, which matters through the gradient clip and Adam's
 epsilon), and the priority is the loss rather than the pairwise |TD| (c51: the cross-entropy rather
 than Rainbow's KL). b40's `mqrdqnlocal` is therefore M-QR-DQN-mixture. Group A's code is left as it ran;
-the papers' forms are `algos/rainbow/agent.py`'s (`c-value-stack.md`, decided 2026-09-23).
+the papers' forms are `algos/rainbow/agent.py`'s (`c-rainbow-btr.md`, decided 2026-09-23).
 
 Not a new head: a log-policy term added to the reward and a soft (log-sum-exp) target, applied to any
 of A1-A5. So it is **two knobs on `algos/dqn/` and `algos/dist/`, not a package**: `SNEK_MUNCHAUSEN_ALPHA`
@@ -277,7 +277,7 @@ A4's risk-sensitive read is a second greedy policy over the same weights. The ev
   schedule reads; changing it would change the training.
 
 This is the same shape as the "no policy" reference form the fixed-path rows already use in the HOF,
-and it is what G1's search-versus-network decision (`g-planning.md` §5) reuses.
+and it is what G1's search-versus-network decision (`g-mcts-muzero.md` §5) reuses.
 
 ## 6. What would change the plan
 

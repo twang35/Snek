@@ -1,5 +1,5 @@
 """Shrink-and-perturb resets: `algos/dqn/resets.py`, the `maybe_reset` hook on both agents, the knobs.
-Group D, row D1 (`plans/algoExploration/d-data-efficiency.md`)."""
+Group D, row D1 (`plans/algoExploration/d-bbf.md`)."""
 
 import numpy as np
 import pytest

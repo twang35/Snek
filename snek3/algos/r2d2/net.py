@@ -1,6 +1,6 @@
 """R2D2's network (Kapturowski et al. 2019, §2.3 and Figure 8): trunk -> [previous action one-hot, previous
 reward] -> LSTM (512) -> dueling streams (512 wide) -> a scalar Q per action, or C51's atoms per action for the
-local variant. `plans/algoExploration/e-memory.md` §2 and §2b.
+local variant. `plans/algoExploration/e-r2d2.md` §2 and §2b.
 
 | piece | the paper | here |
 |---|---|---|

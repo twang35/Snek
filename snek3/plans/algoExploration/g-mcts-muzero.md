@@ -186,7 +186,7 @@ a better teacher than the policy gradient for this game even when no search runs
 
 The eval protocol measures a policy network. G1's *agent* is a search; the network alone is a
 different, weaker policy, and both are legitimate results with different claims attached. The decision,
-in the shape `a-return-tail.md` §5 set:
+in the shape `a-dqn-distributional.md` §5 set:
 
 - **`arch.json` describes the checkpoint; `search` in it says a search is available, not that one is
   used.** The default `restore` read is the **network alone**, so stage A (which feeds nothing here but

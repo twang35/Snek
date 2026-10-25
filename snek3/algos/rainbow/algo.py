@@ -2,7 +2,7 @@
 
 `rainbow` (Hessel et al. 2018) and `btr` (Clark, Towers, Evers & Hare 2024) are one network assembled from
 flags and one agent, so they share this module; the two names differ in their **defaults**, which are each
-paper's settings translated by `plans/algoExploration/README.md`'s rules (`c-value-stack.md` §2b). A spec
+paper's settings translated by `plans/algoExploration/README.md`'s rules (`c-rainbow-btr.md` §2b). A spec
 states only what departs. The knobs DQN owns keep DQN's names (`SNEK_LEARNING_RATE`, `SNEK_BATCH_SIZE`,
 ...), the head's keep Group A's `SNEK_DIST_*`, and what is this group's carries `RAINBOW_` or `BTR_`:
 

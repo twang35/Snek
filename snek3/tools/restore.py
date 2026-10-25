@@ -91,7 +91,7 @@ def policy_fn_for(arch, net, device='cpu', variant=None):
     into the *same* net between episodes and must keep the same callable.
 
     `variant` names a second greedy read of the same weights (`cvar:0.25`, the risk-sensitive read
-    of a distributional head; `plans/algoExploration/a-return-tail.md` §5). None is the read every
+    of a distributional head; `plans/algoExploration/a-dqn-distributional.md` §5). None is the read every
     checkpoint has. A module without a `variant_policy_fn` refuses a variant by name rather than
     measuring the mean under a label that says otherwise.
     """

@@ -1,7 +1,7 @@
 """R2D2's collector: N lanes in lockstep, each carrying an LSTM state, its previous action and reward and its
 own epsilon, banking one row per lane per step and cutting the rows into windows for `SequenceReplay`.
 
-## The loss-block rule (`plans/algoExploration/e-memory.md` §0, decided 2026-09-30)
+## The loss-block rule (`plans/algoExploration/e-r2d2.md` §0, decided 2026-09-30)
 
 A loss block of `block` (80) steps starts every `stride` (40) steps of an episode from its first step, so
 consecutive windows overlap by `block - stride` (the paper's 40) and every step is a loss position `block / stride`

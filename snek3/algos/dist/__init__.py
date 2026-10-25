@@ -1,5 +1,5 @@
 """The distributional value heads: C51, QR-DQN, IQN and FQF, behind `algos/dqn/`'s replay, collector
-and schedules. Group A of `plans/algoExploration/a-return-tail.md`.
+and schedules. Group A of `plans/algoExploration/a-dqn-distributional.md`.
 
 The four rungs differ in three places and only three -- the head, the loss, and how a greedy action is
 read off the head -- so this package is one `net.py` (the heads), one `losses.py`, one `agent.py` (a

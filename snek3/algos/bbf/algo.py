@@ -2,7 +2,7 @@
 (`algos/dqn/algo.py` for the seam's members). `SNEK_ALGO=bbf`.
 
 **This is the paper's recipe, whole, on the shared game and the shared measurement**, built 2026-09-20 to read
-how BBF does on Snake; it is expected to run a few batches and then rest (`plans/algoExploration/d-data-efficiency.md`
+how BBF does on Snake; it is expected to run a few batches and then rest (`plans/algoExploration/d-bbf.md`
 §7). It is its own package and not a subclass of `DqnAlgo` because two of its pieces do not fit the shared path:
 the n-step return is computed at **sample time** from a sequential replay (`replay.py`), so the anneal of n and
 gamma reaches every drawn transition at once, as the paper's does; and SPR needs the K observations after each

@@ -7,7 +7,7 @@ Group A's distributional rungs all act greedily on the mean of the quantiles (`a
 there in the head and nothing but the CVaR read of b38 has ever acted on it. This pass takes the best
 checkpoints of the four quantile cells and re-measures each one under a family of alternative reads, so
 the question "does the tail carry information the mean throws away" gets a paired answer on the same
-weights. It is `a-return-tail.md` §5's second-greedy-policy mechanism, broadened.
+weights. It is `a-dqn-distributional.md` §5's second-greedy-policy mechanism, broadened.
 
 **Cells**: b37 `qrdqnlocal` (e-h), b38 `iqnlocal` (a-d), b39 `fqflocal` (a-d), b40 `mqrdqnlocal` (e-h).
 Plus b37 `c51local` (a-d), included at review (§6).
@@ -184,7 +184,7 @@ the user said; the reads are the interesting part and pruning them saves little.
 | 9 | **the page** (built 2026-09-22 on the first controls, republished when the batch closes): `viewer/pages/reads-b45.html`, self-contained, the data inlined by a one-off reducer kept outside the tree. Five views: the matrix (16 reads × 5 cells, coloured by Δ perfect / Δ deaths / Δ starves), the algorithm view with the control pinned and the reads scrolling beneath it, one read across the five algorithms, a checkpoint drill (every read on one checkpoint with Wilson intervals), and the table. Strips are ordered by the control's perfect rate with the axis floored at the cell's own range; final-score histograms in bins of 5 on a square-root share axis, the perfect game alone, the control outlined | `viewer/`, standing authorization |
 
 Two things this deliberately does not touch: stage A stays the `mean` read (it drives the epsilon
-schedule, `a-return-tail.md` §5), and no training runs. The pass is measurement only, on frozen
+schedule, `a-dqn-distributional.md` §5), and no training runs. The pass is measurement only, on frozen
 weights.
 
 ## 6. Decisions (2026-09-22)
@@ -205,5 +205,5 @@ weights.
   it is dropped before the specs are written rather than measured to 1,000 episodes.
 - If FQF rows are more than three times slower than QR-DQN rows, the b39 cell runs reads 0 to 6 only.
 - If any read beats `mean` by more than 1 pp on b37 or b40, the follow-up is the hof5000 protocol on
-  those checkpoints under that read, and the HOF row carries the variant as §5 of `a-return-tail.md`
+  those checkpoints under that read, and the HOF row carries the variant as §5 of `a-dqn-distributional.md`
   already provides for.

@@ -1,4 +1,4 @@
-"""`R2d2Agent`: the learner of Kapturowski et al. 2019 (`plans/algoExploration/e-memory.md` §2), on one
+"""`R2d2Agent`: the learner of Kapturowski et al. 2019 (`plans/algoExploration/e-r2d2.md` §2), on one
 fixed-grid batch from `SequenceReplay`.
 
 | piece | the paper | here |

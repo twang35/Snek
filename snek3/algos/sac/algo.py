@@ -9,7 +9,7 @@ name** (`algos/ppo/algo.py` §2 on why refusing beats ignoring), and SAC's own c
 
 `sac` is Christodoulou 2019's agent at its paper values; `sac2` (`sac2.py`) is the same class with Zhou et
 al. 2022's values as its defaults: alpha fixed at 0.05, entropy-penalty 0.5, double average Q with a
-Q-clip of 0.5, Polyak 0.005, lr 1e-5, 3-step, 1e5 replay, 0.1 updates a move (`b-entropy.md` §2b).
+Q-clip of 0.5, Polyak 0.005, lr 1e-5, 3-step, 1e5 replay, 0.1 updates a move (`b-sac.md` §2b).
 """
 
 import os

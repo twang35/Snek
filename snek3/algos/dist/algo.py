@@ -9,7 +9,7 @@ Knobs, all `SNEK_DIST_*` and each its config key lowercased, over DQN's own (whi
 
 | knob | rungs | default | paper |
 |---|---|---|---|
-| `SNEK_DIST_ATOMS`, `SNEK_DIST_V_MIN`, `SNEK_DIST_V_MAX` | c51 | 51, -10, 110 | 51 atoms; the support is this game's return range, `a-return-tail.md` §1 |
+| `SNEK_DIST_ATOMS`, `SNEK_DIST_V_MIN`, `SNEK_DIST_V_MAX` | c51 | 51, -10, 110 | 51 atoms; the support is this game's return range, `a-dqn-distributional.md` §1 |
 | `SNEK_DIST_QUANTILES` | qrdqn, fqf | 200 (qrdqn), 32 (fqf) | N |
 | `SNEK_DIST_TAU_SAMPLES`, `SNEK_DIST_TAU_PRIME_SAMPLES`, `SNEK_DIST_POLICY_SAMPLES` | iqn | 64, 64, 32 | N, N', K |
 | `SNEK_DIST_EMBEDDING` | iqn, fqf | 64 | the cosine embedding's width |

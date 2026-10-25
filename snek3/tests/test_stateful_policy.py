@@ -1,5 +1,5 @@
 """The stateful-policy seam: `begin(rows, fresh, prev_reward)` on the engine, `StatefulPolicy` behind it,
-and the two scalar entry points' loops (`plans/algoExploration/e-memory.md` §1).
+and the two scalar entry points' loops (`plans/algoExploration/e-r2d2.md` §1).
 
 What would be silent without these:
 

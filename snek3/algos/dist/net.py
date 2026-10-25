@@ -13,7 +13,7 @@ output. `arch['head']` (see `tools/arch.py`'s `OPTIONAL_FIELDS`) says which head
 
 **One interface for the agent and the policy**: `q_values(obs)` is the mean of the distribution per
 action, `(m, actions)`, and `cvar_values(obs, alpha)` is the mean of its lower `alpha` tail, which is
-what the risk-sensitive read (`a-return-tail.md` §5) acts on. `distribution(obs)` is the whole thing
+what the risk-sensitive read (`a-dqn-distributional.md` §5) acts on. `distribution(obs)` is the whole thing
 as `(values, masses)`, both `(m, actions, n)`, which the reads in `reads.py` score. The greedy
 `policy_fn` is the argmax of one of those, in the `(m, obs_len) float32 -> (m,) int64` shape the engine
 takes; a `variant` string (`cvar:0.25`, `mix:0.7`, ...; `reads.parse_variant`) selects the read and is

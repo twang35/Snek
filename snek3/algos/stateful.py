@@ -6,7 +6,7 @@ the engine calls it once per resident job on that job's rows, and **lanes migrat
 between episodes without telling the policy.** A recurrent policy needs, per lane, a hidden state that
 persists across steps and is zeroed when the lane's episode restarts -- and R2D2's net also takes the previous
 action and the previous reward as inputs, the first of which the policy chose itself and the second of which
-only the engine knows. So the protocol (`plans/algoExploration/e-memory.md` §1) is the same callable **plus**
+only the engine knows. So the protocol (`plans/algoExploration/e-r2d2.md` §1) is the same callable **plus**
 one method:
 
     policy.begin(rows, fresh, prev_reward)   # before the call: which lanes, which of them were reset since

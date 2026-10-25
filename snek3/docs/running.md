@@ -88,7 +88,7 @@ existed, b2's shaping dose had to be confirmed by reading `/proc/<pid>/environ` 
 | `SNEK_MUNCHAUSEN_ALPHA` | 0 (off) | Munchausen RL (Vieillard, Pietquin & Geist 2020) on any DQN-family algorithm: the clipped, `tau`-scaled log-policy of the taken action is added to the reward and the bootstrap becomes the soft value under the target net's policy at temperature `tau`. Paper 0.9. **0 is plain double DQN to the bit**; the fixture says so. Group A, row A6 |
 | `SNEK_MUNCHAUSEN_TAU` | 0.03 | the temperature, in reward units (the paper's value against a unit reward; food here is 1) |
 | `SNEK_MUNCHAUSEN_L0` | -1 | the log-policy clip's floor |
-| `SNEK_RESET_INTERVAL` | 0 (off) | BBF's shrink-and-perturb resets (Schwarzer et al. 2023) on any DQN-family algorithm, every this many **gradient steps**: the trunk (every hidden linear) is pulled toward a fresh initialisation, the head (and IQN's embedding, FQF's fraction net) is re-initialised, the target becomes a copy of the reset net and every optimiser's state is cleared. `algos/dqn/resets.py`; `plans/algoExploration/d-data-efficiency.md` |
+| `SNEK_RESET_INTERVAL` | 0 (off) | BBF's shrink-and-perturb resets (Schwarzer et al. 2023) on any DQN-family algorithm, every this many **gradient steps**: the trunk (every hidden linear) is pulled toward a fresh initialisation, the head (and IQN's embedding, FQF's fraction net) is re-initialised, the target becomes a copy of the reset net and every optimiser's state is cleared. `algos/dqn/resets.py`; `plans/algoExploration/d-bbf.md` |
 | `SNEK_RESET_ALPHA` | 0.5 | how much of the old trunk survives a reset: θ ← α θ + (1 − α) θ_fresh. 1 keeps the trunk and still re-initialises the head; 0 is a full re-initialisation |
 | `SNEK_RESET_STOP_AFTER` | 0 (never) | the gradient step after which no reset fires, so the final stretch of training settles |
 | `SNEK_RESET_ANNEAL_N_STEP`, `SNEK_RESET_ANNEAL_GAMMA` | off | BBF's within-cycle anneal, both or neither: `10,3` and `0.97,0.997` restart n-step and γ at the first value after every reset and take them to the second over `SNEK_RESET_ANNEAL_STEPS` gradient steps (exponential in n and in log(1 − γ), Dopamine's schedule; the first cycle starts at gradient step 0). On the DQN-family path the collector's window, its discount and the env's `shaping_discount` move **together** (`docs/invariants.md` §6), so a banked transition keeps the `γ^n` it was collected under and new ones carry the new; each eval row carries a `cycle` block. Inert without resets beyond the first cycle. 2026-09-20; `algos/dqn/resets.py` `CycleSchedule` |
@@ -117,13 +117,13 @@ existed, b2's shaping dose had to be confirmed by reading `/proc/<pid>/environ` 
 
 ### Distributional heads — only under `SNEK_ALGO=c51`, `qrdqn`, `iqn` or `fqf`
 
-Group A of the algorithm series (`plans/algoExploration/a-return-tail.md`; `algos/dist/`). Each is DQN
+Group A of the algorithm series (`plans/algoExploration/a-dqn-distributional.md`; `algos/dist/`). Each is DQN
 with a distributional head and the loss that fits it, on the same replay, collector and schedules, so
 **every DQN knob above applies unchanged**, and the sidecar gains a `head` field that the restore path
 reads (`tools/arch.py`, `OPTIONAL_FIELDS`). The greedy policy every eval measures is the argmax of the
 distribution's **mean**; `--policy-variant cvar:<alpha>` on `evaluate.py`, `tools.closeout` and
 `tools.shard` measures the argmax of its lower tail instead, under an explicit `--label` so the rows sit
-beside the mean's file (`a-return-tail.md` §5).
+beside the mean's file (`a-dqn-distributional.md` §5).
 
 | knob | default | rungs | notes |
 |---|---|---|---|
@@ -143,7 +143,7 @@ gradient steps a counted step at batch 128 cost IQN 15 st/s, so the heavy heads 
 
 ### Discrete SAC — only under `SNEK_ALGO=sac` or `sac2`
 
-Group B of the algorithm series (`plans/algoExploration/b-entropy.md`; `algos/sac/`). A categorical actor
+Group B of the algorithm series (`plans/algoExploration/b-sac.md`; `algos/sac/`). A categorical actor
 (DQN's `QNet` read as logits, exactly PPO's, so the checkpoint is the actor alone and `arch.json` gains no
 field), two Q critics with target copies, and an automatically tuned or fixed temperature; off-policy from
 DQN's replay and collector with the fork and the shield **off** -- the agent samples from its own policy.
@@ -172,11 +172,11 @@ and distributional knob is **refused by name**, as under PPO; `SNEK_COLLECT_ENVS
 
 Each eval row carries `alpha` and a `sac` block -- `entropy`, `target_entropy`, `critic_loss`, `actor_loss`,
 `alpha_loss`, `entropy_penalty`, `clip_fraction` (the share of critic samples the clipped branch won) and
-`episodes` -- so the gates in `b-entropy.md` §4 read off the history file.
+`episodes` -- so the gates in `b-sac.md` §4 read off the history file.
 
 ### BBF — only under `SNEK_ALGO=bbf`
 
-Bigger, Better, Faster (Schwarzer et al. 2023), the paper's recipe whole (`algos/bbf/`; `plans/algoExploration/d-data-efficiency.md`
+Bigger, Better, Faster (Schwarzer et al. 2023), the paper's recipe whole (`algos/bbf/`; `plans/algoExploration/d-bbf.md`
 §7), built 2026-09-20 to read how it does on Snake and expected to rest after a few batches. Its own package because two pieces do not
 fit the shared path: the n-step return is summed **when a batch is drawn**, from a replay that keeps each lane's rows in order, so the
 anneal of n and γ reaches every drawn transition; and SPR needs the K observations after each state. It shares the collector (at n-step
@@ -213,7 +213,7 @@ slower than 1 under that load. A 100k-move paper arm is ~800k gradient steps, ab
 ### R2D2 — only under `SNEK_ALGO=r2d2`
 
 Recurrent Replay Distributed DQN (Kapturowski et al. 2019), the paper's learner and actor recipe in one
-process (`algos/r2d2/`, `plans/algoExploration/e-memory.md` §2). The shared names keep their meaning
+process (`algos/r2d2/`, `plans/algoExploration/e-r2d2.md` §2). The shared names keep their meaning
 (`SNEK_LEARNING_RATE`, `SNEK_ADAM_EPSILON`, `SNEK_BATCH_SIZE`, `SNEK_DISCOUNT`, `SNEK_N_STEP_UPDATE`,
 `SNEK_TARGET_UPDATE_PERIOD`, `SNEK_GRADIENT_CLIPPING`, `SNEK_COLLECT_ENVS`, `SNEK_PRIORITY_EXPONENT`,
 `SNEK_INITIAL_COLLECT_STEPS`, `SNEK_DIST_ATOMS/V_MIN/V_MAX`) at the paper's defaults; what is R2D2's
@@ -277,7 +277,7 @@ launchable at all.
 | `SNEK_PPO_TARGET_KL` | 0 (off) | stops the epoch loop early when `approx_kl` exceeds it — **between epochs, never mid-epoch**, or some samples are used more often than others. `approx_kl` is reported either way |
 | `SNEK_PPO_NORMALIZE_ADV` | 1 | zero-mean, unit-sd per minibatch. What makes the update invariant to the reward scale |
 | `SNEK_PPO_VALUE_LOSS` | `huber` | or `mse`. Huber for the reason `algos/dqn/agent.py` gives: one +100 terminal would dominate a squared error over 256 samples |
-| `SNEK_PPO_RECURRENT` | unset | `lstm` or `gru` puts a recurrent cell between the trunk and the head of **both** towers (`algos/ppo/net.py`'s `RecurrentTower`; the critic gets its own cell), the actor carrying a per-lane state through the rollout and the update replaying each lane's whole rollout from the state it stored at step 0, zeroed at every episode start. Unset is the feed-forward actor, byte for byte. Group E's E1 (`plans/algoExploration/e-memory.md`) |
+| `SNEK_PPO_RECURRENT` | unset | `lstm` or `gru` puts a recurrent cell between the trunk and the head of **both** towers (`algos/ppo/net.py`'s `RecurrentTower`; the critic gets its own cell), the actor carrying a per-lane state through the rollout and the update replaying each lane's whole rollout from the state it stored at step 0, zeroed at every episode start. Unset is the feed-forward actor, byte for byte. Group E's E1 (`plans/algoExploration/e-r2d2.md`) |
 | `SNEK_PPO_RECURRENT_HIDDEN` | 128 | the cell's width. The checkpoint's `arch.json` carries `recurrent: {type, hidden}`, so a recurrent checkpoint restores through `tools/restore.py` and measures as a `StatefulPolicy` (`algos/stateful.py`) |
 | `SNEK_PPO_SEQ_MINIBATCH` | 2 | **lanes** per minibatch for a recurrent arm; each lane is a whole rollout, so the minibatch is `seq x rollout` transitions (2 x 256 = 512, b27's size). `SNEK_PPO_MINIBATCH` is derived from it and **refused if set to anything else** |
 

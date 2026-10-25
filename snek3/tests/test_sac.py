@@ -1,5 +1,5 @@
 """Discrete SAC behind the seam: `algos/sac/agent.py`'s arithmetic, `algos/sac/algo.py`'s knobs and defaults,
-the registry and the restore path (`plans/algoExploration/b-entropy.md` §2)."""
+the registry and the restore path (`plans/algoExploration/b-sac.md` §2)."""
 
 import math
 

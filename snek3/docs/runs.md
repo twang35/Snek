@@ -164,7 +164,7 @@ at complete separation (Mann-Whitney p=0.029). Details in [`protocol.md`](protoc
 
 | | |
 |---|---|
-| base | none: the paper cell (`e-memory.md` §2b). hist8, b2 reward, step penalty 0.01, shaping **off** (the paper-cell rule), `fc 320`, 32 lanes |
+| base | none: the paper cell (`e-r2d2.md` §2b). hist8, b2 reward, step penalty 0.01, shaping **off** (the paper-cell rule), `fc 320`, 32 lanes |
 | the config | `SNEK_ALGO=r2d2`: LSTM 512 after the trunk with the previous action one-hot and the raw previous reward as cell inputs, dueling 512-wide streams, scalar Q; windows of 120 stored rows = 40 burn-in prefix + 80 loss steps, a new loss block every 40 steps (the paper's m = 80, l = 40, overlap 40), cut per episode from its first step (0 burn-in at the start); burn-in on online and target from the stored `(h, c)`; squared TD on the 5-step double-Q target under h(x) ε 1e-3, summed over the block, IS-weighted (β 0.6, max-normalised), averaged over 64 windows; PER α 0.9, priority 0.9 max + 0.1 mean, new windows at max; Adam 1e-4 ε 1e-3, hard target copy every 2,500 updates, clip 40; ε ladder 0.4^(1 + 7i/31) over the lanes, held; replay 30,000 windows |
 | varies | **r2d2paper** (a-d) / **ffr2d2** (e-h, `SNEK_R2D2_RECURRENT=dense`: the paper's own §4 feed-forward ablation, same windows, loss positions, priorities, targets, moves, updates, batch) / **r2d2c51** (i-l, `SNEK_R2D2_HEAD=c51 SNEK_R2D2_RESCALE=0`: the categorical head on [−10, 110] under the memory; two recipes against the paper cell, not the distribution alone) |
 | cells × seeds | 3 × 4, seeds pinned to the letter |
@@ -172,7 +172,7 @@ at complete separation (Mann-Whitney p=0.029). Details in [`protocol.md`](protoc
 | control | `ffr2d2` for the memory; b46a-d (Rainbow paper) and b35's DQN paper cell for shape; the paper cell for c51 |
 | predicted | registered 2026-09-30 by the agent: the paper cell reaches 90%+ perfect inside 41.6M moves and holds (the low-ε lanes and the 0.997 horizon suit the game); `ffr2d2` trails it on the hold (drawdowns, sef) but not on the peak; the c51 cell is level with the paper cell within noise; none reaches PPO's 99.8 `hof30k` row — **paper half held** (100/500 and 99.5 /5,000, but b and d never reached `hof5000` and no 30k row); **`ffr2d2` falsified in part** (trails on the peak too); **c51 falsified upward**; **"none at 99.8" falsified** — b52k 29,970 /30,000 at 1.779M and 1.800M, at 180k updates |
 
-**Why.** Group E's E2 (`e-memory.md`): recurrence on a value agent with the stored-state and burn-in
+**Why.** Group E's E2 (`e-r2d2.md`): recurrence on a value agent with the stored-state and burn-in
 machinery, so a gain can be attributed to the memory (paper minus `ffr2d2`, the only pair differing in
 the LSTM alone) rather than to the agent. Built 2026-09-30 whole in `algos/r2d2/` (`test_r2d2.py`,
 `mut_r2d2.json`); the paper's figures were read from the PDF the user supplied (§0: ~190k updates over 10B frames). The update count is the budget by decision; the move cap is what 200k updates buys in ~24 h.
@@ -244,7 +244,7 @@ stays the incumbent; the open half of Group E is whether memory helps a value ag
 climbs back to a 55-69 plateau in 15k-100k counted steps. The reset-free tail reaches 59-64 against b43a-d's 40-55, so the anneal
 helps a little, and b40e-h without resets holds 89-93. D1 closes null: resets are not the late-plasticity lever on this game.
 
-**Why.** `d-data-efficiency.md` §5's "worse everywhere" branch: b43's reset alone never held, but b43 lacked the piece BBF's own
+**Why.** `d-bbf.md` §5's "worse everywhere" branch: b43's reset alone never held, but b43 lacked the piece BBF's own
 ablations put among the most important in the reset regime -- a freshly reset head relearning from a shorter, more myopic target -- so
 no b43 result closes D1. Built 2026-09-20 (`resets.CycleSchedule`, `mut_resets.json` 21 / 21), due since 2026-09-22, queued 2026-09-26.
 
@@ -263,7 +263,7 @@ no b43 result closes D1. Built 2026-09-20 (`resets.CycleSchedule`, `mut_resets.j
 stack without spectral norm both land about two points under the paper cell (best30 94.90 and 94.62 against 96.58), inside n = 4's
 noise but on the same side, with fewer stage-B rows and no `hof5000` candidate. BTR's gap to Rainbow is not its trunk. Group C closes.
 
-**Why.** `c-value-stack.md` §3's C2 ablation: without it, C2 minus C1 is one number with four changes behind it. Queued beside
+**Why.** `c-rainbow-btr.md` §3's C2 ablation: without it, C2 minus C1 is one number with four changes behind it. Queued beside
 b47 rather than after it (2026-09-23, the user's call to queue the group): the paper cell's settings are the paper's, so there is
 no tuning wave for the ablation to wait on.
 
@@ -284,7 +284,7 @@ held 89-95% perfect. Stage A acts noise-off and ε-free in both cells, so the ga
 is not settled is why: 1% random moves on a long board, the schedule's 62.5k-move decay, or the noise itself. The plateau's shape is the
 local DQN cells', not the paper cell's.
 
-**Why.** `c-value-stack.md` §3's C1 ablation: whether noisy nets matter here, the one ingredient C1 adds that nothing earlier built.
+**Why.** `c-rainbow-btr.md` §3's C1 ablation: whether noisy nets matter here, the one ingredient C1 adds that nothing earlier built.
 Pinned to the laptop, the smallest Group C batch, to finish overnight.
 
 ## b47 — Beyond the Rainbow: paper cell beside the local plumbing
@@ -304,7 +304,7 @@ early (best 98.1 at 2,055 episodes). That is below Rainbow's paper cell, which g
 is the surprise: 90 by 0.11-0.17M counted steps where b40e-h's M-QR-DQN needed 1.13-1.54M, then held (sef 87, drawdowns under 80 in
 0.6% of evals). The stack is a faster learner, not a higher one.
 
-**Why.** Row C2 (`plans/algoExploration/c-value-stack.md`): the practical ceiling of the value family on one box. Built 2026-09-20,
+**Why.** Row C2 (`plans/algoExploration/c-rainbow-btr.md`): the practical ceiling of the value family on one box. Built 2026-09-20,
 reworked 2026-09-23 after two external reviews so the paper cell is the paper wherever the game allows (the spectral-norm start,
 the stream layers, M-IQN's target, the loss reduction and priorities, batch-max weights, the code's β, ε shape and warmup).
 
@@ -355,7 +355,7 @@ the starve is the next thing to look at.
 
 **Why.** Every Group A number is the argmax of the mean of a distribution the head carries and nothing acts on. The user asked
 what the tail knows that the mean throws away, and the machinery for a second greedy read of the same weights already existed
-(`--policy-variant`, `a-return-tail.md` §5). A pilot on two b40e checkpoints (`plans/quantile-reads.md` §4b) already showed the
+(`--policy-variant`, `a-dqn-distributional.md` §5). A pilot on two b40e checkpoints (`plans/quantile-reads.md` §4b) already showed the
 shape: the upward reads walk into the wall, because the never-taken action's quantiles are noise and some of that noise is large.
 Queued 2026-09-22 on the desktop, all five cells' checkpoints on that box (b40's rsynced). The rows now carry `deaths` and `starves`
 from the env's flags, added for this batch. No charts: the batch trains nothing; its result is `tools/read_compare.py`'s table per cell.
@@ -378,7 +378,7 @@ hundredth of the moves. What it changes: nothing for D1, which is b50's.
 
 **Why.** The user's ask (2026-09-20): a read on how BBF itself does on Snake, separate from Group D's reset probe (b43, the reset alone
 on a tuned cell) -- the plan had dropped the paper cell because SPR and the CNN had no meaning here, and the package `algos/bbf/` now
-carries the recipe whole with the MLP analogue stated (`plans/algoExploration/d-data-efficiency.md` §7). Read for the shape first:
+carries the recipe whole with the MLP analogue stated (`plans/algoExploration/d-bbf.md` §7). Read for the shape first:
 whether anything is learned in 100k moves, what each reset costs and recovers, whether the anneal's early myopic cycles show. Gates: 25
 tests and 18 / 18 mutants, a smoke with resets every 2,000 gradient steps that checkpointed, resumed with its buffer and restored through
 `evaluate.py`; the whole suite passes. Queued 2026-09-26 beside b50, on the user's go-ahead.
@@ -564,7 +564,7 @@ whether the ceiling is N 8 -- eight samples against a +100 point mass -- or the 
 
 **Why.** Rows A2 and A3, moved from the papers' plumbing to snek3's own because b35 and b36 showed the
 papers' recipe does not reach competence in 10M moves on this game for either DQN or C51
-(`../plans/algoExploration/a-return-tail.md` §6, first bullet; decided with the user 2026-09-17). The
+(`../plans/algoExploration/a-dqn-distributional.md` §6, first bullet; decided with the user 2026-09-17). The
 local cell arrives in a million steps at 4.3 h an arm, so the heads can be compared where a head has
 something to act on; with the base fixed the two rows share one wave.
 **The rungs' CPU cost, measured 2026-09-17** (laptop, one arm at a time, 2,000 steps, counted steps/s): DQN 484, C51 285,
@@ -588,7 +588,7 @@ ceiling now rests on b38's CVaR-trained cell.
 | control | none: a stability batch, judged on its own curve (`zero_since` never above 200 evals once an arm has read 80%; no target mass piling on the end atoms) |
 | predicted | registered 2026-09-17 by the agent: both supports stable at this reward -- snek2's C51 instability was the 30-value observation and the b2-era reward scale, not the head -- and 101 atoms level with 51 on onset and density, so 51 is the comparison's setting |
 
-**Why.** Row A2 of the algorithm series (`plans/algoExploration/a-return-tail.md` §3) runs C51 against
+**Why.** Row A2 of the algorithm series (`plans/algoExploration/a-dqn-distributional.md` §3) runs C51 against
 b35's DQN, but snek2's C51 was unstable enough that a win-reward shrink was tried and falsified, so the
 plan puts a stability batch first. The support is this game's discounted return range, not the paper's
 clipped [−10, 10]: at 51 atoms that is a 2.4-wide bin against the paper's 0.4, so the second cell halves
@@ -606,7 +606,7 @@ comparison.
 | control | PPO's `hist8` table (`b27q`-`b27x`, 94-95% density, 99.81 /30k); the two cells against each other |
 | predicted | registered 2026-09-17 by the agent: the local cell reaches 90% perfect by 1M counted steps as b2 did and ends at 40-60% stage-B density, well under PPO; the paper cell learns more slowly (ε is 0.5 for its first 125k moves), reads a non-zero perfect rate by 3M moves and ends below the local cell, because uniform replay and an unshielded ε 0.01 keep feeding the endgame deaths the fork exists to avoid -- **falsified on the local cell** (90% by 1M for one seed of four; stage-B density 0%, best row 96.6), **held on the paper cell**, which at 10M moves reads 7-16% perfect and gives stage B nothing |
 
-**Why.** Row A1 of the algorithm series (`plans/algoExploration/a-return-tail.md`): every value-based
+**Why.** Row A1 of the algorithm series (`plans/algoExploration/a-dqn-distributional.md`): every value-based
 row -- C51 through FQF, Rainbow, R2D2 -- is read against DQN, and no DQN has run on the 26+16
 observation or b27's reward. Two cells because the series compares algorithms on their papers'
 settings, and this codebase's own plumbing (the fork, the shield, PER, the fast target copy) exists in
@@ -617,7 +617,7 @@ row's paper cell can be read with it in mind.
 arrive in 10M moves: 7-16% perfect, trailing score 80-85, still rising, no stage B. The local plumbing reaches 90% in
 0.6-1.6M counted steps and then oscillates at 71-88% with 74.5% of its evals below 80; 45 stage-B rows, best 96.6, none at
 98. So the fork, the shield, PER and the fast target are worth the whole gap, and the value ladder cannot be built on the
-paper cell at this budget (a fifth of the plan's 50M). `plans/algoExploration/a-return-tail.md` §6, first bullet, applies.
+paper cell at this budget (a fifth of the plan's 50M). `plans/algoExploration/a-dqn-distributional.md` §6, first bullet, applies.
 
 ## b34 — zigzag shaping: a reversal potential beside a reversal penalty
 

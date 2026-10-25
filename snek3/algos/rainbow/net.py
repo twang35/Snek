@@ -16,7 +16,7 @@ head, `features`/`sample_taus`/`quantiles_at` for IQN, and `q_values` for every 
 
 The trunk with `residual` off is `QNet`'s hidden stack to the initialiser, so a `rainbow` arm with
 dueling and noisy off differs from A2's c51 arm by nothing but the module name. With `residual` on it is
-the plan's MLP analogue of BTR's IMPALA stack (`c-value-stack.md` §2, C2): a stem to `fc_layer_params[-1]`,
+the plan's MLP analogue of BTR's IMPALA stack (`c-rainbow-btr.md` §2, C2): a stem to `fc_layer_params[-1]`,
 then `blocks` residual blocks of two linears with ReLUs, spectral normalisation on those two linears
 only (the paper's placement -- the residual path, never the stem or the head) and an optional layer norm
 at each block's input (the paper's post-submission variant, off in the paper cell).

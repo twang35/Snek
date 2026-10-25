@@ -5,12 +5,12 @@ What is this module's and not the parent's:
 | | |
 |---|---|
 | the network | `algos/rainbow/net.py`'s, rebuilt over the parent's (which builds A's head for the same sidecar) |
-| acting | **noise on** (`c-value-stack.md`, decided 2026-09-20): the collector's greedy action is a noisy forward, one fresh draw per act, and epsilon-greedy over that when the schedule says so. Rainbow's paper cell runs epsilon 0, so this is its whole exploration |
+| acting | **noise on** (`c-rainbow-btr.md`, decided 2026-09-20): the collector's greedy action is a noisy forward, one fresh draw per act, and epsilon-greedy over that when the schedule says so. Rainbow's paper cell runs epsilon 0, so this is its whole exploration |
 | measuring | `policy_fn` is `net.greedy_policy_fn`: noise off. Stage A, restore, `watch.py` and every pass read the `mu` weights |
 | learning | `update` below, with the noise on in both the online and the target net so each forward is its own draw (Fortunato et al. §3.2: independent noise for the online and target networks) |
 | double-Q | `double=False` (BTR) takes the target action from the **target** net's own argmax; with Munchausen on there is no argmax and the flag has no effect, as the plan says |
 
-**Why the update is this module's** (2026-09-23, the review of `c-value-stack.md`'s implementation):
+**Why the update is this module's** (2026-09-23, the review of `c-rainbow-btr.md`'s implementation):
 Group A's `DistAgent.update` departs from both papers in three places, and Group A's closed results
 were measured on it, so it is left as it is and the papers' forms live here:
 

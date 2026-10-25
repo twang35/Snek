@@ -89,7 +89,7 @@ cadence, with or without the anneal; this supersedes the scoping on the b43 entr
 b43 (closed 2026-09-22). On b40's M-QR-DQN cell, resets every 600k gradient steps (twenty cycles) hold the perfect rate at 30-60% for the
 whole run with no eval at 97; every 2.4M (five cycles) gives 30-70 with a climb once the resets stop at ~2.6M steps (`b43g` reaches 90 at
 2.94M). Both far under the same cell without resets (89-93, 436 stage-B rows). **Scoped, not general**: b43 lacks BBF's within-cycle n-step / γ
-anneal, and the plan (`d-data-efficiency.md` §5) reads a poor recovery without it as the omission's effect; the annealed wave decides the row.
+anneal, and the plan (`d-bbf.md` §5) reads a poor recovery without it as the omission's effect; the annealed wave decides the row.
 
 ### The value target is not where the ceiling is either: Munchausen tightens the hold on both critics and moves no best row, and Group A closes with every rung at 96.6-98.0
 
@@ -155,7 +155,7 @@ post-competence evals below 80, 45 stage-B rows in the batch (44 from one arm), 
 cell at 95.4% density this is the same order as b3's 11.6x. Two limits: the paper cell ran a fifth of the plan's 50M-move
 budget, so the finding is "not in 10M", not "never"; and b36 (live) shows C51 on the same paper plumbing at the same 14-25%
 at 8.5M moves, so the recipe, not the head, is what is missing. Consequence for the algorithm series: the value ladder's rows
-are read on the local plumbing (`../plans/algoExploration/a-return-tail.md` §6, first bullet).
+are read on the local plumbing (`../plans/algoExploration/a-dqn-distributional.md` §6, first bullet).
 
 ### A per-reversal penalty on the `hist8` base gives the fastest onset and the best stability measured and costs 5 pp of plateau density; a potential over the same reversals is a no-op
 

@@ -1,5 +1,5 @@
 """BBF (`algos/bbf/`): the sequential replay's sample-time n-step return and SPR sequences, the agent's EMA
-target, SPR loss, resets and cycle, the seam, the knobs and the checkpoint. `d-data-efficiency.md` §7."""
+target, SPR loss, resets and cycle, the seam, the knobs and the checkpoint. `d-bbf.md` §7."""
 
 import numpy as np
 import pytest

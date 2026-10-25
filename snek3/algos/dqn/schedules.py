@@ -158,7 +158,7 @@ def linear_epsilon(moves, initial_epsilon, min_epsilon, anneal_moves):
     """The papers' schedule: a straight line from `initial_epsilon` at move 0 to `min_epsilon` at
     `anneal_moves`, held there after. A function of the move count and nothing else.
 
-    Exists for the algorithm series' paper cells (`plans/algoExploration/a-return-tail.md` §1b): every
+    Exists for the algorithm series' paper cells (`plans/algoExploration/a-dqn-distributional.md` §1b): every
     DQN-family paper anneals ε over a fixed number of agent steps and holds it, and the eval-driven
     schedule above is this codebase's own answer, so a paper cell needs this one to be the paper's
     configuration at all. `SNEK_EPSILON_SCHEDULE=linear` selects it; the default, `eval`, is the

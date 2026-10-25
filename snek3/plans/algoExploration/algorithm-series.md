@@ -2,8 +2,8 @@
 
 **Status: agreed 2026-09-16, nothing built.** This is the ordering and the reasoning only. Each group has
 its implementation plan beside this file -- [`README.md`](README.md) indexes them and holds the conventions
-every plan leans on: `a-return-tail.md`, `b-entropy.md`, `c-value-stack.md`, `d-data-efficiency.md`,
-`e-memory.md`, `f-exploration.md`, `g-planning.md`, `h-gdi.md`.
+every plan leans on: `a-dqn-distributional.md`, `b-sac.md`, `c-rainbow-btr.md`, `d-bbf.md`,
+`e-r2d2.md`, `f-ngu-agent57.md`, `g-mcts-muzero.md`, `h-gdi.md`.
 
 The question behind the series is not "which algorithm has the highest Atari score". Atari
 human-normalised scores mix three regimes -- 200M-frame single-agent runs, 100k-step data-efficiency

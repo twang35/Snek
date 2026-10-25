@@ -1,6 +1,6 @@
 """R2D2's replay: rows in play order, stored once, and **windows** over them -- a loss block of 40 steps
 with up to 40 steps of burn-in before it and `n` steps of lookahead after -- each with the recurrent state
-the collector carried into its first row, prioritised per window (`plans/algoExploration/e-memory.md` §2,
+the collector carried into its first row, prioritised per window (`plans/algoExploration/e-r2d2.md` §2,
 the replay row; the geometry is §0's, decided 2026-09-30).
 
 ## Rows

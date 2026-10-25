@@ -1,5 +1,5 @@
 """R2D2 -- Recurrent Replay Distributed DQN (Kapturowski et al. 2019) -- behind the seam `train.py` drives
-(`algos/dqn/algo.py` for the seam's members). `SNEK_ALGO=r2d2`. `plans/algoExploration/e-memory.md` §2.
+(`algos/dqn/algo.py` for the seam's members). `SNEK_ALGO=r2d2`. `plans/algoExploration/e-r2d2.md` §2.
 
 Built 2026-09-30 for Group E's E2: the paper's learner and its actor recipe on this game's 32 lanes in one
 process. Its own package because nothing in `algos/dqn/` stores sequences: the replay holds windows over rows

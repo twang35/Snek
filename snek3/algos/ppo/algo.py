@@ -30,7 +30,7 @@ refuses — and here the cost of ignoring is concrete: a PPO arm launched from a
 would silently take DQN's `1e-5` learning rate, which is ~64x too little total parameter movement, and
 report "PPO does not learn". That is why the learning rate and the batch size have `PPO_` names at all.
 
-## 3. Recurrence is a knob on the same arm (group E, row E1; `plans/algoExploration/e-memory.md`)
+## 3. Recurrence is a knob on the same arm (group E, row E1; `plans/algoExploration/e-r2d2.md`)
 
 `SNEK_PPO_RECURRENT=gru|lstm` puts a cell of `SNEK_PPO_RECURRENT_HIDDEN` units between each tower's
 trunk and its head (`algos/ppo/net.py` `RecurrentTower`; the critic gets **its own** cell, as it has its own

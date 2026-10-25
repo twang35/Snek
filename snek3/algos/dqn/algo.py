@@ -86,7 +86,7 @@ def build_config(tuned):
         # The exploration schedule: `eval` is `schedules.epsilon_for` off the eval history (the
         # codebase's own, every batch to date); `linear` is the papers' straight line from
         # `initial_epsilon` to `min_epsilon` over `epsilon_anneal_steps` **moves**, then held
-        # (`plans/algoExploration/a-return-tail.md` §1b). With `linear` the shield fraction is the
+        # (`plans/algoExploration/a-dqn-distributional.md` §1b). With `linear` the shield fraction is the
         # configured value from move 0, since there is no bootstrap phase to hand over from.
         'epsilon_schedule': str(tuned('EPSILON_SCHEDULE', 'eval', str)),
         'epsilon_anneal_steps': int(tuned('EPSILON_ANNEAL_STEPS', 250000, int)),
