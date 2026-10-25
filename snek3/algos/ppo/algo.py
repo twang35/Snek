@@ -56,6 +56,7 @@ from algos.ppo import collect
 from algos.ppo import rollout as rollout_module
 from algos.ppo import schedules
 from algos.ppo.agent import PpoAgent
+from algos.ngu import knobs as ngu_knobs
 from algos.r2d2 import knobs as r2d2_knobs
 from vectorized.vec_env import VecSnake
 from tools import checkpoints
@@ -85,7 +86,7 @@ REJECTED = (
     'SAC_CRITIC_COMBINE', 'SAC_Q_CLIP', 'SAC_REPLAY_BUFFER_MAX_LENGTH', 'SAC_PRIORITY_EXPONENT',
     'SAC_PREFILL',
     'BBF_WEIGHT_DECAY', 'BBF_SPR_WEIGHT', 'BBF_SPR_STEPS', 'BBF_PROJECTION', 'BBF_TRANSITION_WIDTH', 'BBF_DUELING', 'BBF_DOUBLE',
-) + r2d2_knobs.R2D2_KNOBS
+) + r2d2_knobs.R2D2_KNOBS + ngu_knobs.NGU_KNOBS
 
 # The recurrence knobs, for the other algorithms' refusal lists.
 PPO_RECURRENT_KNOBS = ('PPO_RECURRENT', 'PPO_RECURRENT_HIDDEN', 'PPO_SEQ_MINIBATCH')

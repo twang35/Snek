@@ -129,6 +129,30 @@ def unflat(f):
     return (f % GRID - 1, f // GRID - 1)
 
 
+# The board codes `VecSnake.board_codes` writes (and `board_codes_of` for a scalar game): one uint8 per playable
+# cell. A body segment k behind the head is `HEAD_CODE - k` (head 254, 100 segments fit above 154), so the codes
+# order the body tail-to-head; food is 255; empty 0.
+BOARD_CELLS = C.PLAY * C.PLAY
+HEAD_CODE = 254
+FOOD_CODE = 255
+
+
+def _play_index(flat_cells):
+    x, y = unflat(np.asarray(flat_cells, dtype=np.int64))
+    return y * C.PLAY + x
+
+
+def board_codes_of(body_xy, food_xy):
+    """The same codes for one scalar game: `body_xy` is the body as `(x, y)` tiles head first (what
+    `env.game.GameSnapshot.body` holds), `food_xy` an `(x, y)` or None. `(BOARD_CELLS,) uint8`."""
+    out = np.zeros(BOARD_CELLS, dtype=np.uint8)
+    for k, (x, y) in enumerate(body_xy):
+        out[int(y) * C.PLAY + int(x)] = HEAD_CODE - k
+    if food_xy is not None:
+        out[int(food_xy[1]) * C.PLAY + int(food_xy[0])] = FOOD_CODE
+    return out
+
+
 # ------------------------------------------------------------------ bit helpers
 
 def _shl(x, k):
@@ -414,6 +438,28 @@ class VecSnake:
 
     def heads(self):
         return self.body[self.rows, self.hp]
+
+    # ------------------------------------------------------------------ the board, as a frame
+
+    def board_codes(self, rows=None):
+        """`(m, PLAY*PLAY) uint8`: the board of each row as one code per playable cell -- Group F's analogue
+        of the frame (`plans/algoExploration/f-ngu-agent57.md` §0, review 3). 0 empty, `FOOD_CODE` food, and a
+        body cell `HEAD_CODE - k` for the k-th segment behind the head, so one array fixes the state the way a
+        frame stack does: where the snake is, which end is the head, and which way it is moving. torch-free; the
+        decode to channels is `algos/ngu/board.py`."""
+        rows = self.rows if rows is None else np.asarray(rows, dtype=np.int64).reshape(-1)
+        m = rows.shape[0]
+        ks = np.arange(CAP, dtype=np.int64)
+        idx = (self.hp[rows][:, None] - ks[None, :]) % CAP               # (m, CAP): segment k's ring slot
+        cells = self.body[rows[:, None], idx]                             # flat padded indexes
+        live = ks[None, :] < self.length[rows][:, None]
+        out = np.zeros((m, BOARD_CELLS), dtype=np.uint8)
+        r, k = np.nonzero(live)
+        out[r, _play_index(cells[r, k])] = (HEAD_CODE - k).astype(np.uint8)
+        food = self.food[rows]
+        has = food >= 0
+        out[np.flatnonzero(has), _play_index(food[has])] = FOOD_CODE
+        return out
 
     def body_list(self, i):
         """Env `i`'s body as flat cell indices, head first — the order `GameSnapshot.body` uses."""

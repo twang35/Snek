@@ -35,7 +35,9 @@ FIELDS = ('algo', 'fc_layer_params', 'num_actions', 'obs_len', 'obs_era')
 # `recurrent` (group E, 2026-09-30) is the memory cell between the trunk and the head -- `{"type": "gru" |
 # "lstm" | "dense", "hidden": N, ...}` -- and a checkpoint with it cannot load into a feed-forward net or
 # the reverse, which is the point of its being in the signature.
-OPTIONAL_FIELDS = ('head', 'trunk', 'recurrent')
+# `conditioning` and `intrinsic` (group F, 2026-10-25) are NGU's: the (β, γ) ladder's endpoints and layout, and every
+# shape and constant behind the intrinsic reward a restored policy recomputes.
+OPTIONAL_FIELDS = ('head', 'trunk', 'recurrent', 'conditioning', 'intrinsic')
 
 
 class ArchMismatch(Exception):
@@ -50,7 +52,7 @@ def arch_path(policy_dir):
 
 
 def build_arch(fc_layer_params, num_actions, obs_len, obs_era, algo='dqn', head=None, trunk=None,
-               recurrent=None):
+               recurrent=None, conditioning=None, intrinsic=None):
     """The canonical dict.
 
     `fc_layer_params` is stored as a list of ints, because JSON has no tuples and every reader
@@ -69,6 +71,10 @@ def build_arch(fc_layer_params, num_actions, obs_len, obs_era, algo='dqn', head=
         arch['trunk'] = dict(trunk)
     if recurrent is not None:
         arch['recurrent'] = dict(recurrent)
+    if conditioning is not None:
+        arch['conditioning'] = dict(conditioning)
+    if intrinsic is not None:
+        arch['intrinsic'] = dict(intrinsic)
     return arch
 
 

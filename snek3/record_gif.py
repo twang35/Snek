@@ -92,6 +92,7 @@ from env import render as R
 from env.constants import GIFS_DIR, HOF_DIR, POLICY_DIR
 from tools import arch as arch_tools
 from tools import checkpoints
+from vectorized import vec_env
 
 # The entry `record_gif.py hof` records with no arguments. **`hallOfFame/HOF.md` is the authority
 # on which entry is the record, and this constant is not kept in step with it** (user's decision
@@ -446,7 +447,12 @@ def play_episode(env, policy_fn):
     fresh, reward = True, 0.0
     while not done:
         if begin is not None:
-            begin(np.array([0]), np.array([fresh]), np.array([reward], dtype=np.float32))
+            if getattr(policy_fn, 'needs_board', False):
+                snap = game.snapshot()
+                begin(np.array([0]), np.array([fresh]), np.array([reward], dtype=np.float32),
+                      board=vec_env.board_codes_of(snap.body, snap.food)[None, :])
+            else:
+                begin(np.array([0]), np.array([fresh]), np.array([reward], dtype=np.float32))
         action = int(policy_fn(observation.reshape(1, -1))[0])
         observation, reward, done, info = env.step(action)
         fresh = False

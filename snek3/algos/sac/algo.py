@@ -14,6 +14,7 @@ Q-clip of 0.5, Polyak 0.005, lr 1e-5, 3-step, 1e5 replay, 0.1 updates a move (`b
 
 import os
 
+from algos.ngu import knobs as ngu_knobs
 from algos.r2d2 import knobs as r2d2_knobs
 
 from algos.dqn import collect
@@ -52,7 +53,7 @@ REJECTED = (
     'PPO_VF_COEF', 'PPO_LEARNING_RATE', 'PPO_LEARNING_RATE_FINAL', 'PPO_ANNEAL_FRACTION',
     'PPO_ADAM_EPSILON', 'PPO_TARGET_KL', 'PPO_GRADIENT_CLIPPING', 'PPO_NORMALIZE_ADV', 'PPO_VALUE_LOSS',
     'BBF_WEIGHT_DECAY', 'BBF_SPR_WEIGHT', 'BBF_SPR_STEPS', 'BBF_PROJECTION', 'BBF_TRANSITION_WIDTH', 'BBF_DUELING', 'BBF_DOUBLE',
-) + r2d2_knobs.R2D2_KNOBS
+) + r2d2_knobs.R2D2_KNOBS + ngu_knobs.NGU_KNOBS
 
 # The knobs this module reads, for `algos/ppo/algo.py`'s refusal list and the docs.
 SAC_KNOBS = (

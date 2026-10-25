@@ -1,0 +1,97 @@
+{
+ "tests": [
+  "tests/test_ngu.py"
+ ],
+ "mutations": [
+  {
+   "desc": "the episodic store not cleared at an episode start",
+   "file": "algos/ngu/intrinsic.py",
+   "from": "        self.memory.reset(rows)\n        if self.training:\n            self.snapshots.refresh(rows, self.net.embed_first, self.net.embed_second)",
+   "to": "        if self.training:\n            self.snapshots.refresh(rows, self.net.embed_first, self.net.embed_second)"
+  },
+  {
+   "desc": "the lifelong factor unclipped above",
+   "file": "algos/ngu/intrinsic.py",
+   "from": "    return alpha.clamp(min=1.0, max=float(cap))",
+   "to": "    return alpha.clamp(min=1.0)"
+  },
+  {
+   "desc": "the mixture one-hot at the next index",
+   "file": "algos/ngu/net.py",
+   "from": "        index = torch.nn.functional.one_hot(mixture.to(torch.int64), self.mixtures).to(features.dtype)",
+   "to": "        index = torch.nn.functional.one_hot((mixture.to(torch.int64) + 1) % self.mixtures, self.mixtures).to(features.dtype)"
+  },
+  {
+   "desc": "the trace coefficient uncapped at 1",
+   "file": "algos/ngu/agent.py",
+   "from": "    c = lam * torch.clamp(pi_taken / mu.clamp(min=1e-8), max=1.0)",
+   "to": "    c = lam * pi_taken / mu.clamp(min=1e-8)"
+  },
+  {
+   "desc": "the snapshot replaced mid-episode",
+   "file": "algos/ngu/intrinsic.py",
+   "from": "        with torch.no_grad():\n            keys = self._embed(rows, inputs)\n            nearest, mean = self.memory.query(rows, keys)",
+   "to": "        if self.training:\n            self.snapshots.refresh(rows, self.net.embed_first, self.net.embed_second)\n        with torch.no_grad():\n            keys = self._embed(rows, inputs)\n            nearest, mean = self.memory.query(rows, keys)"
+  },
+  {
+   "desc": "a terminal row's intrinsic reward computed on the reset board",
+   "file": "algos/ngu/collect.py",
+   "from": "        alive = np.flatnonzero(~done)",
+   "to": "        alive = np.arange(n)"
+  },
+  {
+   "desc": "the intrinsic term added at beta_max rather than the lane's beta",
+   "file": "algos/ngu/collect.py",
+   "from": "        augmented = rewards.astype(np.float32) + self.betas[self.mixture] * reward_int",
+   "to": "        augmented = rewards.astype(np.float32) + self.betas.max() * reward_int"
+  },
+  {
+   "desc": "the epsilon permutation seeded by nothing fixed",
+   "file": "algos/ngu/algo.py",
+   "from": "    return np.random.default_rng(PERMUTE_SEED).permutation(int(lanes))",
+   "to": "    return np.arange(int(lanes))"
+  },
+  {
+   "desc": "the Retrace trace running past a terminal",
+   "file": "algos/ngu/agent.py",
+   "from": "    cont = g * (1.0 - donef) * has_next",
+   "to": "    cont = g * has_next"
+  },
+  {
+   "desc": "the target policy greedy on the target net",
+   "file": "algos/ngu/agent.py",
+   "from": "    greedy = q_online.argmax(dim=-1)                                                       # (T', B)",
+   "to": "    greedy = q_target.argmax(dim=-1)"
+  },
+  {
+   "desc": "the aux pairs taken from the window's start",
+   "file": "algos/ngu/agent.py",
+   "from": "    rank_from_end = torch.flip(torch.cumsum(torch.flip(pair.to(torch.int64), dims=[0]), dim=0), dims=[0])",
+   "to": "    rank_from_end = torch.cumsum(pair.to(torch.int64), dim=0)"
+  },
+  {
+   "desc": "the window's mixture taken as lane 0's",
+   "file": "algos/ngu/collect.py",
+   "from": "                            'ahead': 0, 'closed': False, 'mixture': int(self.mixture[lane])})",
+   "to": "                            'ahead': 0, 'closed': False, 'mixture': int(self.mixture[0])})"
+  },
+  {
+   "desc": "the exploitative eval reads the wrong mixture",
+   "file": "algos/ngu/net.py",
+   "from": "EXPLOIT_INDEX = 0",
+   "to": "EXPLOIT_INDEX = 1"
+  },
+  {
+   "desc": "the eval policy's a_{-1} left at none",
+   "file": "algos/ngu/net.py",
+   "from": "                self.prev_action[index[fresh]] = drawn.to(self.device)",
+   "to": "                pass"
+  },
+  {
+   "desc": "the memory growth losing stored keys",
+   "file": "algos/ngu/intrinsic.py",
+   "from": "            self.keys = torch.cat([self.keys, extra], dim=1)",
+   "to": "            self.keys = torch.cat([torch.zeros_like(self.keys), extra], dim=1)"
+  }
+ ]
+}

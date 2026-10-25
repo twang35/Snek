@@ -1,8 +1,8 @@
 # Running things
 
 `tuned()` is the authoritative knob list and it is read in **two** files — `train.py` for what is not
-algorithm-specific, and the algorithm's own `algo.py` (today only [`algos/dqn/algo.py`](../dqn/algo.py)) for
-the rest. This file is a summary of both.
+algorithm-specific, and the algorithm's own `algo.py` ([`algos/dqn/algo.py`](../algos/dqn/algo.py) and the other
+algorithms' sections below) for the rest. This file is a summary of both.
 
 ```
 conda activate snek3       # or /opt/miniconda3/envs/snek3/bin/python directly
@@ -240,6 +240,37 @@ The checkpoint is the net alone; `arch.json` carries `recurrent: {type, hidden, 
 and `head`, and a greedy read is a `StatefulPolicy` carrying the state, the previous action and the previous
 reward per lane -- the engine tells it which lanes were reset (`begin`, `vectorized/engine.py`), so an eval of
 a recurrent checkpoint is the same 100 episodes every other algorithm gets.
+
+### NGU — only under `SNEK_ALGO=ngu`
+
+Never Give Up (Badia et al. 2020), Group F's F1 (`algos/ngu/`, `plans/algoExploration/f-ngu-agent57.md` §1-2): R2D2
+with the paper's intrinsic reward, 32 policies indexed by (β_j, γ_j) in one network, and the transformed Retrace
+target. Every R2D2 knob above keeps its meaning (`SNEK_R2D2_*`, the ladder, `SNEK_REPLAY_RATIO` in E2's unit) at
+**NGU's** defaults where the papers differ -- `SNEK_ADAM_EPSILON` 1e-4, `SNEK_TARGET_UPDATE_PERIOD` 1,500,
+`SNEK_R2D2_IS_BETA` 0, `SNEK_R2D2_PRIORITY_ETA` 1.0, `SNEK_APEX_ALPHA` 8 -- and `SNEK_R2D2_HEAD` is refused (scalar
+only). `SNEK_N_STEP_UPDATE` is the lookahead the Retrace trace runs into past the loss block, not an n-step target.
+
+| knob | default | notes |
+|---|---|---|
+| `SNEK_NGU_MIXTURES`, `SNEK_NGU_ASSIGN` | 32, `fixed` | the (β, γ) family; `fixed` holds mixture j on lane j for the run (NGU App. A), and **needs `SNEK_COLLECT_ENVS` = mixtures**; `episode` redraws uniformly at each episode start (F2's control). `bandit` is Agent57's and not built |
+| `SNEK_NGU_BETA_MAX`, `SNEK_NGU_GAMMA_MIN` | 0.3, 0.99 | β_0 = 0 .. β_31 = β_max on the paper's sigmoid; γ from `SNEK_DISCOUNT` (0.997, the exploitative end) down to γ_min on the log interpolation. **`SNEK_NGU_BETA_MAX=0` is the control cell**: every β 0, everything else identical |
+| `SNEK_NGU_EPSILON_PERMUTE` | 1 | the Ape-X ladder's rungs shuffled once over the lanes (a fixed seed, independent of `SNEK_SEED`), so ε and β are uncorrelated on 32 lanes; 0 is rung i on lane i |
+| `SNEK_NGU_RETRACE_LAMBDA`, `SNEK_NGU_TARGET_EPSILON` | 0.95, 0.01 | transformed Retrace; π ε-soft greedy on the online net, every value on the target net; the trace runs to the window's last stored row. λ must be in (0, 1] |
+| `SNEK_NGU_MIN_WINDOWS` | 6,250 | windows before the first update (the paper's sequences), beside `SNEK_INITIAL_COLLECT_STEPS`' rows |
+| `SNEK_NGU_INPUT` | `board` | what the embedding and RND read: the 10 x 10 x 4 board tensor (body, head, food, age; `VecSnake.board_codes`, 100 bytes a replay row), or `obs`, the degenerate form whose history bits hand the classifier its answer |
+| `SNEK_NGU_EMBED_DIM`, `SNEK_NGU_EMBED_HIDDEN`, `SNEK_NGU_EMBED_STEPS`, `SNEK_NGU_EMBED_LR`, `SNEK_NGU_EMBED_L2` | 32, 128, 5, 5e-4, 1e-5 | the inverse-dynamics embedding f and its classifier, trained on the last 5 valid pairs of each sampled window. Each lane acts on a snapshot of f taken at its episode start |
+| `SNEK_NGU_RND_HIDDEN`, `SNEK_NGU_RND_OUT` | 128, 128 | the RND predictor and frozen target; the error's running mean / std live on the net (in the checkpoint) and feed α = 1 + (err − μ)/σ |
+| `SNEK_NGU_KNN_K`, `SNEK_NGU_KERNEL_EPSILON`, `SNEK_NGU_CLUSTER_DISTANCE`, `SNEK_NGU_PSEUDO_COUNT`, `SNEK_NGU_MAX_SIMILARITY` | 10, 1e-4, 8e-3, 1e-3, 8 | Alg. 1's constants; `r_epi = 1/sqrt(Σ K + c)`, 0 above the similarity cap -- so a novel board scores up to ~31 |
+| `SNEK_NGU_MEMORY` | 30,000 | keys per lane's episodic memory, reset with the episode; stored as float16, grown with the longest live episode |
+| `SNEK_NGU_LIFELONG_MAX` | 5 | L, the clip on the RND factor: `r_i = r_epi x clip(α, 1, L)` |
+
+The reward the Q-network sees is `r_e + β_j r_i` at the lane's mixture, summed before it enters the replay (the
+window stores j, `r_i` and μ beside it; a terminal row's `r_i` is 0). The checkpoint is the whole `NguNet` -- the
+conditioned Q-network, f, the RND pair and the error statistics -- and `arch.json` carries `conditioning` and
+`intrinsic` beside `recurrent`, so a restored policy recomputes `r^i_{t−1}` per lane from the board the engine hands
+it (`begin(..., board=)`, `algos/stateful.py`) with the checkpoint's f and a memory emptied with the lane. The
+greedy read is **mixture 0** (β = 0, the top γ); `--policy-variant mixture:<i>` measures another. Each eval row
+carries `ngu.intrinsic_mean`, `episodic`, `alpha`, `embed_acc`, `rnd_loss`, `memory_mean`, `updates_per_s` and `rss_gb`.
 
 ### PPO — only under `SNEK_ALGO=ppo`
 

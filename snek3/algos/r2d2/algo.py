@@ -43,6 +43,7 @@ from algos.r2d2.agent import R2d2Agent
 from algos.r2d2.collect import Collector
 from algos.r2d2.replay import SequenceReplay
 from algos.bbf import algo as bbf_algo
+from algos.ngu import knobs as ngu_knobs
 from algos.sac import algo as sac_algo
 from tools import checkpoints
 from vectorized.vec_env import VecSnake
@@ -65,14 +66,14 @@ REJECTED = (
     'PPO_GAE_LAMBDA_FINAL', 'PPO_DISCOUNT_FINAL', 'PPO_ENTROPY_COEF', 'PPO_ENTROPY_COEF_FINAL',
     'PPO_VF_COEF', 'PPO_LEARNING_RATE', 'PPO_LEARNING_RATE_FINAL', 'PPO_ANNEAL_FRACTION',
     'PPO_ADAM_EPSILON', 'PPO_TARGET_KL', 'PPO_GRADIENT_CLIPPING', 'PPO_NORMALIZE_ADV', 'PPO_VALUE_LOSS',
-) + bbf_algo.BBF_KNOBS + sac_algo.SAC_KNOBS
+) + bbf_algo.BBF_KNOBS + sac_algo.SAC_KNOBS + ngu_knobs.NGU_KNOBS
 
 
 def _refuse_foreign_knobs():
     present = sorted(knob for knob in REJECTED if os.environ.get('SNEK_' + knob) is not None)
     if present:
         raise ValueError('SNEK_ALGO=r2d2 cannot honour {0}: {1}. R2D2 has no fork, shield, EMA target, IS-beta anneal, '
-                         'Munchausen term, resets, quantile head, noisy net, PPO rollout, SPR or SAC temperature.'.format(
+                         'Munchausen term, resets, quantile head, noisy net, PPO rollout, SPR, SAC temperature or intrinsic reward.'.format(
                              'these knobs' if len(present) > 1 else 'this knob', ', '.join('SNEK_' + knob for knob in present)))
 
 
@@ -113,6 +114,13 @@ def build_config(tuned):
         'dist_v_min': tuned('DIST_V_MIN', -10.0),
         'dist_v_max': tuned('DIST_V_MAX', 110.0),
     }
+    check_config(config)
+    return config
+
+
+def check_config(config):
+    """The R2D2 keys' validity, as a function so `algos/ngu/algo.py` -- whose config carries every one of these keys
+    under its own defaults -- checks them the same way."""
     if config['epsilon_schedule'] not in EPSILON_SCHEDULES:
         raise ValueError('SNEK_EPSILON_SCHEDULE={0!r} is not one of {1}'.format(config['epsilon_schedule'], EPSILON_SCHEDULES))
     if not 0.0 <= config['min_epsilon'] <= config['initial_epsilon'] <= 1.0:
@@ -146,7 +154,6 @@ def build_config(tuned):
         raise ValueError('SNEK_R2D2_HIDDEN must be at least 1 and SNEK_R2D2_STREAM_WIDTH at least 0')
     if config['dist_v_max'] <= config['dist_v_min']:
         raise ValueError('SNEK_DIST_V_MAX must exceed SNEK_DIST_V_MIN')
-    return config
 
 
 def arch_fields(config):

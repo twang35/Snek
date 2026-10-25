@@ -45,6 +45,7 @@ os.environ.setdefault('SNEK_TILE_PIXELS', '15')
 from env import render as R                                            # noqa: E402
 from env.scalar_env import SnakeEnv                                    # noqa: E402
 from tools import checkpoints, restore                                 # noqa: E402
+from vectorized import vec_env                                         # noqa: E402
 
 
 def main(argv):
@@ -109,7 +110,12 @@ def main(argv):
         fresh, reward = True, 0.0
         while not done:
             if begin is not None:
-                begin(np.array([0]), np.array([fresh]), np.array([reward], dtype=np.float32))
+                if getattr(policy_fn, 'needs_board', False):
+                    snap = env.game.snapshot()
+                    begin(np.array([0]), np.array([fresh]), np.array([reward], dtype=np.float32),
+                          board=vec_env.board_codes_of(snap.body, snap.food)[None, :])
+                else:
+                    begin(np.array([0]), np.array([fresh]), np.array([reward], dtype=np.float32))
             action = int(policy_fn(observation.reshape(1, -1))[0])
             observation, reward, done, info = env.step(action)
             fresh = False

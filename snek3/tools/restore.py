@@ -59,6 +59,13 @@ def _r2d2():
     return network
 
 
+def _ngu():
+    # An NGU checkpoint is the whole `NguNet` -- the conditioned Q-network, the embedding, the RND pair and the error
+    # statistics -- and its greedy policy computes the intrinsic input per lane from the board (`needs_board`).
+    from algos.ngu import net as network
+    return network
+
+
 def _sac():
     # A SAC checkpoint is the actor alone -- DQN's `QNet` read as logits, as PPO's is -- so its module's
     # `build` and `greedy_policy_fn` are PPO's, and `sac`/`sac2` need no sidecar field.
@@ -69,7 +76,7 @@ def _sac():
 ALGORITHMS = {'dqn': _dqn, 'ppo': _ppo, 'c51': _dist, 'qrdqn': _dist, 'iqn': _dist, 'fqf': _dist,
               'sac': _sac, 'sac2': _sac, 'rainbow': _rainbow, 'btr': _rainbow,
               # A BBF checkpoint is its dueling C51 Rainbow network alone; the SPR heads live in `resume.pt`.
-              'bbf': _rainbow, 'r2d2': _r2d2}
+              'bbf': _rainbow, 'r2d2': _r2d2, 'ngu': _ngu}
 
 
 def _module_for(arch):
@@ -99,8 +106,8 @@ def policy_fn_for(arch, net, device='cpu', variant=None):
     if variant is None or variant == '':
         return module.greedy_policy_fn(net, device=device)
     if not hasattr(module, 'variant_policy_fn'):
-        raise arch_tools.ArchMismatch('algo {0!r} has no policy variant {1!r}; only the distributional '
-                                      'heads (c51, qrdqn, iqn, fqf) offer one'.format(arch['algo'], variant))
+        raise arch_tools.ArchMismatch('algo {0!r} has no policy variant {1!r}; the distributional heads (c51, qrdqn, '
+                                      'iqn, fqf: cvar:<q>) and ngu (mixture:<i>) offer one'.format(arch['algo'], variant))
     return module.variant_policy_fn(net, device=device, variant=variant)
 
 

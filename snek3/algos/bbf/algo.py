@@ -41,6 +41,7 @@ paper cell runs shaping off for that reason, and a spec that turns it on accepts
 
 import os
 
+from algos.ngu import knobs as ngu_knobs
 from algos.r2d2 import knobs as r2d2_knobs
 
 from algos.bbf.agent import BbfAgent
@@ -72,7 +73,7 @@ REJECTED = (
     'PPO_GAE_LAMBDA_FINAL', 'PPO_DISCOUNT_FINAL', 'PPO_ENTROPY_COEF', 'PPO_ENTROPY_COEF_FINAL',
     'PPO_VF_COEF', 'PPO_LEARNING_RATE', 'PPO_LEARNING_RATE_FINAL', 'PPO_ANNEAL_FRACTION',
     'PPO_ADAM_EPSILON', 'PPO_TARGET_KL', 'PPO_GRADIENT_CLIPPING', 'PPO_NORMALIZE_ADV', 'PPO_VALUE_LOSS',
-) + r2d2_knobs.R2D2_KNOBS + sac_algo.SAC_KNOBS
+) + r2d2_knobs.R2D2_KNOBS + ngu_knobs.NGU_KNOBS + sac_algo.SAC_KNOBS
 
 
 def _refuse_foreign_knobs():

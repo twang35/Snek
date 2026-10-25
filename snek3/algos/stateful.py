@@ -13,6 +13,12 @@ one method:
                                              # the last step, and each lane's reward from its previous step
     actions = policy(obs)                    # the call, on exactly those rows
 
+**A policy that reads the board** (Group F: the intrinsic modules see the board, not the observation;
+`plans/algoExploration/f-ngu-agent57.md` §0) says so with a class attribute `needs_board = True`, and every
+caller then passes `begin(rows, fresh, prev_reward, board=<(m, 100) uint8>)` -- `VecSnake.board_codes(rows)`,
+or `vec_env.board_codes_of` for a scalar game. The base policy ignores the keyword, so the three callers
+(`vectorized/engine.py`, `watch.py`, `record_gif.py`) branch on the attribute and nothing else changes.
+
 The engine duck-types on the method name (`getattr(policy_fn, 'begin', None)`), so a plain callable is
 treated as today and `vectorized/` still imports no torch: the arrays that cross the seam are numpy. **The
 policy owns the state.** It keeps the recurrent state, the previous action and the previous reward indexed by
@@ -33,6 +39,8 @@ class StatefulPolicy(object):
     """`step_fn(obs, prev_action, prev_reward, state) -> (actions, state)`, all torch tensors on `device`:
     `obs (m, obs_len)`, `prev_action (m,)` long with -1 for "none yet", `prev_reward (m,)`, `state (m, width)`.
     `state_width` is the flat recurrent state's width (a GRU's hidden, an LSTM's 2 x hidden, 0 for none)."""
+
+    needs_board = False
 
     def __init__(self, step_fn, state_width, device='cpu'):
         self.step_fn = step_fn
@@ -58,9 +66,9 @@ class StatefulPolicy(object):
         self.prev_reward = torch.cat([self.prev_reward, torch.zeros((extra,), dtype=torch.float32,
                                                                     device=self.device)])
 
-    def begin(self, rows, fresh, prev_reward):
+    def begin(self, rows, fresh, prev_reward, board=None):
         """Names the lanes the next call covers. `fresh` rows start a new episode: state zero, no previous
-        action, reward 0."""
+        action, reward 0. `board` is for a policy with `needs_board`; ignored here."""
         rows = np.asarray(rows, dtype=np.int64).reshape(-1)
         fresh = np.asarray(fresh, dtype=bool).reshape(-1)
         prev_reward = np.asarray(prev_reward, dtype=np.float32).reshape(-1)

@@ -332,7 +332,10 @@ def measure_stream(next_job, on_complete, episodes, width=None, max_live=None, s
             if rows.size:
                 begin = getattr(job.policy_fn, 'begin', None)
                 if begin is not None:
-                    begin(rows, fresh[rows], last_reward[rows])
+                    if getattr(job.policy_fn, 'needs_board', False):
+                        begin(rows, fresh[rows], last_reward[rows], board=vec.board_codes(rows))
+                    else:
+                        begin(rows, fresh[rows], last_reward[rows])
                 actions[rows] = job.policy_fn(obs[rows])
 
         # `observe=False` plus one explicit `observe()` below, rather than letting `step` build the
