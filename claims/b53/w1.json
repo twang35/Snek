@@ -1,0 +1,14 @@
+{
+ "arms": [
+  "b53a-ngu-seed1",
+  "b53b-ngu-seed2",
+  "b53c-ngu-seed3",
+  "b53d-ngu-seed4"
+ ],
+ "batch": "b53",
+ "box": "desktop",
+ "claimed_iso": "2026-10-25T15:59:06",
+ "claimed_ts": 1792969146.8756297,
+ "kind": "wave",
+ "wave": 1
+}
