@@ -230,7 +230,15 @@ commit a job spec, it runs it, it pushes results back. **snek3's daemon owns the
 | limit | **8 trainers** | `max_trainers` (8; no host ceiling), `eval_shards` ≤ 16 |
 | check | **the same `status.json`: `at_a_glance.laptop_running` / `laptop_queued`, with `laptop_iso` as the laptop's own timestamp** (published by the laptop's scheduler to `laptop-status`, folded in by the daemon); `ps -Ao pid=,command= \| grep '[t]rain.py'` is the cross-check on the laptop itself | **`git fetch origin ops-status && git show origin/ops-status:status.json`** |
 | queue work | **one queue for both**: commit the specs to `queue/pending/` on `ops` (`queue-batch` skill), unpinned or `"box": "desktop"` / `"laptop"`; each box's scheduler claims a wave when it comes free (`snek3/tools/claims.py`). `at_a_glance.pool` is the shared queue: what is unclaimed and what each box holds | the same specs, the same branch |
-| start it now | start the laptop's scheduler if none is up (`laptop-run`); it claims while it runs and exits when the pool has nothing for it | `ssh the-claw-den 'Snek/snek3/desktop/trigger'`; the daemon also starts a scheduler whenever `ops` or `claims` moves |
+| start it now | **only when the user asks for the laptop**: start its scheduler if none is up (`laptop-run`); it claims while it runs and exits when the pool has nothing for it | `ssh the-claw-den 'Snek/snek3/desktop/trigger'`; the daemon also starts a scheduler whenever `ops` or `claims` moves |
+
+**The laptop takes no part in training or evals unless the user explicitly asks for it** (the user, 2026-10-25).
+The desktop is the box that runs the work; the laptop is where the code is written and the docs are read. So,
+unasked: never start a laptop scheduler, never pin a spec `"box": "laptop"`, never run a trainer, a close-out
+or a hand eval here. An unpinned spec on `ops` is safe to push -- the laptop claims only while its scheduler
+runs, so with none up the desktop takes every wave. When a batch would go faster with both boxes, say so as a
+recommendation and wait for the word; "run it on the laptop too" or "train X here" is the go-ahead, and it
+covers that batch only.
 
 **A progress update commits a closed batch's `runs/` files — JSON, `.md` and `.png` — and nothing for a
 live one.** The pictures of a live arm are on the `site` branch, rebuilt by the desktop from both boxes'

@@ -9,6 +9,10 @@ Run from `snek3/`.
 
 ## Rules that break a run if missed
 
+- **Only on the user's explicit say-so.** The laptop takes no part in training or evals unless the user
+  asked for it on this batch (the user, 2026-10-25); the desktop is the box that runs the work. Invoking
+  this skill without that ask is the bug, whatever the pool holds. A recommendation ("this would go faster
+  with the laptop too") is fine; the launch waits for the word.
 - **Call the env python directly. Never `conda run`** for anything backgrounded — it buffers stdout,
   so the log stays empty for 90+ seconds while the process is fine, and `kill -9` then discards the
   buffer for good.

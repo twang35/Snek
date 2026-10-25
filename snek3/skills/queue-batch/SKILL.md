@@ -114,8 +114,9 @@ ssh the-claw-den 'Snek/snek3/desktop/trigger'          # the desktop looks now r
 
 **The desktop's daemon starts its scheduler whenever `ops` or `claims` moves.** The laptop has no daemon:
 its scheduler claims work while it is up and exits when the pool has nothing for it, so **the laptop takes
-part exactly while its scheduler runs.** If the laptop should help with this batch, start one if none is
-up (the `laptop-run` skill, "The laptop's scheduler"):
+part exactly while its scheduler runs.** **Start one only if the user asked for the laptop on this batch**
+(the user, 2026-10-25: the laptop takes no part in training or evals unasked; the desktop is the box). When
+they did, start one if none is up (the `laptop-run` skill, "The laptop's scheduler"):
 
 ```
 cd /Users/tony_wang/Projects/Snek/snek3
