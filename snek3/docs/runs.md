@@ -13,6 +13,9 @@ are in git history before 2026-09-10.
 
 ## Open
 
+- **Group F, exploration** (F1 built and queued as b53, 2026-10-25). The question is whether an intrinsic term hurts a game with no
+  exploration problem: `ngu` against its own β = 0 control. F2 (Agent57: split networks, the bandit) is built while b53 trains and
+  is gated on F1 showing a cost. The wall-time limit is lifted for the group: ~52 h a 4-arm wave measured by the b99 bench, two waves.
 - **Group E, memory** (b51 closed 2026-10-03, b52 closed 2026-10-09; **the group closed 2026-10-25**, user: no seed wave on the c51
   cell, the stage is finished as it stands and the series moves to Group F). Memory subtracts from PPO's window (b51) and is most of
   R2D2's edge over its dense control (b52). b52's c51 cell at 180k updates is at the PPO record (b52k 29,970 /30k twice). Open now:
@@ -83,6 +86,7 @@ are in git history before 2026-09-10.
 
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
+| [b53](#b53--f1-ngu-the-papers-intrinsic-reward-agent-and-its-β--0-control) | the algorithm: NGU as its paper has it (`SNEK_ALGO=ngu`: R2D2's core with the mixture one-hot and both previous rewards into the LSTM, 32 (β, γ) mixtures one per lane, episodic k-NN × RND intrinsic reward on the board, transformed Retrace λ 0.95, PER 0.9 / IS 0 / η 1.0, Adam 1e-4 ε 1e-4, target 1,500, permuted ε ladder α 8) / the same at β_max 0 (`ngubeta0`) | b52's paper cell at NGU's values: hist8, b2 reward, step penalty 0.01, shaping **off** | 2 × 4 | 1.3M steps = 41.6M moves, **130k updates** (b52's; the paper's ~650k) | `ngu` trails b52 on onset, level or below on density; `ngubeta0` level with b52; mean r^i falls early | **queued 2026-10-25** |
 | [b52](#b52--r2d2-the-papers-recurrent-value-agent-its-feed-forward-control-and-its-c51-head) | the algorithm: R2D2 as its paper has it (`SNEK_ALGO=r2d2`: LSTM 512 with prev action and reward in, dueling 512 streams, 120-row windows = 40 burn-in + 80 loss, stride 40, n-step 5 double-Q under h(x), PER 0.9/0.6/η 0.9, Adam 1e-4, target copy 2,500, clip 40, the Ape-X ε ladder over 32 lanes) / the same with the LSTM replaced by a dense layer (`ffr2d2`) / the same with a C51 head and the rescaling off | none (paper): hist8, b2 reward, step penalty 0.01, shaping **off** | 3 × 4 | 1.3M steps = 41.6M moves, **130k updates** (shortfall against the 200k floor, stated); the c51 cell on to 1.8M (2026-10-07) and **2.4M = 240k updates** (2026-10-12) | paper 90%+ and holds, `ffr2d2` trails on the hold, c51 level; none at PPO's 99.8 | **closed 2026-10-09.** Memory is most of R2D2's edge (paper 50.4% vs `ffr2d2` 16.1% at ≥98%); the paper cell tops Rainbow on the peak, not the hold. The c51 cell, run on to 1.8M / 180k updates, is the value family's first arm at the PPO record: b52k 29,970 /30,000 (99.900%) twice, median of 66 full 30k rows 29,950; **confirmed on seed 13 2026-10-12** (29,960 /30k @1795000, tied with the `b32g` record, in the hall of fame); **2.4M extension landed 2026-10-14**: i and j arrived (97% / 93% of new rows ≥98), k and l held, 100.0 rows in all four, best30 99.72; **`hof30k` 2026-10-15: nothing above the tie** (k's new full rows median 29,949, best 29,965; l 29,941; i, j none) |
 | [b51](#b51--e1-recurrent-ppo-an-lstm-in-both-towers-on-b27s-config) | `SNEK_PPO_RECURRENT=lstm` (128, both towers, whole-lane minibatches of 2 x 256) at `SNEK_OBS_HISTORY` 8 / 0 | b27's hist8 config verbatim | 2 × 4 | 100M | `lstmhist0` well above hist0 and at or under hist8; `lstmhist8` level with hist8 | **half held**: `lstmhist0` 89.0% density (hist0 49, hist8 95.4); `lstmhist8` 74.4%, under hist8 on every seed; best30 99.55 both, no `hof30k` row at 99.8 |
 | [b50](#b50--d1-anneal-wave-bbfs-within-cycle-n-step--γ-anneal-on-b43s-reset600k-cell) | BBF's within-cycle anneal on the reset cell: `SNEK_RESET_ANNEAL_N_STEP=10,3 SNEK_RESET_ANNEAL_GAMMA=0.97,0.997` over 10k gradient steps after each reset | b43a-d (resets every 600k on b40's M-QR-DQN cell) | 1 × 4 | 3M steps | **held** | D1 closes null: every reset still drops the cell to 0%, recovery to 55-69 within the cycle; tail 59-64 against b40e-h's 89-93 |
@@ -161,6 +165,24 @@ evals below 50% and 80%), then best30. `hof5000` re-measures the top rows at 5,0
 at complete separation (Mann-Whitney p=0.029). Details in [`protocol.md`](protocol.md).
 
 ---
+
+## b53 — F1: NGU, the paper's intrinsic-reward agent and its β = 0 control
+
+| | |
+|---|---|
+| base | the E2 paper cell (b52a-d) at NGU's values (`f-ngu-agent57.md` §0, §2b): hist8, b2 reward, step penalty 0.01, shaping **off**, `fc 320`, 32 lanes, 1.3M steps, `SNEK_REPLAY_RATIO` 1/320 |
+| the config | `SNEK_ALGO=ngu`: R2D2's LSTM 512 core with the mixture one-hot, the previous action and the previous extrinsic **and intrinsic** rewards into the cell; 32 mixtures, lane j on mixture j (β_0 = 0 .. β_31 = 0.3 on the paper's sigmoid, γ 0.997 → 0.99), the Ape-X ε ladder at α 8 **permuted** over the lanes; `r^i` = episodic k-NN (k 10, ε 1e-4, ξ 8e-3, c 1e-3, s_m 8, memory 30,000) over a 32-d inverse-dynamics embedding of the **board** (10 × 10 × 4, not the observation) × RND (128) clipped to [1, 5], each lane on a snapshot of f from its episode start; reward `r_e + β_j r^i`; transformed Retrace λ 0.95, π ε-soft 0.01 on the online net; PER α 0.9, IS 0, η 1.0; Adam 1e-4 ε 1e-4, target copy 1,500, clip 40; 6,250 windows before learning; the embedding and RND predictor on the last 5 pairs of each sampled window at 5e-4; replay 30,000 windows |
+| varies | **ngu** (a-d, `SNEK_NGU_BETA_MAX=0.3`) / **ngubeta0** (e-h, `SNEK_NGU_BETA_MAX=0`: every β 0 and nothing else changed — NGU's own "R2D2 (Retrace)" baseline, the control that says whether the intrinsic term costs anything) |
+| cells × seeds | 2 × 4, seeds pinned to the letter |
+| cap | **b52's update count**: 1.3M steps × 32 moves = 41.6M moves, **130,000 updates**, against the paper's ~650k (5x short, three orders in frames). Benchmark 2026-10-25 (laptop solo, one thread, idle): update 647 ms (1.25x b52's 517), the k-NN reward 8 ms a step at a perfect game's 2,500 keys, ~2.5 GB peak RSS with the buffer resident — ~27 h solo. The desktop bench b99 (4 `ngu` arms with the workers up, 2026-10-25): 0.70 updates/s an arm, RSS 0.74 GB at 18k windows, so **~52 h a 4-arm wave, two waves ≈ 4.3 days** at 30,000 windows; the group is the wall-time exception by decision (the user, 2026-10-25) |
+| control | `ngubeta0` for the intrinsic term; b52a-d for the series' cross-row reading, with the estimator (Retrace for n-step), target period, Adam ε, IS exponent, prefill, η and the ladder's α named as what else moved |
+| predicted | registered 2026-09-16 by the agent (`f-ngu-agent57.md` §3): `ngu` trails E2 on onset and is level or below on density — the intrinsic term pays for visiting board states the shortest route avoids and a high-β lane wastes its episode; `ngubeta0` is level with b52a-d within noise, so the gap, if any, is the intrinsic term's. The mean `r^i` trace falls early if the game has nothing to explore. A result that would matter: `ngu` **above** b52 |
+
+**Why.** Group F's question is one the game does not ask: whether exploration machinery matters when a random policy
+finds reward on its first step. The rows are in the series to confirm the null and to measure the one thing the null does not
+settle — whether an intrinsic term *hurts* a game where the shortest route is already right. Built 2026-10-25 whole in
+`algos/ngu/` (`test_ngu.py`, `mut_ngu.json` 15/15), from both PDFs read in four review passes; the intrinsic modules read the
+board because the observation's history bits would hand the inverse-dynamics classifier its answer.
 
 ## b52 — R2D2: the paper's recurrent value agent, its feed-forward control and its C51 head
 

@@ -529,5 +529,17 @@
   "after": "r2d2c51",
   "value": "rainbowpaper",
   "knob": "name"
+ },
+ "b53": {
+  "arms": [
+   "b52a-r2d2paper-seed1",
+   "b52b-r2d2paper-seed2",
+   "b52c-r2d2paper-seed3",
+   "b52d-r2d2paper-seed4"
+  ],
+  "label": "reference: b52's R2D2 paper cell (a-d, 1.3M steps / 130k updates) -- b53 is NGU's paper cell (a-d, beta_max 0.3) and its beta = 0 control (e-h), the same update count",
+  "after": "ngubeta0",
+  "value": "r2d2paper",
+  "knob": "name"
  }
 }
