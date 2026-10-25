@@ -1,6 +1,6 @@
 # Group F: exploration -- NGU, Agent57
 
-**Status: planned 2026-09-16, reviewed against the papers 2026-10-12 (two passes: the agent's, then a second reviewer's, whose accepted points are marked **review 2**), nothing built.** Group F of
+**Status: planned 2026-09-16, reviewed against the papers 2026-10-12 (two passes: the agent's, then a second reviewer's, whose accepted points are marked **review 2**), reviewed again 2026-10-25 against the game and the box (marked **review 3**: the intrinsic modules read the board, not the observation; the ε ladder is permuted off the mixture index; both rows run b52's 130k updates at the papers' geometry and the group is the wall-time exception; the benchmark and memory gates are spelled out), nothing built.** Group F of
 [`algorithm-series.md`](algorithm-series.md); conventions in [`README.md`](README.md). Phase 7 of the running
 order; E2 closed 2026-10-09 (b52, `docs/runs.md`), so the gate is open.
 
@@ -36,7 +36,11 @@ cell is queued**. Where the papers contradict themselves the plan says which val
 | **new** Agent57's discount ladder is misprinted | App. G.1's printed equation (§2b) gives γ_31 = 0.99997 rather than the γ_2 = 0.99 its text and Fig. 11 intend, and its sigmoid piece *rises* from γ_1 at j = 1 to γ_0 at j = 6 before dropping to γ_1 at j = 7, where the figure falls monotonically | the first pass copied the equation | **read as an erratum**: the intended ladder is γ_0 at j = 0, falling through γ_0 − (γ_0 − γ_1) σ(10 (2j − 6) / 6) over j = 1..6 to γ_1 at j = 7, then 1 − exp(((N−9−(j−8)) log(1−γ_1) + (j−8) log(1−γ_2)) / (N−9)) for j ≥ 8, which is γ_1 at j = 8 and γ_2 at j = N−1 -- the NGU interpolation on the lower piece. A fixture pins the endpoints (0.9999, 0.997 at 7 and 8, 0.99 at 31) and strict monotonicity | **decided** (review 2) |
 | **new** the checkpoint and the restore contract | the exploitative policy still reads r^i_{t−1}, so even at β = 0 acting needs the embedding, the RND pair and the error-normalisation statistics, and a per-lane episodic store | `tools/checkpoints.py` saves `algo.net.state_dict()` alone; R2D2's net would leave the intrinsic modules behind and the restored policy would see a zero where the trainer saw r_i | **the net owns the intrinsic modules**: one `NguNet` module holding Q (or Q_e and Q_i), the embedding, the RND predictor and target and the normalisation buffers, so the checkpoint is complete and `tools/restore.py` builds the stateful policy from it; that policy computes r_i per lane with its own episodic store, zeroed with the lane (the `begin` seam `algos/stateful.py` already has). The sidecar carries `conditioning: {mixtures, beta_max, gamma_top, gamma_min, split}` so the β/γ ladder and the two-network layout are rebuilt from the file. `resume.pt` carries the auxiliary optimisers, the normalisation statistics and the bandit windows | **decided** (review 2) |
 | **new** matched controls | NGU's own baseline is "R2D2 (Retrace)"; Agent57's ablations hold the architecture and vary the bandit | §3 read F1 against b52 and F2 against F1, pairs that differ in the estimator, target period, Adam ε, IS exponent, prefill, ladder and (F2) the networks, the γ family and the trace, so a gap could not be attributed | **a control cell in each wave** (§3): F1 runs beside `ngu` at β_max = 0 (every β_i 0, everything else identical -- the paper's R2D2 (Retrace)); F2 beside `agent57` with the bandit replaced by F1's fixed assignment. b52 stays the series' cross-row reading; the controls carry the attribution | **decided** (review 2) |
-| **new** budget | -- | §2b carried "50M moves a cell" | **a benchmark gate** (§3, §4): F2's paper cell is two LSTM networks over a 200-slot window, ~3-4x b52's 517 ms an update, so ~24 h of a 4-arm wave buys ~35-45k updates against b52's 130k. The number is set from the benchmark and the shortfall stated, as E2's was | **open until the benchmark** |
+| budget | -- | §2b carried "50M moves a cell"; the 2026-10-12 pass set it from what ~24 h buys | **b52's 130k updates in both rows, at the papers' geometry** (the user, 2026-10-25): F1 at the 80/40 trace, F2 at Agent57's 160/80, so F1 reads against b52 and F2 against F1 at one update count and the geometry is the paper's in each. **The group is the exception to the ~24 h wave** (`algorithm-series.md` §0 allows it): the estimate is ~30 h a 4-arm wave for F1 and ~85 h for F2 (§3), and the benchmark gate (§4) replaces the estimate with a measurement before either spec is written | **decided** (review 3) |
+| **new** the intrinsic modules' input | the frame: the embedding f and the RND pair read the pixels through the conv stack, so inverse dynamics has to *learn* what the agent controls | the policy's observation -- the 26 values plus the `hist8` block, whose first pair **is** a_t (`[turned left, turned right]` for the last move, most recent first; `docs/environment.md`). A classifier on (f(x_t), f(x_{t+1})) is solved by reading two bits of x_{t+1}, f collapses toward the recent moves, the episodic store holds a handful of keys, and r_i falls to its floor for a reason that has nothing to do with the game | **the board**, the frame's analogue: a per-lane `(10, 10, 4)` tensor -- body, head, food, and body age (tail 0 → head 1, so one tensor fixes the state the way a frame stack does) -- built from the engine's body ring, head and food (`vectorized/vec_env.py` gains `board_tensor(rows)`, numpy, torch-free), flattened into the 400→128→32 embedding MLP and the RND pair. The Q-network's input stays the 42-value observation; `SNEK_NGU_INPUT=board` (default) / `obs` (the degenerate form, kept only to demonstrate the collapse in a test). The `begin` seam and the eval engine hand the stateful policy the board rows beside the observation rows, so a restored checkpoint computes r_i as the trainer did | **decided** (review 3, the user) |
+| **new** ε and the mixture are confounded on 32 lanes | 256 actors: ε_l over l, β over l mod 31, so each mixture is collected eight times across the ε ladder | one lane a mixture: lane j holds β_{j mod 31} **and** ε_j, so the exploitative mixture is acted only at ε 0.4 (lane 0) and ~6.5e-4 (lane 31) and every high-β mixture is a low-ε lane -- β and ε move together in the data | **a fixed permutation of the ε ladder over lanes**, the same in every arm and independent of `SNEK_SEED` (`SNEK_NGU_EPSILON_PERMUTE=1`, default; a fixed-seed shuffle of the 32 rungs), so both ladders are the papers' and the two are uncorrelated. The identity order is the local variant | **decided** (review 3, the user) |
+| **new** Agent57 combines the heads in untransformed space | §3.1: Q(x, a, j) = h(h⁻¹(Q_e) + β_j h⁻¹(Q_i)) | §2 writes Q_e + β Q_i; with the rescaling on and this game's returns in the hundreds the two differ at the top of the range | combine through h⁻¹ as the paper does; one line in `SplitHead` and a fixture at a large Q | **open -- confirm against the PDF before F2's spec** (review 3) |
+| **new** the mixture 31 that nothing acts | App. A's "h = j mod (N−1)" leaves β_{N−1} = β_max collected by no actor | copied | re-read the PDF: a misprint for mod N would mean the top β is acted, and the plan's `fixed` assignment follows whichever it is | **open -- re-read before F1's spec** (review 3) |
 
 Three paper-internal contradictions the plan takes a side on: kernel ε (above); NGU's priority mixing η,
 1.0 in App. A against 0.9 in Table 6 -- **App. A's 1.0** (it is the text's description of the method, and
@@ -53,7 +57,7 @@ Both rows are R2D2 (E2) with an intrinsic reward and a policy conditioned on how
 | package | `algos/ngu/`, one `algo.py` with `NAME`s `ngu` and `agent57`; the second adds the split networks and the meta-controller (§2) |
 | base agent | `algos/r2d2/`, imported: the LSTM net, the sequence replay, the burn-in agent. The intrinsic modules feed it an augmented reward and two more cell inputs |
 | the intrinsic reward | NGU's: an **episodic** term from a k-nearest-neighbour count in a learned embedding, reset every episode, times a **lifelong** term from random network distillation, clipped to [1, L]. Both new, in `algos/ngu/intrinsic.py` |
-| the embedding | NGU's inverse-dynamics embedding: f(obs) trained to predict the action between consecutive observations, on 5 steps per sampled window (§0). On a 26-value vector the embedding is an MLP to 32 dims. **Each lane acts on a snapshot of f taken at its episode start** (§0) |
+| the embedding | NGU's inverse-dynamics embedding: f(**board**) trained to predict the action between consecutive boards, on 5 steps per sampled window (§0). **The input is the board tensor, not the observation** (§0, review 3): the observation's history block hands the classifier the answer. 400 → 128 → 32. **Each lane acts on a snapshot of f taken at its episode start** (§0) |
 | the conditioning | a family of N policies indexed by β_i (intrinsic weight) and γ_i (discount). **The index one-hot, the previous extrinsic reward and the previous intrinsic reward enter the LSTM beside the previous action**, as the paper's Fig. 1 (§0); the observation is not widened. `SNEK_NGU_MIXTURES` **32, the paper's** -- the lanes are vectorised, so 32 lanes is one lane per mixture and costs nothing the box lacks; β_max `SNEK_NGU_BETA_MAX` (0.3) with the paper's spacing β_0 = 0, β_{N−1} = β_max, β_i = β_max · σ(10 (2i − (N − 2)) / (N − 2)); γ from `SNEK_DISCOUNT` (γ_0, the exploitative end, **0.997** for NGU and **0.9999** for Agent57, the papers') down to `SNEK_NGU_GAMMA_MIN` (0.99), spaced as each paper's equation (§2b) |
 | the assignment | `SNEK_NGU_ASSIGN`: **`fixed`** -- lane j holds mixture j mod (N − 1) for the run (NGU App. A; §0), F1's and F2's control cell's; **`bandit`** -- the meta-controller's choice per episode, F2's; `episode` -- a uniform draw per episode, the local variant |
 | the target | **transformed Retrace, λ 0.95** (`SNEK_NGU_RETRACE_LAMBDA`), replacing E2's n-step target in this group; the replay gains a `mu` column (the behaviour probability of the action taken) and the target policy is ε-soft greedy at `SNEK_NGU_TARGET_EPSILON` 0.01 (§0). E2's n-step is the ablation knob (`SNEK_NGU_RETRACE_LAMBDA=0` falls back to it) |
@@ -74,13 +78,15 @@ r = r_e + β_i r_i and one Q-network over the sum.
 
 | module | contents |
 |---|---|
-| `algos/ngu/intrinsic.py` | the RND predictor and target (`SNEK_NGU_RND_HIDDEN` 128, output 128 -- the papers' architecture figures, not their text) with a running normalisation of the error, α_t = 1 + (err − μ)/σ clipped to [1, L] with L = 5; the inverse-dynamics embedding (32 dims, classifier hidden 128, L2 1e-5) at lr 5e-4; both the predictor and the classifier trained on the last 5 valid steps of each sampled window (§0); the episodic k-NN (k = 10, kernel ε 1e-4 (§0), cluster distance 8e-3, pseudo-count constant 1e-3, maximum similarity 8, memory 30,000, all exposed as knobs prefixed `SNEK_NGU_`) |
-| `algos/ngu/algo.py` (`ngu`) | wraps `R2d2Algo`: `advance()` computes r_i per lane per step from the lane's snapshot embedding of the new observation, augments the reward before it enters the sequence buffer, hands the cell the index one-hot and both previous rewards, writes `mu`, trains RND and the embedding on the same batch; `fields()` reports the mean r_i and the mixture per lane |
-| the actors | lane j on mixture j mod (N − 1) for the run (§0), on its own ε from the ladder |
+| `algos/ngu/intrinsic.py` | the RND predictor and target (`SNEK_NGU_RND_HIDDEN` 128, output 128 -- the papers' architecture figures, not their text) with a running normalisation of the error, α_t = 1 + (err − μ)/σ clipped to [1, L] with L = 5; the inverse-dynamics embedding (on the board tensor, §0; 32 dims, classifier hidden 128, L2 1e-5) at lr 5e-4; both the predictor and the classifier trained on the last 5 valid steps of each sampled window (§0); the episodic k-NN (k = 10, kernel ε 1e-4 (§0), cluster distance 8e-3, pseudo-count constant 1e-3, maximum similarity 8, memory 30,000, all exposed as knobs prefixed `SNEK_NGU_`) |
+| `algos/ngu/algo.py` (`ngu`) | wraps `R2d2Algo`: `advance()` computes r_i per lane per step from the lane's snapshot embedding of the new **board** (the replay stores the board rows beside the observation rows, 400 bytes a row as uint8), augments the reward before it enters the sequence buffer, hands the cell the index one-hot and both previous rewards, writes `mu`, trains RND and the embedding on the same batch; `fields()` reports the mean r_i and the mixture per lane |
+| the actors | lane j on mixture j mod (N − 1) for the run (§0), on its own ε from the **permuted** ladder (§0) |
 
 Tests: the episodic reward on a repeated observation falls with each repeat and resets on a new
 episode; RND error is ~1 in normalised units on novel inputs and falls on trained ones; the inverse
-dynamics classifier reaches a non-chance accuracy on a scripted trajectory; with β = 0 the augmented
+dynamics classifier reaches a non-chance accuracy on a scripted trajectory **and loses it when the boards are shuffled with the
+observations kept** (the collapse `SNEK_NGU_INPUT=obs` would have, pinned so nobody reintroduces it); the ε permutation is the same
+across seeds and uncorrelated with the mixture index (|Spearman| < 0.3 over the 32 lanes); with β = 0 the augmented
 reward equals the extrinsic one to the bit; the Retrace target on a hand-worked three-step sequence with
 μ = π reduces to the λ-return and with μ ≠ π cuts the trace at min(1, π/μ); the lane's embedding snapshot
 does not move mid-episode; each γ ladder is strictly decreasing with the papers' endpoints (§0's erratum); a restored checkpoint reproduces the trainer's r_i on a scripted episode to the bit. Mutants: the episodic store not cleared on reset, the lifelong term unclipped,
@@ -117,11 +123,11 @@ exploration bonus dropped, the window not sliding, the return discounted.
 | inputs to the core | encoder features ⊕ one-hot β_i ⊕ a_{t−1} ⊕ r^e_{t−1} ⊕ r^i_{t−1} | the same, j the bandit's index | the same, in `_cell_input` (§0) |
 | priority | exponent 0.9, η 1.0 (App. A; the table's 0.9 is not taken), IS 0 | exponent 0.9, η 0.9, IS 0 | `SNEK_PRIORITY_EXPONENT=0.9 SNEK_R2D2_IS_BETA=0`; `SNEK_R2D2_PRIORITY_ETA` 1.0 for F1, 0.9 for F2 |
 | replay | 5e6 (units unstated), 6,250 sequences before learning | the same | 30,000 windows, the box's (§0); 6,250 windows before learning |
-| intrinsic module | RND 128, embedding 32 (App. B.1: 32 "consistently better" than 64), classifier 128, lr 5e-4, L2 1e-5, L 5, k 10, memory 30,000, embedding snapshot once per episode, 5 steps a sequence for the inverse-dynamics loss | the same | the same, over an MLP in place of the conv stack |
+| intrinsic module | RND 128, embedding 32 (App. B.1: 32 "consistently better" than 64), classifier 128, lr 5e-4, L2 1e-5, L 5, k 10, memory 30,000, embedding snapshot once per episode, 5 steps a sequence for the inverse-dynamics loss | the same | the same, over an MLP on the board tensor (§0) in place of the conv stack over the frame |
 | bandit | -- | window 160, β 1, ε_UCB 0.5, per actor; undiscounted extrinsic return; the evaluator's own bandit at 3,600 / 0.01 | per lane; the evaluator's bandit becomes the logged modal arm plus a `mixture:<i>` pass (§0) |
-| exploration | ε_l = 0.4^(1 + 8 l / 255) over 256 actors (Agent57 App. E; NGU's text does not print the formula); eval ε 0.01 | the same | the Ape-X ladder over 32 lanes with `SNEK_APEX_ALPHA=8` (E2 ran 7, R2D2's); eval greedy |
+| exploration | ε_l = 0.4^(1 + 8 l / 255) over 256 actors (Agent57 App. E; NGU's text does not print the formula); eval ε 0.01 | the same | the Ape-X ladder over 32 lanes with `SNEK_APEX_ALPHA=8` (E2 ran 7, R2D2's), **permuted over the lanes** so ε and β are uncorrelated (§0); eval greedy |
 | value rescaling | h with ε 1e-3 (Table 6; App. E says 1e-2) | 1e-3 | 1e-3, E2's |
-| frames | 35B | the text gives milestones (51 games passed at 5B, Skiing at 78B), the Atlas carries 90B | set by the update count the benchmark gate affords (§3), the paper's budgets being three orders beyond the box, and the rows here to confirm a null |
+| frames | 35B | the text gives milestones (51 games passed at 5B, Skiing at 78B), the Atlas carries 90B | **130k updates, b52's, in both rows** (§3); the paper's budgets are three orders beyond the box, and the rows here confirm a null |
 
 ## 3. The batches
 
@@ -130,15 +136,16 @@ exploration bonus dropped, the window not sliding, the return discounted.
 | F1 | 4 seeds of `ngu` on §2b + **4 seeds the same at `SNEK_NGU_BETA_MAX=0`** (every β_i 0; the same Retrace, inputs, ladder, prefill, replay and updates -- NGU's own R2D2 (Retrace) baseline, and the control that says whether the intrinsic term hurts), exploitative index measured | E2's paper config at §0's changes | **the β = 0 cell** for the intrinsic term; E2 paper (b52a-d) for the series' cross-row reading, with the estimator, target period, Adam ε, IS exponent, prefill and ladder named as what else moved | stage-B density, `hof5000`, `hof30k`, drawdowns; the onset step; **the mean r_i trace**, which should fall to its clip floor early if the game has nothing to explore |
 | F2 | 4 seeds of `agent57` on §2b (two networks, trace 160) + **4 seeds the same at `SNEK_NGU_ASSIGN=fixed`** (the split networks, the 0.9999 ladder and the 160 trace with the bandit replaced by F1's fixed assignment: the control that isolates the meta-controller). `SNEK_A57_SPLIT=heads`, a cost saver and not a question, moves to the tuning wave | F1's | **the fixed-assignment cell** for the bandit; F1 and E2 paper for the cross-row reading | as F1; **the bandit's β = 0 fraction over training** and its modal arm |
 
-**The budget is set by a benchmark, not assumed (2026-10-12).** b52's update cost was 517 ms at a 125-slot window
-(`e-r2d2.md` §2b), and 130k updates was the ~24 h wave. F1 adds the intrinsic modules to that (~1.2x). F2's paper cell
-unrolls **two** LSTM networks over a **200-slot** window: ~3-4x b52 an update, so 24 h of a 4-arm wave is ~35-45k
-updates, far under b52's 130k and the 200k working floor. Before either spec is written: benchmark `ngu` and `agent57`
-updates and collectors solo (the 2,000-step rule), then set `SNEK_REPLAY_RATIO`, `SNEK_MAX_STEPS` and the cap so each cell
-reaches the most updates ~24 h buys, state the shortfall against b52's 130k in the manifest note, and read F2 against F1
-at a common update count. If F2 cannot reach half of b52's updates in 24 h, the batch is the exception
-`algorithm-series.md` §0 allows and runs longer, said so in the spec. Memory: a 200-slot window at 30,000 windows is
-~2.6 GB an arm plus two networks; four arms fit the box.
+**The budget is 130k updates in both rows, the geometry is each paper's, and the group is the wall-time exception (the user,
+2026-10-25).** b52 ran 130k updates (`SNEK_REPLAY_RATIO` 1/320 x 1.3M steps x 32 lanes) in ~24-27 h as a 4-arm wave at 517 ms an update
+over a 125-slot window, and F keeps that count so F1 reads against b52 and F2 against F1 at one update count, with the same
+`SNEK_MAX_STEPS` and ratio. The estimates, to be replaced by the gate's measurements: F1 is b52's update plus the RND and embedding
+passes on 5 x 64 rows, the k-NN per lane per step and the Retrace trace -- ~1.2x, **~30 h a 4-arm wave**, two waves for the 8 arms;
+F2's paper cell is two LSTM networks over a 200-slot window, ~1.6 x 2 = ~3.2x, **~85 h a 4-arm wave**, two waves. A spec states
+its projected hours in the manifest note and the scheduler's ETA reads the real pace. Memory: rows are stored once, so the 200-slot
+window costs little in rows; the stored `(h, c)` doubles with the split networks (~250 MB at 30,000 windows), the board rows add
+~400 bytes a row (~1.5 GB at 4M rows, so **the board replay is uint8 and the window count may have to fall to 20,000**), and the
+unroll's activations over 200 slots and two networks are the unknown the gate measures. The box has ~12.8 GB free with the shards up.
 
 **Registered prediction (the agent's, 2026-09-16).** F1 trails E2 on onset and is level or below on
 density: the intrinsic term pays for visiting board states the shortest route avoids, and a lane on a
@@ -152,9 +159,23 @@ greedy policy and novelty reaches them.
 1. E2 closed -- **done 2026-10-09** (b52).
 2. Smoke for both names; the exploitative checkpoint restores and watches; a `mixture:<i>` variant restores.
 3. The mutation specs kill every mutant.
-4. **The benchmark** (§3): update and collector cost for both names, the update count written into the specs.
-5. Tuning budget: one laptop wave on β_max and the kernel ε (1e-4 against the text's 1e-3). The rows are not
-   tuned further; a null here is the expected finding.
+4. **The benchmark** (§3), solo on the laptop at one thread, the 2,000-step rule, for `ngu`, `ngu` at β_max 0, `agent57` and
+   `agent57` at `fixed`: the update (ms), the collector step with the episodic store at its longest realistic size (a 2,300-move
+   game's keys, not an empty ring), the k-NN query alone, the RND and embedding passes alone, the Retrace target alone, and RSS at
+   30,000 windows with the board rows in. Each number goes into §2b's table beside b52's 517 / 1.5 / 1.4 GB, and the projected hours a
+   wave (`updates x ms / 0.7`) into the spec's manifest note.
+5. **The wave-rate check**: the 0.7x per-arm figure for a 4-arm desktop wave was measured on PPO and R2D2 and is not assumed to hold
+   for a two-network LSTM unroll. Before F2's wave, a 4-arm **`-bench-` smoke of ~1 h on the desktop** at F2's settings measures the
+   per-arm update rate under the wave's contention and the four arms' RSS with the 16 shards up; the projection is corrected from it.
+   If four F2 arms plus the shards do not leave ~2 GB of the box's 15 GB free, F2 runs in **2-arm waves** (four waves, ~45 h each at
+   the same per-arm pace or better), said so in the spec, rather than risking the disk-full and memory incidents of 2026-09-24 and
+   2026-10-05 on an 85-hour arm.
+6. **Pace and memory in the row**: `fields()` reports updates/s, RSS and the episodic store's mean size beside the mean r_i, so the
+   chart and `status.json` carry the pace and the ETA is the measured one. **A check at 10% of the run** (13k updates) reads the pace
+   against the manifest's projection; a shortfall of more than 1.5x is reported as `attention` and the user decides whether the wave
+   runs on, before four days are committed to it.
+7. Tuning budget: one laptop wave on β_max and the kernel ε (1e-4 against the text's 1e-3), **only if the user asks for the laptop**;
+   otherwise a 4-arm desktop wave. The rows are not tuned further; a null here is the expected finding.
 
 ## 5. What would change the plan
 
