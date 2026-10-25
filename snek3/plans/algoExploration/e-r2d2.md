@@ -1,6 +1,7 @@
 # Group E: memory -- recurrent PPO, R2D2
 
-**Status: built 2026-09-30** (the seam, E1's recurrent PPO and E2's R2D2 whole -- `algos/stateful.py`, `algos/ppo/net.py`'s `RecurrentTower`, `algos/r2d2/`; `tests/test_stateful_policy.py`, `test_ppo_recurrent.py`, `test_r2d2.py`, `mut_recurrent.json`, `mut_r2d2.json`; `docs/running.md` has the knobs). **Planned 2026-09-16; reviewed 2026-09-30** (E1 declared local-only, E2's update count made the budget's
+**Status: closed 2026-10-25** (b51 and b52 closed, `docs/runs.md`; the c51 cell's record is one seed deep and the user chose not to run a
+seed wave, so the group ends as it stands and Group F's gate is open). **Built 2026-09-30** (the seam, E1's recurrent PPO and E2's R2D2 whole -- `algos/stateful.py`, `algos/ppo/net.py`'s `RecurrentTower`, `algos/r2d2/`; `tests/test_stateful_policy.py`, `test_ppo_recurrent.py`, `test_r2d2.py`, `mut_recurrent.json`, `mut_r2d2.json`; `docs/running.md` has the knobs). **Planned 2026-09-16; reviewed 2026-09-30** (E1 declared local-only, E2's update count made the budget's
 goal, a feed-forward R2D2 control added, E1's minibatch sized in transitions -- §0, §2, §2b, §3; a second review the same day set the sequence geometry to 40 loss steps inside 80 (**retracted** the same day once the PDF was read: 80 loss steps with a 40-step burn-in prefix, §0), gave the critic its own GRU, put the previous reward on the seam, and rewrote §5 around the new controls; a third fixed the short-episode rule, derived the stride, split the stored states per tower and relabelled the C51 cell). Group E of [`algorithm-series.md`](algorithm-series.md);
 conventions in [`README.md`](README.md). Phase 6 of the running order; waits for Group C, and Group D (the reset probe) runs before it.
 

@@ -58,7 +58,8 @@ limit. **The 2.4M stretch holds k at the tie and lifts nothing** (`hof30k` lande
 abandoned and the 17 full ones read a median of 29,949 (the 1.8M rows: 29,950) with a best of 29,965 @1.835M, under the 29,970 pair;
 l has its first full row, 29,941 @2.055M; i and j, which arrived at ≥98 /500 on stage A, abandoned every one of their 61 and 41 rows.
 So the cell's record is one seed deep at both budgets, the stage-A arrival of i and j does not carry to 30,000 episodes, and the
-table above (now the 2.4M numbers: 89.7%, 2,259 candidates, best30 99.72) overstates the cell's depth by the same token.
+table above (now the 2.4M numbers: 89.7%, 2,259 candidates, best30 99.72) overstates the cell's depth by the same token. **Group E
+closed here 2026-10-25 (user)**: no seed wave on the cell, so whether the record is the cell or seed 11 stays open on purpose.
 <!-- /reading -->
 
 The 2.4M stretch (1.8M-2.4M, 2026-10-12 to 2026-10-14): 583-596 new stage-B rows per arm. i and j arrived -- 97% and 93% of their new

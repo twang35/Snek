@@ -143,7 +143,7 @@ finish fastest: a row that could run earlier on its dependencies alone still wai
 | 3 | **B1 → B2** discrete SAC | one change to a value agent that exists, read against A1 and PPO |
 | 4 | **C1 → C2** Rainbow, Beyond the Rainbow | read against A, so they wait for A. C2 also wants A6's Munchausen result |
 | 5 | **D1** BBF's resets | the reset probe on A6's best cell: whether the late drift every A cell showed is a plasticity problem. Placed after C so its answer is read beside the strongest value stack, and offered to E2 |
-| 6 | **E1** recurrent PPO, then **E2** R2D2 | the memory question in one phase. E1 is the cheaper form with the `hist8` prior behind it and is read against PPO; E2 is read against E1 and C1, the value stack it is built on |
+| 6 | **E1** recurrent PPO, then **E2** R2D2 (**closed 2026-10-25**) | the memory question in one phase. E1 is the cheaper form with the `hist8` prior behind it and is read against PPO; E2 is read against E1 and C1, the value stack it is built on |
 | 7 | **F1 → F2** | built on E2; the expected result is a null, so they run once the value rows they are read against have closed |
 | 8 | **G1**, then **G2 → G3**, **G4** | the planning group in one phase. G1 is the row most likely to beat the record and needs the eval-protocol decision in Group G made first; the learned-model rows are read against G1's number |
 | 9 | **H1** | a reproduction gate first, then the row if it passes |

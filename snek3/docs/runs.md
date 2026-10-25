@@ -13,13 +13,15 @@ are in git history before 2026-09-10.
 
 ## Open
 
-- **Group E, memory** (b51 closed 2026-10-03, b52 closed 2026-10-09). Memory subtracts from PPO's window (b51) and is most of
+- **Group E, memory** (b51 closed 2026-10-03, b52 closed 2026-10-09; **the group closed 2026-10-25**, user: no seed wave on the c51
+  cell, the stage is finished as it stands and the series moves to Group F). Memory subtracts from PPO's window (b51) and is most of
   R2D2's edge over its dense control (b52). b52's c51 cell at 180k updates is at the PPO record (b52k 29,970 /30k twice). Open now:
   done 2026-10-12 -- b52k @1795000 promoted, tied with `b32g` (29,967 / 29,960 against 29,967 / 29,957 on seeds 7 / 13), the first
   value-based entry; and the c51 cell run on to
   **2.4M steps / 240k updates** (cap raised again 2026-10-12): **landed 2026-10-15, nothing moved** -- k's 17 new full 30k rows median
   29,949, best 29,965, under its 29,970 pair; l one row at 29,941; i and j arrived on stage A but abandoned every 30k row. The record is
-  one seed deep, so the next question for the cell is seeds, not steps. The paper cell
+  one seed deep and is left there: a seed wave would say whether the record is the cell or the seed, and the user chose not to
+  run it (2026-10-25). The paper cell
   (a-d) is **not** extended, by decision (user, 2026-10-12): it did well without pushing at the limit, so the budget question for it
   is closed here.
 - **Group C, the value stacks** (b46-b49, closed 2026-09-29). Rainbow's paper cell (best30 97.45) is the value family's best; BTR's
@@ -205,7 +207,8 @@ on to 180k updates: b52k posts 66 full 30k rows with a median of 29,950 and two 
 value agent before had a 30k row at all. Two of its four seeds were still climbing at 1.8M. It changes the plan: the value family is
 no longer behind PPO on the ceiling, and the next question is budget, not algorithm. Confirmed 2026-10-12: @1795000 re-measured 29,960
 /30,000 on seed 13 and sits in the hall of fame tied with `b32g`, not above it. The 2.4M extension (landed 2026-10-15) added
-nothing at 30k: k held at the tie, l reached one full row, i and j none -- the record is one seed deep, and seeds are the next lever.
+nothing at 30k: k held at the tie, l reached one full row, i and j none -- the record is one seed deep, and stays so: **Group E closed
+2026-10-25 (user) without the seed wave** that would have separated the cell from the seed.
 
 ## b51 — E1: recurrent PPO, an LSTM in both towers on b27's config
 
