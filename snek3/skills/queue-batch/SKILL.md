@@ -100,9 +100,20 @@ stage-A workers up (F1's b99, 2026-10-25). Such a run is **throwaway**, and its 
 A `train` spec at a short cap (~40k steps is an hour for a recurrent arm) is the right type when the measurement
 wants stage A running beside the arms; `benchmark` turns stage A off. Pin it `"box": "desktop"`, give it a priority
 below the real batch's so it runs first, and no `runs.md` entry or `references.json` line -- the plan's gate
-section takes the numbers. **Clean it up as soon as the numbers are in the plan**: on the box, `savedPolicies/<arm>/`
-and `desktop/runs/<arm>*` for each arm (`prune_runs` or `rm` by name over ssh), and the specs can stay on `ops` in
-`done/` as the record (the user, 2026-10-25).
+section takes the numbers. **Clean it up as soon as the numbers are in the plan**, in this order (the user, 2026-10-25):
+
+1. **Take the specs off `ops` first**: `git rm` them from `queue/pending/` in the ops worktree and push. The
+   scheduler judges an arm finished by its `runs/<arm>_evals.json` reaching `max_steps`, so pruning the box's
+   runs files while the specs are still on `ops` makes the wave look un-run and it is queued again -- the b99
+   bench showed as `b99 training ... ~45m` behind b53 until its specs were removed. Then release its claim,
+   `PYTHONPATH=. python -m tools.claims release b9xx-w1`, so the pool stops showing the box holding it.
+2. **Prune the box**: `savedPolicies/<arm>/` and `desktop/runs/<arm>*` for each arm (`prune_runs` or `rm` by
+   name over ssh).
+3. **Take it off the site**: the page mirrors the `results` feed and drops what the feed deletes, but the feed
+   is a snapshot of the box's worktree index, so a deletion pushed from the laptop is undone by the next
+   publish. Delete in the worktree itself: `ssh the-claw-den 'cd ~/snek-bus/results && git rm -r -q
+   results/b9xx-stageb results/b9xx-hof5000 results/b9xx-hof30k results/<arm>...'`; the next live-pictures
+   publish (within ten minutes) commits it, and the site build after that removes the charts.
 
 ## 1c. Name the batch's reference cell for the chart viewer
 
