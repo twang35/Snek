@@ -1,14 +1,10 @@
 {
- "arms": [
-  "b99a-f1-bench-ngu-seed1",
-  "b99b-f1-bench-ngu-seed2",
-  "b99c-f1-bench-ngubeta0-seed3",
-  "b99d-f1-bench-ngubeta0-seed4"
- ],
+ "arms": [],
  "batch": "b99",
  "box": "desktop",
  "claimed_iso": "2026-10-25T14:08:03",
- "claimed_ts": 1792962483.5416825,
- "kind": "wave",
+ "kind": "released",
+ "released_iso": "2026-10-25T15:38:50",
+ "released_ts": 1792978730.193676,
  "wave": 1
 }
