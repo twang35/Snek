@@ -613,41 +613,70 @@ def wave_close_times(batch):
     return sorted(times.values())
 
 
-def arm_wall_seconds(batch, runs_dir=None):
+def arm_wall_seconds(batch, runs_dir=None, trained=None):
     """Training wall time of each of the batch's finished arms, from the `summary` of its `_evals.json` in `runs/` or
-    `runs/.live/desktop/`. What a batch's first wave measured, before there is a second close to space it against."""
+    `runs/.live/desktop/`. What a batch's first wave measured, before there is a second close to space it against.
+    `trained` is the set of arm ids the bus says reached their cap: the summary's own `finished` is the stamp of its
+    last write, not completion (b53, 2026-10-25: a live wave 12% in read as a 7.8 h wave), so without `trained`
+    nothing counts."""
     runs_dir = runs_dir or constants.RUNS_DIR
+    trained = set(trained or ())
     walls = {}
     for folder in (runs_dir, os.path.join(runs_dir, viewer_manifest.LIVE_SUBDIR)):
         for path in glob.glob(os.path.join(folder, batch + '[a-z]*_evals.json')):
+            arm = os.path.basename(path)[:-len('_evals.json')]
+            if arm not in trained:
+                continue
             try:
                 with open(path) as f:
                     summary = json.load(f).get('summary') or {}
             except (OSError, ValueError, AttributeError):
                 continue
-            if summary.get('finished') and summary.get('wall_seconds'):
-                walls[os.path.basename(path)] = summary['wall_seconds']
+            if summary.get('wall_seconds'):
+                walls[arm] = summary['wall_seconds']
     return sorted(walls.values())
 
 
-def eta(view, batch, now=None, fallback_seconds=DEFAULT_WAVE_SECONDS, runs_dir=None):
+def running_pace(batch, status):
+    """`(seconds left on the running wave, projected seconds per wave)` from a status's running arms of the batch --
+    the scheduler's own `eta_seconds`, scaled up by the fraction done -- or None when none is far enough in."""
+    best = None
+    for job in (status or {}).get('running') or []:
+        step, cap, left = job.get('step') or 0, job.get('max_steps') or 0, job.get('eta_seconds')
+        if batch_state.batch_of(job.get('id', '')) != batch or not left or step <= 0 or cap <= step:
+            continue
+        per_wave = left / (1.0 - float(step) / cap)
+        if best is None or left > best[0]:
+            best = (left, per_wave)
+    return best
+
+
+def eta(view, batch, now=None, fallback_seconds=DEFAULT_WAVE_SECONDS, runs_dir=None, status=None):
     """(remaining waves, seconds per wave, finish datetime, where the cadence came from) for a batch still training.
     With two boxes pulling, the remaining waves are what is left to claim plus what is claimed and untrained. The
     cadence is the batch's own wave-close spacing on either feed; with one wave closed it is that wave's longest arm
-    (b52's first ETA, 2026-10-03, fell back to b10's 2.5 h while its arms had taken 51 h); with none, the default."""
+    (b52's first ETA, 2026-10-03, fell back to b10's 2.5 h while its arms had taken 51 h); with only a live first
+    wave it is that wave's own pace from the status (`eta_seconds` scaled by the fraction done, and the running
+    wave counts only what it has left); with none, the default."""
     arms, _ = batch_counts(view, batch)
     remaining = -(-(arms['queued'] + arms['running']) // WAVE_ARMS)
+    now = now or pacific_now()
     closes = wave_close_times(batch)
     gaps = [b - a for a, b in zip(closes, closes[1:])]
+    trained = {arm for wave in batch_state.batch(view, batch)['waves'] for arm in wave['trained']}
     if gaps:
         per_wave, source = statistics.median(gaps), 'wave cadence'
     else:
-        walls = arm_wall_seconds(batch, runs_dir)
+        walls = arm_wall_seconds(batch, runs_dir, trained=trained)
+        pace = running_pace(batch, status)
         if walls:
             per_wave, source = walls[-1], 'first wave\'s arms'
+        elif pace:
+            left, per_wave = pace
+            finish = now + datetime.timedelta(seconds=left + max(remaining - 1, 0) * per_wave)
+            return remaining, per_wave, finish, 'running wave\'s pace'
         else:
             per_wave, source = fallback_seconds, 'default, nothing measured'
-    now = now or pacific_now()
     return remaining, per_wave, now + datetime.timedelta(seconds=remaining * per_wave), source
 
 
@@ -661,7 +690,7 @@ def state_line(view, batch, status=None):
     if text.startswith('In flight'):
         arms, _ = batch_counts(view, batch)
         if arms['queued'] or arms['running']:
-            remaining, per_wave, finish, source = eta(view, batch)
+            remaining, per_wave, finish, source = eta(view, batch, status=status)
             text += '; {0} training wave(s) left at ~{1:.1f} h each ({3}) -> ~{2:%Y-%m-%d %H:%M} PT'.format(
                 remaining, per_wave / 3600, finish, source)
     return text

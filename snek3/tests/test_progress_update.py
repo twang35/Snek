@@ -185,10 +185,11 @@ def test_eta_with_one_wave_closed_uses_its_longest_arm_not_the_default(monkeypat
     monkeypatch.setattr(pu, 'wave_close_times', lambda batch: [1000])
     live = tmp_path / '.live' / 'desktop'
     live.mkdir(parents=True)
-    for folder, arm, wall in ((tmp_path, 'b20a-x-seed1', 183869), (live, 'b20b-x-seed2', 187005)):
+    for folder, arm, wall in ((tmp_path, B20[0], 183869), (live, B20[1], 187005)):      # both trained on the bus
         (folder / (arm + '_evals.json')).write_text(json.dumps(
             {'summary': {'finished': '2026-10-03T16:45:32', 'wall_seconds': wall}}))
-    (tmp_path / 'b20c-x-seed3_evals.json').write_text(json.dumps({'summary': {'wall_seconds': 999999}}))  # unfinished
+    (tmp_path / (B20[2] + '_evals.json')).write_text(json.dumps(
+        {'summary': {'finished': '2026-10-03T16:45:32', 'wall_seconds': 999999}}))  # live: `finished` is a write stamp
     (tmp_path / 'b200a-x-seed1_evals.json').write_text(json.dumps(
         {'summary': {'finished': 'x', 'wall_seconds': 999999}}))  # another batch
     remaining, per_wave, _, source = pu.eta(VIEW, 'b20', fallback_seconds=3600, runs_dir=str(tmp_path))
@@ -393,3 +394,23 @@ def test_an_arm_whose_cap_was_raised_has_its_files_imported_again(tmp_path, monk
     assert json.loads((tmp_path / 'b52k-r2d2c51-seed11_evals.json').read_text())['summary']['step'] == 2400000
     assert (tmp_path / 'b52a-r2d2paper-seed1_evals.json').read_text() == '{"summary": {"step": 1300000}}'
     assert pu.import_closed_waves(tree, str(tmp_path)) == 0, 'without the list, an existing file is kept as before'
+
+
+def test_eta_of_a_live_first_wave_projects_from_its_own_pace_not_its_elapsed_wall(monkeypatch, tmp_path):
+    """b53, 2026-10-25: the summary's `finished` is the stamp of its last write, so a wave 12% in read as a 7.8 h wave
+    (and a 07:42 finish against the scheduler's 57 h). Only an arm the bus says is trained has a wall; a live wave's
+    cadence is the status's `eta_seconds` scaled by the fraction done."""
+    monkeypatch.setattr(pu, 'wave_close_times', lambda batch: [])
+    live = tmp_path / '.live' / 'desktop'
+    live.mkdir(parents=True)
+    (live / (B20[2] + '_evals.json')).write_text(json.dumps(
+        {'summary': {'finished': '2026-10-25T23:48:47', 'wall_seconds': 28164, 'step': 163000}}))
+    status = {'running': [{'id': B20[2], 'step': 130000, 'max_steps': 1300000, 'eta_seconds': 180000.0},
+                          {'id': 'b19zz-ref-seed1', 'step': 10, 'max_steps': 100, 'eta_seconds': 5.0}]}
+    now = datetime.datetime(2026, 10, 25, 23, 0)
+    remaining, per_wave, finish, source = pu.eta(VIEW, 'b20', now=now, fallback_seconds=3600,
+                                                 runs_dir=str(tmp_path), status=status)
+    assert source == "running wave's pace" and per_wave == 200000.0
+    assert finish == now + datetime.timedelta(seconds=180000)
+    # The live arm's 28,164 s wall is not a finished arm's: without a status it is the default, not 7.8 h.
+    assert pu.eta(VIEW, 'b20', now=now, fallback_seconds=3600, runs_dir=str(tmp_path))[1:4:2] == (3600, 'default, nothing measured')

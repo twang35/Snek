@@ -129,10 +129,10 @@ def test_the_pool_training_line_carries_what_the_batchs_labels_share_within_150_
     for i, spec in enumerate(sorted(cells.values(), key=lambda s: s['id'])):
         spec['label'] = 'b27: hist{0}, seed {1} of 4 -- wave 1 of 2'.format(4 if i < 4 else 8, i % 4 + 1)
     assert claims.pool_view(cells, [])['lines'] == ['b27 training | 8/8 arms']
-    # the whole line stays within POOL_LINE_MAX, the description ending in `...`
+    # the whole description, never cut to `...` (2026-10-25): the daemon wraps a long status line instead
     long = 'b31: ' + 'x' * 300 + ', seed 1 of 8'
     view = claims.pool_view({'b31a-x-seed1': dict(_spec('b31a-x-seed1'), label=long)}, [])
-    assert len(view['lines'][0]) <= claims.POOL_LINE_MAX and view['lines'][0].endswith('...')
+    assert 'x' * 300 in view['lines'][0] and not view['lines'][0].endswith('...')
     assert view['lines'][0].startswith('b31 training | 1/1 arms | xxx')
 
 
@@ -362,3 +362,18 @@ def test_gather_reads_the_pool_from_the_refs(bus):
     assert view['heads']['claims'] == desktop.head and view['heads']['ops']
     assert view['published'] == {} and view['running'] == {}
     assert set(view['ledger']) == set(bus['specs'])
+
+
+def test_published_ids_counts_a_job_only_once_its_json_is_on_the_feed(monkeypatch):
+    """b53, 2026-10-25: a live arm's `.md`/`.png` land in `results/<arm>/` every ten minutes, so the directory alone
+    read as a finished arm -- the batch showed trained at 12% and its ETA as 7.8 h. The `_evals.json` (an arm) or the
+    merged `_checkpoint_evals*.json` (a pass) is what the finals bring."""
+    from desktop.daemon import gitbus
+    listing = '\n'.join(['results/b53a-ngu-seed1/b53a-ngu-seed1.md', 'results/b53a-ngu-seed1/b53a-ngu-seed1.png',
+                         'results/b52a-r2d2paper-seed1/b52a-r2d2paper-seed1.png',
+                         'results/b52a-r2d2paper-seed1/b52a-r2d2paper-seed1_evals.json',
+                         'results/b52-stageb/b52a-r2d2paper-seed1_checkpoint_evals.json'])
+    monkeypatch.setattr(gitbus, 'ref_head', lambda repo, ref: 'abc')
+    monkeypatch.setattr(gitbus, '_git', lambda args, cwd, **kw: listing)
+    ids = claims.published_ids(repo='.', remote='origin', feeds={'desktop': 'results'}, fetch=False)
+    assert ids == {'b52a-r2d2paper-seed1': 'desktop', 'b52-stageb': 'desktop'}

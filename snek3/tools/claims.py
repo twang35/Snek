@@ -289,7 +289,7 @@ def ledger(specs, records, published, running):
     return view
 
 
-POOL_LINE_MAX = 150      # a pool line with its description; the user reads status.json in a terminal
+POOL_LINE_MAX = 150      # the old cut-off; kept as the name tests and docs used, no longer applied (2026-10-25)
 
 
 def batch_description(batch_specs):
@@ -312,15 +312,13 @@ def batch_description(batch_specs):
     return shared
 
 
-def with_description(line, description, limit=POOL_LINE_MAX):
-    """`line | description`, the description shortened with `...` so the whole stays under `limit`."""
+def with_description(line, description, limit=None):
+    """`line | description`, whole. Until 2026-10-25 the description was shortened with `...` to keep the line
+    under `POOL_LINE_MAX`; the daemon now breaks a long status line into continuation entries instead
+    (`desktop.daemon.daemon.wrap_lines`), so nothing is cut and the reader sees the whole message. `limit`
+    is accepted and ignored for the callers that passed it."""
     if not description:
         return line
-    room = limit - len(line) - len(' | ')
-    if room < 8:
-        return line
-    if len(description) > room:
-        description = description[:room - 3].rstrip(' ,-') + '...'
     return line + ' | ' + description
 
 
@@ -595,7 +593,10 @@ def claim_next(store, box, wave_size, has_checkpoints=default_has_checkpoints, r
 # ---------------------------------------------------------------- the feeds and statuses
 
 def published_ids(repo=REPO, remote=REMOTE, feeds=FEEDS, fetch=True):
-    """Every job id on either results feed: `results/<job-id>/` directories. `fetch` pulls the feeds first."""
+    """Every *finished* job id on either results feed: a `results/<job-id>/` directory holding a `.json` -- an arm's
+    `_evals.json`, a pass's merged files. A live arm's pictures (`.md`, `.png`, every ten minutes) land in the same
+    directory before its finals, so the directory alone is not the signal: b53's first wave read as trained at 12%
+    and its ETA as 7.8 h (2026-10-25). `fetch` pulls the feeds first."""
     ids = {}
     for box, feed in feeds.items():
         if fetch:
@@ -603,11 +604,11 @@ def published_ids(repo=REPO, remote=REMOTE, feeds=FEEDS, fetch=True):
         ref = '{0}/{1}'.format(remote, feed)
         if not gitbus.ref_head(repo, ref):
             continue
-        listing = gitbus._git(['ls-tree', '--name-only', ref, 'results/'], cwd=repo)
+        listing = gitbus._git(['ls-tree', '-r', '--name-only', ref, 'results/'], cwd=repo)
         for line in listing.splitlines():
-            name = line.strip().split('/')[-1]
-            if name:
-                ids[name] = box
+            parts = line.strip().split('/')
+            if len(parts) == 3 and parts[2].endswith('.json'):
+                ids[parts[1]] = box
     return ids
 
 
