@@ -651,19 +651,31 @@ def running_pace(batch, status):
     return best
 
 
+def remaining_waves(state):
+    """Training waves still to run for a batch: every claimed wave with an arm short of its cap, plus the unclaimed
+    arms in waves of the size the batch's claims came in (`max_trainers` on ops decides that, and it is 4 for a
+    heavy head: b53, 2026-10-26, read as one wave left while its 4 live and 4 unclaimed arms were two waves of 4, so
+    the finish was a wave early). With no claim yet, waves of `WAVE_ARMS`."""
+    open_waves = sum(1 for wave in state['waves'] if len(wave['trained']) < len(wave['arms']))
+    sizes = [len(wave['arms']) for wave in state['waves']]
+    wave_size = max(sizes) if sizes else WAVE_ARMS
+    return open_waves + -(-len(state['unclaimed']) // wave_size)
+
+
 def eta(view, batch, now=None, fallback_seconds=DEFAULT_WAVE_SECONDS, runs_dir=None, status=None):
     """(remaining waves, seconds per wave, finish datetime, where the cadence came from) for a batch still training.
-    With two boxes pulling, the remaining waves are what is left to claim plus what is claimed and untrained. The
+    With two boxes pulling, the remaining waves are `remaining_waves`: what is claimed and untrained plus what is
+    left to claim, in waves of the size the claims came in. The
     cadence is the batch's own wave-close spacing on either feed; with one wave closed it is that wave's longest arm
     (b52's first ETA, 2026-10-03, fell back to b10's 2.5 h while its arms had taken 51 h); with only a live first
     wave it is that wave's own pace from the status (`eta_seconds` scaled by the fraction done, and the running
     wave counts only what it has left); with none, the default."""
-    arms, _ = batch_counts(view, batch)
-    remaining = -(-(arms['queued'] + arms['running']) // WAVE_ARMS)
+    state = batch_state.batch(view, batch)
+    remaining = remaining_waves(state)
     now = now or pacific_now()
     closes = wave_close_times(batch)
     gaps = [b - a for a, b in zip(closes, closes[1:])]
-    trained = {arm for wave in batch_state.batch(view, batch)['waves'] for arm in wave['trained']}
+    trained = {arm for wave in state['waves'] for arm in wave['trained']}
     if gaps:
         per_wave, source = statistics.median(gaps), 'wave cadence'
     else:

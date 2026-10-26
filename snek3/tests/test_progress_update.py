@@ -174,7 +174,7 @@ def test_eta_uses_the_fallback_cadence_when_nothing_is_measured(monkeypatch, tmp
     monkeypatch.setattr(pu, 'wave_close_times', lambda batch: [])
     now = datetime.datetime(2026, 9, 3, 12, 0)
     remaining, per_wave, finish, source = pu.eta(VIEW, 'b20', now=now, fallback_seconds=3600, runs_dir=str(tmp_path))
-    assert remaining == 1 and per_wave == 3600 and finish == now + datetime.timedelta(hours=1)
+    assert remaining == 2 and per_wave == 3600 and finish == now + datetime.timedelta(hours=2)
     assert source.startswith('default')
     monkeypatch.setattr(pu, 'wave_close_times', lambda batch: [0, 7200, 14400])
     assert pu.eta(VIEW, 'b20', now=now, runs_dir=str(tmp_path))[1:4:2] == (7200, 'wave cadence')
@@ -206,7 +206,7 @@ def test_state_line_reads_wave_by_wave_across_the_boxes(monkeypatch):
     assert pu.state_line(VIEW, 'b19').startswith('Closed: w1 laptop closed')
     line = pu.state_line(VIEW, 'b20', {'running': [{'id': B20[2], 'step': 4, 'max_steps': 10}]})
     assert line.startswith('In flight: w1 desktop closed, w2 laptop training (0 of 1 at cap, live at 40%), 1 arm unclaimed; ')
-    assert '1 training wave(s) left' in line
+    assert '2 training wave(s) left' in line, 'w2 live on the laptop, and one arm unclaimed is a wave of its own'
     assert pu.state_line(_view([], []), 'b99').startswith('b99: not on ops')
 
 
@@ -411,6 +411,21 @@ def test_eta_of_a_live_first_wave_projects_from_its_own_pace_not_its_elapsed_wal
     remaining, per_wave, finish, source = pu.eta(VIEW, 'b20', now=now, fallback_seconds=3600,
                                                  runs_dir=str(tmp_path), status=status)
     assert source == "running wave's pace" and per_wave == 200000.0
-    assert finish == now + datetime.timedelta(seconds=180000)
+    assert finish == now + datetime.timedelta(seconds=180000 + 200000), 'what the live wave has left, then the unclaimed wave'
     # The live arm's 28,164 s wall is not a finished arm's: without a status it is the default, not 7.8 h.
     assert pu.eta(VIEW, 'b20', now=now, fallback_seconds=3600, runs_dir=str(tmp_path))[1:4:2] == (3600, 'default, nothing measured')
+
+
+def test_remaining_waves_counts_the_unclaimed_in_waves_of_the_claimed_size():
+    """b53, 2026-10-26: `max_trainers` 4 on ops, four arms live and four unclaimed -- two waves of 4, not one of 8 --
+    and the ETA put the batch's finish a whole wave early."""
+    b53 = ['b53%s-ngu-seed%d' % (c, i + 1) for i, c in enumerate('abcd')] + \
+          ['b53%s-ngubeta0-seed%d' % (c, i + 5) for i, c in enumerate('efgh')]
+    view = _view([_train(p) for p in b53],
+                 [{'kind': 'wave', 'batch': 'b53', 'wave': 1, 'box': 'desktop', 'arms': b53[:4]}],
+                 running={p: 'desktop' for p in b53[:4]})
+    state = pu.batch_state.batch(view, 'b53')
+    assert pu.remaining_waves(state) == 2
+    assert pu.remaining_waves(pu.batch_state.batch(VIEW, 'b20')) == 2, 'one live wave of one, one arm unclaimed'
+    # Nothing claimed yet: the unclaimed arms in waves of the default size.
+    assert pu.remaining_waves(pu.batch_state.batch(_view([_train(p) for p in b53], []), 'b53')) == 1
