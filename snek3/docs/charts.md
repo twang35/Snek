@@ -38,7 +38,7 @@ on why the arms stopped opening it, and [`findings.md`](findings.md) on the thre
 | **r2d2paper** (reference) | 1,238 | 50.4% | 62.8 6.2 61.9 10.3 | 113 | 100.0 | 98.17 (97.1-99.0) | 56.4 | 0.06% | 11.29% | 18.1% |
 
 <!-- reading -->
-Wave 1 (a-d, the `ngu` paper cell) is 29% in at 372k steps after ~44 h on the desktop, ~42 h left on the wave and the β=0
+Wave 1 (a-d, the `ngu` paper cell) is 29% in at 372k steps after ~17.5 h on the desktop, ~42 h left on the wave and the β=0
 control (e-h) still to claim, so the batch clears ~Fri 2026-10-30 afternoon PT, not Wednesday. Read it against `b52a-d`
 (`r2d2paper`), the same R2D2 core without the intrinsic reward and mixtures. **The 12% reading is reversed.** The onset was
 slower, as the prediction had it, but between 330k and 373k the four `ngu` traces hold a greedy perfect-game rate of 89-97%
