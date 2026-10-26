@@ -976,7 +976,8 @@ def test_the_pool_is_read_every_network_cycle_and_published_whole(tmp_path, monk
     assert env['PYTHONPATH'] == daemon.host['SNEK_DIR'] and env['SNEK_BOX'] == 'desktop'
     status = bus.status[-1]
     assert status['at_a_glance']['pool'] == POOL['lines']
-    assert status['at_a_glance']['attention'] == pool['attention']
+    # published wrapped to the page width (`wrap_glance`), whole
+    assert status['at_a_glance']['attention'] == daemon_module.wrap_lines(pool['attention'])
     assert status['ledger'] == POOL['ledger']
     assert status['pool']['held'] == POOL['held'] and status['pool']['heads'] == POOL['heads']
     daemon.poll_once(git=False)
@@ -1142,9 +1143,9 @@ def test_restart_true_forces_it_and_a_failed_deploy_is_attention_never_a_restart
     record = daemon.ledger['deploy-4']
     assert record['state'] == 'failed' and record['rc'] == 3 and 'restart' not in record
     assert not daemon.stop
-    assert bus.status[-1]['at_a_glance']['attention'] == [
+    assert bus.status[-1]['at_a_glance']['attention'] == daemon_module.wrap_lines([
         '** deploy-4 failed: deploy exited 3: snek3/runs/b1a_evals.json differs from the commit; '
-        'nothing touched. Nothing was changed; fix it and queue a new id.']
+        'nothing touched. Nothing was changed; fix it and queue a new id.'])
 
 
 def test_a_restart_action_runs_even_under_a_pause_and_a_done_one_is_not_repeated(tmp_path, monkeypatch):
@@ -1158,3 +1159,23 @@ def test_a_restart_action_runs_even_under_a_pause_and_a_done_one_is_not_repeated
     again.spawn = Spawns()
     again.poll_once(git=True)
     assert not again.stop and again.restart_requested is None
+
+
+def test_a_long_status_line_is_wrapped_into_continuation_entries_not_cut():
+    """user, 2026-10-25: the b99 bench's queued line read `... 4 ngu arms with the w... (4 arms) | ~45m`. Every
+    published line fits a terminal page and a long one continues on indented entries, whole."""
+    label = 'F1 desktop bench (ngu), 40k steps ~1 h: rate and RSS of 4 ngu arms with the workers up, before b53'
+    line = 'b99 training | {0} (4 arms) | ~45m'.format(label)
+    wrapped = daemon_module.wrap_lines([line, 'short'], width=60)
+    assert wrapped[-1] == 'short' and len(wrapped) > 2
+    assert all(len(entry) <= 60 for entry in wrapped)
+    assert wrapped[0].startswith('b99 training |') and all(e.startswith(daemon_module.CONTINUATION) for e in wrapped[1:-1])
+    assert ' '.join(e.strip() for e in wrapped[:-1]) == line          # nothing lost, nothing shortened
+    # The glance: every list wrapped, strings and None untouched; the default width fits a page.
+    glance = daemon_module.wrap_glance({'pool': [line], 'desktop_remaining': '~1h', 'laptop_iso': None}, width=60)
+    assert len(glance['pool']) > 1 and glance['desktop_remaining'] == '~1h' and glance['laptop_iso'] is None
+    assert 80 <= daemon_module.STATUS_LINE_MAX <= 120
+    # `build_at_a_glance` no longer cuts a label at 80 characters.
+    out = daemon_module.build_at_a_glance([], [{'id': 'b99a-f1-bench-ngu-seed1', 'type': 'train', 'policy': 'p'}],
+                                          {'b99': label})
+    assert label in out['queued'][0] and '...' not in out['queued'][0]

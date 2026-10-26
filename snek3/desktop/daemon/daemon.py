@@ -486,7 +486,7 @@ class Daemon(object):
             'iso': time.strftime('%Y-%m-%dT%H:%M:%S'),
             'ts': time.time(),
             'project': 'snek3',
-            'at_a_glance': with_laptop(glance, laptop_text),
+            'at_a_glance': wrap_glance(with_laptop(glance, laptop_text)),
             'scheduler': {'alive': alive, 'pid': self.state.get('scheduler_pid'),
                           'spawned': self.state.get('spawned'), 'last_exit': self.state.get('last_exit'),
                           'log': self.state.get('scheduler_log'),
@@ -739,8 +739,7 @@ def build_at_a_glance(running, queued_order, labels, held_by=(), attention=(), n
         label = describe_jobs(jobs) or labels.get(batch) or ''
         if not label:
             return ''
-        label = to_ascii(label)
-        return ' | ' + (label if len(label) <= 80 else label[:77] + '...')
+        return ' | ' + to_ascii(label)      # whole: `wrap_glance` breaks a long line, nothing is cut
 
     def arms(jobs):
         """"N arms", counted in **distinct policies**, not in jobs."""
@@ -795,6 +794,43 @@ def build_at_a_glance(running, queued_order, labels, held_by=(), attention=(), n
     return {'running': running_lines, 'queued': queued_lines, 'attention': list(attention),
             'remaining': remaining_text(totals['running'], totals['queued'],
                                         time.time() if now is None else now, partial=partial)}
+
+
+STATUS_LINE_MAX = int(os.environ.get('SNEK_STATUS_LINE_MAX', '100'))
+CONTINUATION = '    '
+
+
+def wrap_lines(lines, width=None):
+    """Each line of `lines` at most `width` characters: a longer one is broken at spaces into continuation
+    entries indented `CONTINUATION`, so a reader of `status.json` in a terminal sees the whole message
+    without scrolling and nothing is shortened to `...` (user, 2026-10-25: the b99 bench's description
+    read `rate and RSS of 4 ngu arms with the w...`). The first entry keeps its own start, so a filter
+    on `startswith` (`** paused`, `** queue`) still sees it. A word longer than the width stands alone."""
+    width = width or STATUS_LINE_MAX
+    out = []
+    for line in lines:
+        text = str(line)
+        if len(text) <= width:
+            out.append(text)
+            continue
+        first, room = True, width
+        words, current = text.split(' '), ''
+        for word in words:
+            candidate = word if not current else current + ' ' + word
+            if len(candidate) <= room or not current:
+                current = candidate
+                continue
+            out.append(current if first else CONTINUATION + current)
+            first, room = False, width - len(CONTINUATION)
+            current = word
+        if current:
+            out.append(current if first else CONTINUATION + current)
+    return out
+
+
+def wrap_glance(glance, width=None):
+    """`glance` with every list of lines wrapped (`wrap_lines`); strings and None pass through."""
+    return {key: wrap_lines(value, width) if isinstance(value, list) else value for key, value in glance.items()}
 
 
 LAPTOP_KEYS = ('laptop_running', 'laptop_queued', 'laptop_remaining', 'laptop_iso')
