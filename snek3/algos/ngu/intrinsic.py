@@ -62,6 +62,7 @@ class EpisodicMemory(object):
     so the two compute the same r^i; the quantisation (2^-11 relative) is far under the clustering distance ξ."""
 
     GROW = 256
+    CHUNK_BYTES = 4 << 20    # a query's float32 working block; well under glibc's 32 MB mmap ceiling
 
     def __init__(self, lanes, capacity, dim, k, device='cpu'):
         self.lanes, self.capacity, self.dim, self.k = int(lanes), int(capacity), int(dim), int(k)
@@ -103,9 +104,17 @@ class EpisodicMemory(object):
         if span == 0:
             inf = torch.full((m, self.k), float('inf'), device=self.device)
             return inf, torch.zeros(m, device=self.device)
-        stored = self.keys[rows, :span].to(torch.float32)                      # (m, span, dim)
         query = keys.to(torch.float16).to(torch.float32)                         # as it will be stored
-        d = ((stored - query.unsqueeze(1)) ** 2).sum(dim=-1)                   # (m, span)
+        d = torch.empty((m, span), dtype=torch.float32, device=self.device)
+        # In blocks of lanes, each row's arithmetic unchanged, so the result is bit-identical to one pass. One pass
+        # built (m, span, dim) float32 temporaries -- ~250 MB a step at a shard's 1,024 lanes -- which glibc serves
+        # by mmap and returns by munmap, so the kernel zeroed a fresh GB a step: on the desktop's 16 NGU shards
+        # 57% of the CPU was page faults (perf, 2026-11-04). Blocks under CHUNK_BYTES come from the reused heap.
+        block = max(1, self.CHUNK_BYTES // (span * self.dim * 4))
+        for lo in range(0, m, block):
+            hi = min(m, lo + block)
+            stored = self.keys[rows[lo:hi], :span].to(torch.float32)              # (block, span, dim)
+            d[lo:hi] = ((stored - query[lo:hi].unsqueeze(1)) ** 2).sum(dim=-1)
         slot = torch.arange(span, device=self.device).unsqueeze(0)
         d = torch.where(slot < count.unsqueeze(1), d, torch.full_like(d, float('inf')))
         kk = min(self.k, span)

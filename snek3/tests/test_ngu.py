@@ -169,6 +169,38 @@ def test_the_memory_grows_in_steps_without_changing_what_a_query_returns():
     assert small.allocated == 2 * grow and big.allocated == 4 * grow
 
 
+def _one_pass_nearest(memory, rows, keys):
+    """The query's distances as one (m, span, dim) pass -- the pre-2026-11-04 code, the reference the blocks match."""
+    rows = torch.as_tensor(np.asarray(rows, dtype=np.int64))
+    count = memory.count[rows]
+    span = int(count.max())
+    stored = memory.keys[rows, :span].to(torch.float32)
+    query = keys.to(torch.float16).to(torch.float32)
+    d = ((stored - query.unsqueeze(1)) ** 2).sum(dim=-1)
+    slot = torch.arange(span).unsqueeze(0)
+    d = torch.where(slot < count.unsqueeze(1), d, torch.full_like(d, float('inf')))
+    return torch.topk(d, min(memory.k, span), dim=1, largest=False).values
+
+
+@pytest.mark.parametrize('chunk_bytes', [1, 3 * 40 * 8 * 4, 1 << 30])
+def test_the_query_in_lane_blocks_is_bit_identical_to_one_pass(monkeypatch, chunk_bytes):
+    # 1 byte forces one lane a block, the middle a ragged last block (3 lanes a block over 10), 1 GB one block.
+    # Lanes hold different counts, so the padding to the longest lane is exercised inside every block.
+    monkeypatch.setattr(intrinsic.EpisodicMemory, 'CHUNK_BYTES', chunk_bytes)
+    lanes, dim, k = 10, 8, 4
+    memory = intrinsic.EpisodicMemory(lanes, 64, dim, k)
+    rng = np.random.default_rng(3)
+    for step in range(40):
+        rows = [r for r in range(lanes) if step < 4 * (r + 1)]     # lane r stops storing after 4(r+1) keys
+        keys = torch.as_tensor(rng.normal(size=(len(rows), dim)).astype(np.float32))
+        memory.insert(rows, keys)
+    rows = list(range(lanes))[::-1]                                  # out of order, as the engine's rows arrive
+    keys = torch.as_tensor(rng.normal(size=(lanes, dim)).astype(np.float32))
+    expected = _one_pass_nearest(memory, rows, keys)
+    nearest, _ = memory.query(rows, keys)
+    assert torch.equal(nearest, expected)
+
+
 def test_the_lifelong_factor_is_one_before_statistics_and_clipped_to_the_cap():
     err = torch.tensor([0.0, 1.0, 100.0])
     assert torch.equal(intrinsic.lifelong_factor(err, torch.tensor(0.0), torch.tensor(0.0), 5.0), torch.ones(3))
