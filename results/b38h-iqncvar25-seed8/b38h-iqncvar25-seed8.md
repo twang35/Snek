@@ -1,0 +1,85 @@
+# b38h-iqncvar25-seed8
+
+step **2,000,000** · 2000 evals · trailing **88.55** · peak **93.47** @1,096,000 · sef **0.0** · best30 **66.4** @999,000
+
+## Config
+
+| | |
+|---|---|
+| adam_epsilon | 1e-07 |
+| algo | iqn |
+| batch_size | 128 |
+| beta_anneal_steps | 300000 |
+| collect_envs | 1 |
+| discount | 0.99 |
+| dist_atoms | 51 |
+| dist_embedding | 64 |
+| dist_fraction_entropy | 0.001 |
+| dist_fraction_lr | 2.5e-09 |
+| dist_kappa | 1.0 |
+| dist_policy_samples | 32 |
+| dist_quantiles | 32 |
+| dist_risk_alpha | 0.25 |
+| dist_risk_train | True |
+| dist_tau_prime_samples | 8 |
+| dist_tau_samples | 8 |
+| dist_v_max | 110.0 |
+| dist_v_min | -10.0 |
+| epsilon_anneal_steps | 250000 |
+| epsilon_schedule | eval |
+| eval_interval | 1000 |
+| eval_queue | True |
+| eval_queue_depth | 16 |
+| eval_workers | 8 |
+| fc_layers | (320,) |
+| fork_branches | 4 |
+| fork_max_steps | 60 |
+| fork_min_length | 85 |
+| fork_prob | 0.5 |
+| gradient_clipping | 0.0 |
+| graph_eval_episodes | 100 |
+| guided_fraction | 0.8 |
+| init_from | None |
+| initial_collect_steps | 2000 |
+| initial_epsilon | 0.4 |
+| is_beta | 0.4 |
+| is_beta_final | 1.0 |
+| is_weights | True |
+| learning_rate | 1e-05 |
+| max_steps | 2000000 |
+| min_checkpoint_score | 40.0 |
+| min_epsilon | 0.002 |
+| munchausen_alpha | 0.0 |
+| munchausen_l0 | -1.0 |
+| munchausen_tau | 0.03 |
+| n_step_update | 1 |
+| priority_exponent | 0.6 |
+| replay_buffer_max_length | 100000 |
+| replay_ratio | 1.0 |
+| seed | 8 |
+| target_update_period | 8 |
+| target_update_tau | 1.0 |
+| torch_threads | 1 |
+
+![b38h-iqncvar25-seed8](b38h-iqncvar25-seed8.png)
+
+## Evals
+
+| step | avg score | trailing avg | min score | max score | avg reward | perfect % | epsilon |
+|---|---|---|---|---|---|---|---|
+| 1000 | 0.66 | 0.66 | 0.0 | 4.0 | 0.107 | 0.0 | 0.4 |
+| 2000 | 0.62 | 0.64 | 0.0 | 5.0 | 0.067 | 0.0 | 0.4 |
+| 3000 | 0.75 | 0.68 | 0.0 | 4.0 | 0.196 | 0.0 | 0.4 |
+| ... | ... | ... | ... | ... | ... | ... | ... |
+| 1989000 | 88.4 | 88.89 | 65.0 | 95.0 | 112.151 | 28.0 | 0.00597 |
+| 1990000 | 87.78 | 88.85 | 65.0 | 95.0 | 108.432 | 25.0 | 0.00605 |
+| 1991000 | 89.42 | 88.87 | 68.0 | 95.0 | 119.386 | 34.0 | 0.00608 |
+| 1992000 | 89.01 | 88.85 | 73.0 | 95.0 | 115.799 | 31.0 | 0.00613 |
+| 1993000 | 87.99 | 88.82 | 64.0 | 95.0 | 109.621 | 26.0 | 0.00614 |
+| 1994000 | 88.04 | 88.8 | 60.0 | 95.0 | 110.666 | 27.0 | 0.00616 |
+| 1995000 | 87.85 | 88.75 | 67.0 | 95.0 | 107.337 | 24.0 | 0.00621 |
+| 1996000 | 88.77 | 88.75 | 73.0 | 95.0 | 112.467 | 28.0 | 0.00624 |
+| 1997000 | 88.87 | 88.74 | 66.0 | 95.0 | 120.881 | 36.0 | 0.00631 |
+| 1998000 | 87.02 | 88.67 | 61.0 | 95.0 | 107.583 | 25.0 | 0.00634 |
+| 1999000 | 87.99 | 88.63 | 67.0 | 95.0 | 105.414 | 22.0 | 0.0063 |
+| 2000000 | 86.54 | 88.55 | 68.0 | 95.0 | 98.823 | 17.0 | 0.00636 |
