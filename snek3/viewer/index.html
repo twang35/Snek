@@ -325,30 +325,43 @@
   // view, the hash and an open zoom survive -- and the charts follow through `src()`'s `?v=generated`.
   // Visible means the tab is showing on a lit screen, whichever app has focus -- so a viewer beside the
   // terminal refreshes, and a background tab, a minimised window or a dark display does not (focus was
-  // the first test, and it missed the side-by-side case). Hidden at :00: nothing is fetched; the reload
-  // happens when the page is next shown, if a slot went by. A timer cannot keep the laptop awake.
-  var REFRESH_MS = 10 * 60 * 1000, pending = false;
+  // the first test, and it missed the side-by-side case). Hidden at :00: nothing is fetched.
+  //
+  // Coming back is judged by the clock, not by a flag the timer sets (user, 2026-11-20): Chrome suspends
+  // a long-hidden tab, and a frozen tab's timer never runs to set a flag, while a discarded tab is
+  // reloaded from the HTTP cache without revalidating, so the `<script src="manifest.js">` above hands
+  // back the manifest it had when it was suspended. So: one cache-busted fetch on every page load, and
+  // one whenever the page is shown or thawed more than a minute after the last fetch. A fetch that
+  // brings the same `generated` redraws nothing. A timer cannot keep the laptop awake.
+  var REFRESH_MS = 10 * 60 * 1000, WAKE_MS = 60 * 1000, lastFetch = 0, fetching = false;
   function refresh() {
-    pending = false;
+    if (fetching) return;
+    fetching = true; lastFetch = Date.now();
     var tag = document.createElement('script');
     tag.src = 'manifest.js?v=' + Date.now();
     tag.onload = function () {
-      M = window.SNEK_MANIFEST || M; RUNS = M.charts_dir || RUNS;
+      fetching = false; tag.remove();
+      var next = window.SNEK_MANIFEST || M;
+      if (next.generated === M.generated) return;
+      M = next; RUNS = M.charts_dir || RUNS;
       index(); render();
       var lb = $('lightbox');
       if (lb.style.display === 'flex') { var img = lb.querySelector('img'), open = current.filter(function (a) { return a.policy === img.alt; })[0]; if (open) img.src = src(open); }
-      tag.remove();
     };
-    tag.onerror = function () { tag.remove(); };
+    tag.onerror = function () { fetching = false; lastFetch = 0; tag.remove(); };   // retried on the next wake
     document.head.appendChild(tag);
   }
   function tick() {
-    if (document.visibilityState === 'visible') refresh(); else pending = true;
+    if (document.visibilityState === 'visible') refresh();
     schedule();
   }
   function schedule() { setTimeout(tick, REFRESH_MS - (Date.now() % REFRESH_MS) + 1000); }   // one second past :00
-  document.addEventListener('visibilitychange', function () { if (pending && document.visibilityState === 'visible') refresh(); });
+  function wake() { if (document.visibilityState === 'visible' && Date.now() - lastFetch > WAKE_MS) refresh(); }
+  document.addEventListener('visibilitychange', wake);
+  document.addEventListener('resume', wake);          // thawed after a freeze (Page Lifecycle)
+  window.addEventListener('pageshow', wake);          // restored from the back/forward cache
   schedule();
+  refresh();                                          // the load itself may have come from a stale cache
 })();
 </script>
 </body>
