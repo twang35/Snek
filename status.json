@@ -1,6 +1,6 @@
 {
-  "iso": "2026-11-20T20:51:03",
-  "ts": 1795236663.184639,
+  "iso": "2026-11-20T21:01:05",
+  "ts": 1795237265.1161618,
   "project": "snek3",
   "at_a_glance": {
     "pool": [
@@ -11,7 +11,7 @@
     ],
     "desktop_queued": [],
     "attention": [],
-    "desktop_remaining": "~65h of work: 65h running; clear ~Mon 13:54",
+    "desktop_remaining": "~65h of work: 65h running; clear ~Mon 14:08",
     "laptop_running": [],
     "laptop_queued": [],
     "laptop_remaining": null,
@@ -23,7 +23,7 @@
     "spawned": 1792962472.4094677,
     "last_exit": null,
     "log": "/home/claw/.snek3-daemon/logs/scheduler-20261025-140752.log",
-    "status_iso": "2026-11-20T20:48:37"
+    "status_iso": "2026-11-20T20:58:41"
   },
   "runtime": {
     "max_trainers": 4,
@@ -54,7 +54,7 @@
       ],
       "step": null,
       "max_steps": null,
-      "eta_seconds": 234323.10804459223,
+      "eta_seconds": 234608.5383300362,
       "box": "desktop"
     }
   ],
@@ -3627,8 +3627,8 @@
       ]
     },
     "status_ages": {
-      "desktop": 462.48998284339905,
-      "laptop": 4412409.680015087
+      "desktop": 492.59460496902466,
+      "laptop": 4413015.449608803
     },
     "heads": {
       "claims": "b56938de88c16a95a0f96eb26840d7955e48006a",
@@ -3638,15 +3638,15 @@
   "disk_free_gb": 98.2,
   "head": "847c62c37f23",
   "site": {
-    "iso": "2026-11-20T20:51:03",
+    "iso": "2026-11-20T21:01:05",
     "ok": true,
-    "seconds": 110.8,
+    "seconds": 106.9,
     "note": "site: 865 arms, 2432 charts (1 copied, 0 removed); 0 feed file(s) flattened, 1 local file(s) overlaid; pushed",
     "forced": false
   },
   "load_avg": [
-    16.87158203125,
-    16.62109375,
-    16.63916015625
+    17.1396484375,
+    16.845703125,
+    16.6845703125
   ]
 }
