@@ -17,6 +17,15 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### NGU's intrinsic reward costs density here; what lifts NGU over R2D2 is everything else it changes
+
+b53 (closed 2026-11-23, `docs/results.md`). NGU as its paper has it against its own β = 0 control, 4 seeds each, 130k updates. The
+control is above `ngu` on every seed at stage B (89.5-95.0% of rows ≥98% against 83.1-86.1%, Mann-Whitney p = 0.029), with 173
+against 56 full rows ≥99.8% at 5,000 games and 60 against 23 at 30,000. Both are far above b52's R2D2 paper cell (50.4%) at the same
+update count, so the gain is in the Retrace target, the mixture inputs and the optimiser values that moved with them, not in
+exploration -- those moved together and are not separated. **Not established:** a new record. `b53a` @617000's 29,979 /30,000 is
+the highest selected count yet but is a picked maximum on seed 7, z ≈ 1.6 from the record's 29,967.
+
 ### R2D2 with a C51 head reaches the PPO record, and its memory is most of its edge over a dense control
 
 b52 (closed 2026-10-09, `docs/results.md`). R2D2 as its paper has it (LSTM 512, burn-in 40, 80-step loss windows, PER, Ape-X ladder,

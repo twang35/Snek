@@ -22,6 +22,47 @@ whose published artifacts are history, and the daemon's ledger, whose keys are t
 waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
 
 
+<!-- progress_update: batch b53 -->
+## Batch b53 — the `knob` sweep, 2 values x 4 seeds, 1M, closed 2026-11-23
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b52a-r2d2paper-seed1, b52b-r2d2paper-seed2, b52c-r2d2paper-seed3, b52d-r2d2paper-seed4`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| knob | rows | ≥98%/500 | per-seed share | ≥99.2 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| ngu | 3,526 | 84.5% | 84.7 86.1 83.1 84.2 | 1556 | 100.0 | 99.70 (99.6-99.8) | 78.4 | 0.1% | 1.39% | 61.0% |
+| ngubeta0 | 4,255 | 92.4% | 89.5 94.8 95.0 90.0 | 2489 | 100.0 | 99.78 (99.7-99.8) | 91.5 | 0.12% | 1.08% | 76.5% |
+| **r2d2paper** (reference) | 1,238 | 50.4% | 62.8 6.2 61.9 10.3 | 113 | 100.0 | 98.17 (97.1-99.0) | 56.4 | 0.06% | 11.29% | 18.1% |
+
+<!-- reading -->
+
+**The β=0 control beats `ngu` at every depth but the single best row, so the intrinsic term costs density and buys nothing.**
+Read `ngubeta0` against `ngu` first, then both against r2d2paper. At stage B every control seed (89.5-95.0% of rows ≥98%) is above
+every `ngu` seed (83.1-86.1%), and both are far above r2d2paper's 50.4% with its two seeds that never arrived. The passes agree: at
+5,000 games the control holds 173 full rows ≥99.8% (42, 72, 50, 9 by seed) against `ngu`'s 56 (33, 13, 9, 1), and at 30,000 games
+60 full rows ≥99.8% (12, 27, 19, 2) against 23 (21, 1, 0, 1) -- `ngu`'s depth is one seed, the control's is three. The exception is
+the top: `b53a` @617000 is **29,979 /30,000**, the highest 30k count any arm has posted (record 29,967; `b52k`'s best selected rows
+29,970), with @607000 and @621000 at 29,969 and 29,968 beside it; the control's best is `b53f` @657000 at 29,975. Both are selected
+maxima on seed 7 and not distinguishable from the record (z ≈ 1.6), so neither is a record until a fresh-seed re-measure. What the
+table does not settle is *which* of the things that moved from b52 lifts both cells -- the Retrace target, the mixture inputs, the
+target period, Adam ε, IS 0 -- since they moved together.
+
+<!-- /reading -->
+
+### Every arm
+
+| arm | knob | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b53a-ngu-seed1` | ngu | 883 | 84.7% | 367 | 100.0 | 99.7 @0.6M | 78.4 | 0.48% |
+| `b53b-ngu-seed2` | ngu | 839 | 86.1% | 416 | 100.0 | 99.8 @1.0M | 76.0 | 0.1% |
+| `b53c-ngu-seed3` | ngu | 913 | 83.1% | 369 | 100.0 | 99.6 @0.6M | 82.4 | 0.09% |
+| `b53d-ngu-seed4` | ngu | 891 | 84.2% | 404 | 100.0 | 99.7 @1.0M | 76.8 | 0.0% |
+| `b53e-ngubeta0-seed5` | ngubeta0 | 1013 | 89.5% | 578 | 100.0 | 99.8 @0.5M | 92.2 | 0.17% |
+| `b53f-ngubeta0-seed6` | ngubeta0 | 1066 | 94.8% | 667 | 100.0 | 99.8 @0.3M | 89.6 | 0.08% |
+| `b53g-ngubeta0-seed7` | ngubeta0 | 1141 | 95.0% | 732 | 100.0 | 99.8 @1.1M | 91.5 | 0.17% |
+| `b53h-ngubeta0-seed8` | ngubeta0 | 1035 | 90.0% | 512 | 100.0 | 99.7 @0.5M | 92.8 | 0.0% |
+
+<!-- /progress_update: batch b53 -->
+
 <!-- progress_update: batch b52 -->
 ## Batch b52 — the `knob` sweep, 3 values x 4 seeds, 2M, closed 2026-10-09
 
