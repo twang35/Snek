@@ -23,8 +23,8 @@ b53 (closed 2026-11-23, `docs/results.md`). NGU as its paper has it against its 
 control is above `ngu` on every seed at stage B (89.5-95.0% of rows ≥98% against 83.1-86.1%, Mann-Whitney p = 0.029), with 173
 against 56 full rows ≥99.8% at 5,000 games and 60 against 23 at 30,000. Both are far above b52's R2D2 paper cell (50.4%) at the same
 update count, so the gain is in the Retrace target, the mixture inputs and the optimiser values that moved with them, not in
-exploration -- those moved together and are not separated. **Not established:** a new record. `b53a` @617000's 29,979 /30,000 is
-the highest selected count yet but is a picked maximum on seed 7, z ≈ 1.6 from the record's 29,967.
+exploration -- those moved together and are not separated. **The top row held on a fresh seed.** `b53a` @617000's 29,979 /30,000 was a picked maximum on seed 7, z ≈ 1.6 from the record's
+29,967. Re-measured 2026-11-24 on seed 13 (desktop, 30,000 each): `b53a` @617000 **29,979 again** (different failures: 15 deaths + 6 starves against 14 + 7), 59,958 pooled against the record `b32g`'s 59,924 (z = 3.1) and `b52k`'s 59,927 (z = 2.9); `b53f` @657000 fell to 29,962, 59,937 pooled, not distinguishable from the record (z = 1.1). **Not promoted** (the user, 2026-11-24).
 
 ### R2D2 with a C51 head reaches the PPO record, and its memory is most of its edge over a dense control
 

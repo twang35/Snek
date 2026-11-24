@@ -14,8 +14,9 @@ are in git history before 2026-09-10.
 ## Open
 
 - **Group F, exploration** (F1 = b53, **closed 2026-11-23**). The intrinsic term costs density against its own β = 0 control, and
-  both cells beat b52's paper cell by a wide margin. Open, and the user's call: (1) a seed-13 re-measure of `b53a` @617000 (29,979 /30k
-  selected, record 29,967) and `b53f` @657000 (29,975) before either is a record; (2) F2 (Agent57) -- its gate, F1 showing a cost, is
+  both cells beat b52's paper cell by a wide margin. Open, and the user's call: (1) whether to promote `b53a` @617000 -- 29,979 /30k on seed 7 and
+  29,979 again on seed 13 (2026-11-24), above the record on both seeds pooled (z = 3.1); `b53f` @657000 fell 29,975 to 29,962 and ties it.
+  Nothing is promoted until the user says so; (2) F2 (Agent57) -- its gate, F1 showing a cost, is
   met, but a bandit over β can at best find β = 0; (3) which of NGU's changes around R2D2 (Retrace, mixture inputs, target period,
   Adam ε, IS 0) carries the gain over b52a-d. Nothing is queued on either box.
 - **Group E, memory** (b51 closed 2026-10-03, b52 closed 2026-10-09; **the group closed 2026-10-25**, user: no seed wave on the c51
@@ -190,8 +191,8 @@ board because the observation's history bits would hand the inverse-dynamics cla
 against 84.5% of rows ≥98%, complete separation) and holds 60 full 30k rows ≥99.8% over three seeds against `ngu`'s 23, 21 of them
 one seed's. The surprise is that both cells are far above b52's paper cell (50.4%, two seeds never arriving) at the same 130k
 updates, so the gain is in what NGU changes around R2D2 -- Retrace, the mixture inputs, target period, Adam ε, IS 0 -- not in
-exploration. `b53a` @617000 posted 29,979 /30k, the highest selected count yet; it needs a fresh-seed re-measure before it means
-anything. It changes the plan: F2's gate (F1 showing a cost) is met, but the cost says a β bandit can at best learn β = 0.
+exploration. `b53a` @617000 posted 29,979 /30k, the highest selected count yet; re-measured on seed 13 (2026-11-24) it read
+29,979 again, above the record pooled (z = 3.1), and is not promoted yet. It changes the plan: F2's gate (F1 showing a cost) is met, but the cost says a β bandit can at best learn β = 0.
 
 ## b52 — R2D2: the paper's recurrent value agent, its feed-forward control and its C51 head
 
