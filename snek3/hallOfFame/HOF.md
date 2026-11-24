@@ -13,12 +13,13 @@ nothing.
 All admitted on 30,000 fresh episodes at **seed 7** — a seed the selecting pass never used; `b5h` and
 `b6b` on 2026-09-01, `b9ch` and the two `b10ck` checkpoints on 2026-09-03, `b17cl` on 2026-09-06, `b27t` and `b27k` (the first move-history
 entries) on 2026-09-09, `b32g` (the first warm start) on 2026-09-13, `b52k` (the first value-based entry, and the first with
-memory -- R2D2 with a C51 head) on 2026-10-12. Add one with the
+memory -- R2D2 with a C51 head) on 2026-10-12, `b53a` (the first NGU entry, and the record) on 2026-11-24. Add one with the
 [`hof-promote`](../skills/hof-promote/SKILL.md) skill.
 
 | entry | algo / net | confirmed **/30,000** | 95% CI | selected at | drop |
 |---|---|---|---|---|---|
-| **`b32g-warm-b28n-185926k-seed7-ckpt62423040`** | PPO, `fc 320`, 4 epochs, move history 8, **warm-started from `b28n` @185925632 (a 200M `hist8` hold, 29,940 /30k) and annealed γ and λ 0.999 → 1.0 over 50M** | **99.89%** (29967) | [99.8, 99.9] | 99.8 /5000 | +0.09 pp |
+| **`b53a-ngu-seed1-ckpt617000`** | **NGU** (`SNEK_ALGO=ngu`, β_max 0.3): R2D2's LSTM 512 core after `fc 320` with the mixture one-hot, the previous action and both previous rewards as inputs, 32 (β, γ) mixtures one per lane, episodic k-NN × RND intrinsic reward on the board, transformed Retrace λ 0.95, move history 8, 61.7k updates -- **the first entry trained with an intrinsic reward** | **99.93%** (29979) | [99.9, 100.0] | 99.9 /5000 | +0.03 pp |
+| `b32g-warm-b28n-185926k-seed7-ckpt62423040` | PPO, `fc 320`, 4 epochs, move history 8, **warm-started from `b28n` @185925632 (a 200M `hist8` hold, 29,940 /30k) and annealed γ and λ 0.999 → 1.0 over 50M** | **99.89%** (29967) | [99.8, 99.9] | 99.8 /5000 | +0.09 pp |
 | `b52k-r2d2c51-seed11-ckpt1795000` | **R2D2 + C51 head** (`SNEK_ALGO=r2d2`, `SNEK_R2D2_HEAD=c51`, rescaling off): LSTM 512 after `fc 320` with the previous action and reward as inputs, dueling 512 streams, move history 8, the Ape-X ε ladder over 32 lanes, 180k updates -- **the first value-based entry** | **99.89%** (29967) | [99.8, 99.9] | 99.8 /5000 | +0.09 pp |
 | `b27t-hist8-seed20-ckpt85065728` | PPO, `fc 320`, 4 epochs, b24's λ/γ anneal, step penalty 0.01, **move history 8** (26+16 values) | **99.81%** (29944) | [99.8, 99.9] | 99.8 /5000 | +0.01 pp |
 | `b27k-hist4-seed11-ckpt77889536` | PPO, `fc 320`, 4 epochs, b24's λ/γ anneal, step penalty 0.01, **move history 4** (26+8 values) | **99.81%** (29942) | [99.8, 99.9] | 99.9 /5000 | −0.09 pp |
@@ -46,9 +47,12 @@ distance to the shortcut reference is the part of their speed that is not explai
 `b10ck`'s gifs below put the undiscounted record-holder at 2,774-3,727, slower than either. The finding and the commands are in
 [`docs/findings.md`](../docs/findings.md) (2026-09-16); the measurement is `runs/fixed-path.json`.
 
-`b52k` @1795000 and `b32g` @62423040 are **not distinguishable**: 29,967 against 29,967 on seed 7 (z = 0), 29,960 against
+`b53a` @617000 leads both former record holders, and the lead is the fresh seed's: 29,979 against 29,967 on seed 7 is not a
+separation by itself (z = 1.6, p = 0.10), but a second 30,000 on seed 13 read 29,979 again against `b32g`'s 29,957 (z = 2.7,
+p = 0.006) and `b52k`'s 29,960 (z = 2.4, p = 0.015), and pooled over the 60,000 it is 59,958 against 59,924 (z = 3.1, p = 0.002)
+and 59,927 (z = 2.9, p = 0.004). `b52k` @1795000 and `b32g` @62423040 are **not distinguishable**: 29,967 against 29,967 on seed 7 (z = 0), 29,960 against
 29,957 on a second 30,000 at seed 13 (z = 0.3, p = 0.74), 59,927 against 59,924 pooled over the 60,000 (p = 0.81) -- the two
-families hold the ceiling jointly on the counts, and `b32g` keeps the record's title as the incumbent. `b52k` leads `b27t`
+families held the ceiling jointly on the counts until `b53a`, with `b32g` keeping the title as the incumbent. `b52k` leads `b27t`
 @85065728 by 0.08 pp (z = 2.4, p = 0.015). `b32g` @62423040 leads `b27t` @85065728 by 0.08 pp (z = 2.4, p = 0.015) and `b27k` @77889536 by 0.08 pp (z = 2.6, p = 0.009) — a modest margin on the one count, carried by its basin (its section, below) and by a second 30,000 on seed 13 that read 29,957. `b27t` @85065728 and `b27k` @77889536 are **not distinguishable from each other** (z = 0.19, p = 0.85): two arms, two
 history depths, one rate, admitted as a pair. Each leads `b10ck` @30523392 by 0.16 pp (`b27t` z = 3.9, p < 1e-4; `b27k`
 z = 3.8, p = 0.0002), so the record moved. Below them: `b10ck` @30523392 leads `b9ch` by 0.35 pp (z = 5.9, p < 1e-8); the two `b10ck` entries are 16,384
@@ -76,7 +80,31 @@ batch's densest with `clipannealhold80` (24.3 and 23.5% of stage-B rows ≥98%, 
 
 The copy was verified from `hallOfFame/` at 500 episodes on seed 11: 496/500.
 
-## Tied with the record: `b52k` @1795000, 99.89% over 30,000 episodes — 2026-10-12
+## ‡ The record: `b53a` @617000, 99.93% over 30,000 episodes — 2026-11-24
+
+**The first NGU entry, and the first row to beat the 29,967 ceiling on fresh episodes.** b53 (`docs/runs.md`) ran NGU as its paper
+has it -- R2D2's recurrent core with the mixture one-hot and both previous rewards into the cell, 32 (β, γ) mixtures, an episodic
+k-NN × RND intrinsic reward computed on the board, transformed Retrace -- against its own β = 0 control. Seed 1 of the `ngu` cell
+is the arm, at 617,000 of 1.3M steps (61.7k of 130k learner updates). The protocol found it end to end: 883 checkpoints screened
+into stage B at 500 episodes, 367 re-measured at 5,000 (`hof5000`, desktop; this one 4,995), 114 sent to 30,000 on seed 7
+(`hof30k`, desktop, 21 holding the 99.8 track to the end), where it read **29,979** -- the maximum of those 21. A picked maximum
+should fall on a fresh seed, as `b52k`'s two 29,970s did (to 29,954 and 29,942); on **seed 13** (desktop, 2026-11-24, 30,000) it
+read **29,979 again**, on different games (15 deaths and 6 starves against 14 and 7), 59,958 pooled against `b32g`'s 59,924 and
+`b52k`'s 59,927 on the same two seeds. **It is the record on the pooled count** (z = 3.1 and 2.9, the ordering paragraph); on
+seed 7 alone it would be a tie. **The basin is the plateau, not above it**: its 20 full-30k neighbours, all in 427k-635k, average
+29,950 (99.83, the same as `b32g`'s and `b52k`'s regions), none under 29,937, eight at or above 29,950, with @607000 and @621000
+at 29,969 and 29,968 beside it; its 150 full `hof5000` neighbours average 99.64. So this is the best checkpoint of a region that is
+otherwise at the old ceiling, admitted on the strength of the second seed rather than the basin. Across the `ngu` cell's 23 full
+30k rows the 5,000 → 30,000 drop was +0.04 pp. Two cautions that belong with the number: the record is one seed deep (the cell's
+other three arms hold 2 full 30k rows between them), and the batch's own result is that the β = 0 control is the better *cell* --
+60 full 30k rows ≥99.8% over three seeds against 23 -- whose best row, `b53f` @657000, read 29,975 on seed 7 and 29,962 on seed 13
+and is not admitted.
+
+The copy was verified from `hallOfFame/` at 500 episodes on seed 11: 499/500. The `arch.json` era is `obs26-20260907-hist8`
+(42 values) with `algo: ngu`, a `recurrent` block and the `conditioning` and `intrinsic` blocks; `watch.py`, `evaluate.py` and
+`record_gif.py` take the `hallOfFame/` path with nothing set by hand.
+
+## Tied with the previous record: `b52k` @1795000, 99.89% over 30,000 episodes — 2026-10-12
 
 **The first value-based entry, the first with memory, and the first from outside PPO.** b52 (`docs/runs.md`) ran R2D2 as its
 paper has it -- an LSTM 512 after the `fc 320` trunk with the previous action and reward as inputs, stored states and burn-in,
@@ -100,7 +128,9 @@ The copy was verified from `hallOfFame/` at 500 episodes on seed 11: 499/500. Th
 (42 values) with a `recurrent` block, so it measures through `algos/stateful.StatefulPolicy`; `watch.py`, `evaluate.py` and
 `record_gif.py` take the `hallOfFame/` path with nothing set by hand.
 
-## ‡ The record: `b32g` @62423040, 99.89% over 30,000 episodes — 2026-09-13
+## ‡ The previous record: `b32g` @62423040, 99.89% over 30,000 episodes — 2026-09-13
+
+**`b32g` held the record from 2026-09-13 to 2026-11-24**, jointly with `b52k` on the counts from 2026-10-12; what follows is as written when it was admitted.
 
 **The first entry from a warm start, and the first row above the 99.82 ceiling.** b32 (`docs/runs.md`) took b28's eight
 best /30k checkpoints — `hist8` arms held at their converged values for 200M — and started a fresh 100M arm from each
@@ -263,7 +293,7 @@ Captured with [`record_gif.py`](../record_gif.py) straight off the offscreen sur
 game step at 50 fps, snek2's settings (`--tile 20 --colors 32`, game seeds 1, 2, 3), so the two eras'
 folders read alike. **The number under each is its confirmed rate from the table above, not anything
 the recording shows** — three games settle nothing about a rate. 200x247, 61-202 s, 1.5-5.3 MB
-(**30.2 MB for the section**, the two references included), reproducible: the policy is greedy and food placement is the only
+(**32.3 MB for the section**, the two references included), reproducible: the policy is greedy and food placement is the only
 randomness, so the same command gives the same bytes.
 
 ```
@@ -272,8 +302,9 @@ PYTHONPATH=. python -u record_gif.py hallOfFame/<entry> --tile 20 --colors 32 --
 
 | recording | what to watch for |
 |:--|:--|
-| ![b32g](gifs/b32g-warm-b28n-185926k-seed7-ckpt62423040.gif)<br>**`b32g-warm-b28n-185926k-seed7`** @62423040<br>**99.89% /30,000** — the record | **A `b28n` policy with 62M more transitions on an undiscounted horizon.** Three perfect games of 839-1,016 steps, the shortest in the folder — shorter than `b27t`'s 1,014-1,027 and a quarter of `b10ck`'s, even though its γ is the same 1.0 that made `b10ck` slow: the anneal reached 1.0 from a policy that already routed directly, and the routes stayed. Watch the fill against `b27t`: the same tight sweeps, fewer detours. |
-| ![b52k](gifs/b52k-r2d2c51-seed11-ckpt1795000.gif)<br>**`b52k-r2d2c51-seed11`** @1795000<br>**99.89% /30,000** — tied with the record | **The first value-based policy in the folder, and the first that carries a memory.** Three perfect games of 976-1,339 steps: a little longer than `b32g`'s 839-1,016 and in `b27t`'s range. Watch the mid game against `b32g`: the same tight sweeps, but it takes the occasional longer loop before committing to a fill, which is where the extra steps go. |
+| ![b53a](gifs/b53a-ngu-seed1-ckpt617000.gif)<br>**`b53a-ngu-seed1`** @617000<br>**99.93% /30,000** — the record | **The first policy here trained with an intrinsic reward, and the second that carries a memory.** Three perfect games of 1,173-1,481 steps: longer than `b32g`'s 839-1,016 and at or past the top of `b52k`'s 976-1,339, so the highest rate in the folder is not its most direct route. Watch it against `b52k`, the other recurrent value agent: the same tight fills, with more and longer holding loops before it commits. |
+| ![b32g](gifs/b32g-warm-b28n-185926k-seed7-ckpt62423040.gif)<br>**`b32g-warm-b28n-185926k-seed7`** @62423040<br>**99.89% /30,000** — the previous record | **A `b28n` policy with 62M more transitions on an undiscounted horizon.** Three perfect games of 839-1,016 steps, the shortest in the folder — shorter than `b27t`'s 1,014-1,027 and a quarter of `b10ck`'s, even though its γ is the same 1.0 that made `b10ck` slow: the anneal reached 1.0 from a policy that already routed directly, and the routes stayed. Watch the fill against `b27t`: the same tight sweeps, fewer detours. |
+| ![b52k](gifs/b52k-r2d2c51-seed11-ckpt1795000.gif)<br>**`b52k-r2d2c51-seed11`** @1795000<br>**99.89% /30,000** — tied with the previous record | **The first value-based policy in the folder, and the first that carries a memory.** Three perfect games of 976-1,339 steps: a little longer than `b32g`'s 839-1,016 and in `b27t`'s range. Watch the mid game against `b32g`: the same tight sweeps, but it takes the occasional longer loop before committing to a fill, which is where the extra steps go. |
 | ![b27t](gifs/b27t-hist8-seed20-ckpt85065728.gif)<br>**`b27t-hist8-seed20`** @85065728<br>**99.81% /30,000** — the previous record | **The first policy here that can see its own last eight turns.** Three perfect games of 1,014-1,027 steps — as direct as `b9ch`'s routes and a third of `b10ck`'s length, at a higher rate than either. Watch the late game against `b10ck`: it fills the board in tight sweeps rather than long circuits. |
 | ![b27k](gifs/b27k-hist4-seed11-ckpt77889536.gif)<br>**`b27k-hist4-seed11`** @77889536<br>**99.81% /30,000** | Four turns of history instead of eight, a different arm and seed, and indistinguishable at depth (z = 0.19). Games of 969-1,040 steps; set beside `b27t` the two read as one style, which is the claim the table makes. |
 | ![b10ck @30523392](gifs/b10ck-g100-seed3-ckpt30523392.gif)<br>**`b10ck-g100-seed3`** @30523392<br>**99.65% /30,000** | **The undiscounted policy is slow.** Its three perfect games run 2,774-3,727 steps against 1,081-1,329 for the three discounted entries: with γ 1.00 a reward later is worth exactly a reward now, so the critic has no reason to prefer the short way to the food, and the policy settles into long safe circuits. It also holds the record — the safety that costs it speed is the same thing that wins it games. `avg_steps` is not in the eval tables; it should be. |

@@ -1,0 +1,39 @@
+{
+  "algo": "ngu",
+  "conditioning": {
+    "beta_max": 0.3,
+    "gamma_min": 0.99,
+    "gamma_top": 0.997,
+    "mixtures": 32,
+    "split": "none"
+  },
+  "fc_layer_params": [
+    320
+  ],
+  "head": {
+    "type": "scalar"
+  },
+  "intrinsic": {
+    "cluster_distance": 0.008,
+    "embed_dim": 32,
+    "embed_hidden": 128,
+    "input": "board",
+    "kernel_epsilon": 0.0001,
+    "knn_k": 10,
+    "lifelong_max": 5.0,
+    "max_similarity": 8.0,
+    "memory": 30000,
+    "pseudo_count": 0.001,
+    "rnd_hidden": 128,
+    "rnd_out": 128
+  },
+  "num_actions": 3,
+  "obs_era": "obs26-20260907-hist8",
+  "obs_len": 42,
+  "recurrent": {
+    "hidden": 512,
+    "prev_input": true,
+    "stream_width": 512,
+    "type": "lstm"
+  }
+}

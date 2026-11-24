@@ -45,8 +45,9 @@ every `ngu` seed (83.1-86.1%), and both are far above r2d2paper's 50.4% with its
 5,000 games the control holds 173 full rows ≥99.8% (42, 72, 50, 9 by seed) against `ngu`'s 56 (33, 13, 9, 1), and at 30,000 games
 60 full rows ≥99.8% (12, 27, 19, 2) against 23 (21, 1, 0, 1) -- `ngu`'s depth is one seed, the control's is three. The exception is
 the top: `b53a` @617000 is **29,979 /30,000**, the highest 30k count any arm has posted (record 29,967; `b52k`'s best selected rows
-29,970), with @607000 and @621000 at 29,969 and 29,968 beside it; the control's best is `b53f` @657000 at 29,975. Both are selected
-maxima on seed 7 and not distinguishable from the record (z ≈ 1.6), so neither is a record until a fresh-seed re-measure. What the
+29,970), with @607000 and @621000 at 29,969 and 29,968 beside it; the control's best is `b53f` @657000 at 29,975. Both were selected
+maxima on seed 7; re-measured on seed 13 (2026-11-24) `b53a` @617000 read 29,979 again and is in the hall of fame as the record
+(59,958 pooled against `b32g`'s 59,924, z = 3.1), while `b53f` @657000 fell to 29,962. What the
 table does not settle is *which* of the things that moved from b52 lifts both cells -- the Retrace target, the mixture inputs, the
 target period, Adam ε, IS 0 -- since they moved together.
 <!-- /reading -->
