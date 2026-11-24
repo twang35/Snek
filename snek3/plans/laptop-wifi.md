@@ -58,8 +58,9 @@ router or the laptop is changed.
 
 **Next, in order.** (1) Wait for one capture, toggling only after the notification. (2) If it says power
 save: turn Low Power Mode off (`sudo pmset -a powermode 0`) and see whether episodes stop. (3) If it says
-host: repeat with GlobalProtect disconnected. (4) Either way, pin the laptop to the 6 GHz SSID or use
-Ethernet at the desk, and read the router's own client table during an episode. The older steps below still
+host: repeat with GlobalProtect disconnected. (4) Either way, read the router's own client table during an episode; Ethernet at
+the desk is the certain workaround. **6 GHz is out** (the user, 2026-11-24: its range is too short to be
+useful), so the fix has to work on 5 GHz. The older steps below still
 stand as fallbacks.
 
 ## Symptom
@@ -101,6 +102,10 @@ driver (Qualcomm WCN785x, Wi‑Fi 7), not by being an older client. Two aggravat
 with the machine in swap are the likely trigger for the link to fall into the bad state in the first place.
 
 ## Steps, in order
+
+**Superseded in part, 2026-11-24:** step 1 (6 GHz) and the recommendation built on it are withdrawn — the
+user does not want the 6 GHz network because it does not reach far enough. Steps 2 onward stand as
+fallbacks behind the 2026-11-24 plan above.
 
 Each step is one change, then wait for the next occurrence (a few hours of normal use) before the next.
 
