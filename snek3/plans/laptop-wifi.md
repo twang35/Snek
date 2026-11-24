@@ -43,6 +43,19 @@ notification that it is safe to toggle. Each capture answers the open question d
 | `ping_gw_slow.txt` vs `ping_gw.txt` | 1/s against 10/s: more loss when the radio is allowed to idle points at power save |
 | `wifi_log.txt` and `watch.log` | the onset to within 20 s, and what the driver logged then |
 
+**When it goes bad (the user's part).**
+
+1. Do not toggle Wi‑Fi yet. Wait for the "Wi‑Fi fault recorded" notification, about two minutes after the
+   link degrades (the capture itself takes ~90 s).
+2. No notification after three minutes: `tail -3 ~/wifi-diag/watch.log`. No fresh lines means the recorder
+   is not running (it does not survive a reboot or logout): start it with
+   `nohup ~/wifi-diag/wifi_watch.sh >/dev/null 2>&1 &`, wait two minutes, then continue.
+3. Toggle Wi‑Fi, and tell the agent a capture exists. It reads `~/wifi-diag/captures/<stamp>/` and the
+   onset time in `watch.log`.
+
+One capture decides between the two open candidates; a second episode confirms it before anything on the
+router or the laptop is changed.
+
 **Next, in order.** (1) Wait for one capture, toggling only after the notification. (2) If it says power
 save: turn Low Power Mode off (`sudo pmset -a powermode 0`) and see whether episodes stop. (3) If it says
 host: repeat with GlobalProtect disconnected. (4) Either way, pin the laptop to the 6 GHz SSID or use
