@@ -6,6 +6,49 @@ happens every few hours, usually during heavy Claude Code plus training activity
 `git fetch`, a stalled `rsync` to the desktop and a timed-out auto-mode classifier all look like from
 inside a session. This page is the evidence, what was ruled out, and the steps to try, in order.
 
+## 2026-11-24 episode: the Mac's radio layer does not see the loss
+
+**Status: root cause not proven. The 6 GHz move did not stick (the laptop was back on channel 153), and the
+fault recurred there. A recorder now captures the next episode automatically.**
+
+| measured (all times PT) | bad state, ~14:17–15:40 | after the Wi‑Fi toggle, 15:41 |
+|---|---|---|
+| ping to the router, 10/s | 30.5% of 600 lost, in 100–600 ms runs with no period; RTT 4–113 ms, mean 35 | 0 of 300 lost; RTT 3–22 ms, mean 5 |
+| channel, RSSI | 153 / 80 MHz, ‑50 to ‑57 dBm | the same |
+| driver: transmit retries / failures | 20–30% / ~0 | 25–35% / 0 |
+| driver: received frames marked retry | 2–4% | 2–3% |
+| driver: beacons received | 99% | 99% |
+| load, power | load 2–3, on battery, `powermode 1` (Low Power Mode, set for AC too) | the same |
+
+The driver's 5‑second link records (`log show`, `LQM: rssi=`) are **the same in both states**, so the lost
+packets are not failing as radio frames the Mac can count. They vanish either inside the router's
+per-client state or in the Mac between the driver and the IP stack. The September reading ("802.11ax
+feature interaction") is neither confirmed nor excluded by this.
+
+| candidate | standing | evidence |
+|---|---|---|
+| router holds the laptop's frames as if it were asleep (power-save state out of step) | **leading, unproven** | RTT spreads up to one beacon interval (102 ms); loss without frame failures; cleared only by re-association; other clients fine |
+| Mac host path (GlobalProtect network extension, Skywalk) dropping above the driver | open | not tested in the bad state; the kernel-counter test in the recorder settles it |
+| channel contention on 153 | not the cause | channel busy 18–25% in both states; 294 neighbour beacons per 5 s is an aggravation only |
+| AWDL, Bluetooth, background scans, CPU load | ruled out | AWDL 0 packets; no Bluetooth device connected, 0% airtime; one 7.7 s Duo Desktop scan only; load 2–3 |
+
+**The recorder.** `~/wifi-diag/wifi_watch.sh` (read-only, outside the repo) pings the router every 20 s into
+`~/wifi-diag/watch.log`; on two bad checks in a row it writes `~/wifi-diag/captures/<stamp>/` and posts a
+notification that it is safe to toggle. Each capture answers the open question directly:
+
+| file | what it decides |
+|---|---|
+| `counters_before/after.txt` vs `ping_gw.txt` | kernel echo replies counted vs replies `ping` received: equal to sent = lost above the driver (host); equal to received = lost at or below the radio |
+| `ping_self.txt`, `ping_desktop.txt`, `desktop_view.txt` | host stack alone; another client through the same router; the other side's view |
+| `ping_gw_slow.txt` vs `ping_gw.txt` | 1/s against 10/s: more loss when the radio is allowed to idle points at power save |
+| `wifi_log.txt` and `watch.log` | the onset to within 20 s, and what the driver logged then |
+
+**Next, in order.** (1) Wait for one capture, toggling only after the notification. (2) If it says power
+save: turn Low Power Mode off (`sudo pmset -a powermode 0`) and see whether episodes stop. (3) If it says
+host: repeat with GlobalProtect disconnected. (4) Either way, pin the laptop to the 6 GHz SSID or use
+Ethernet at the desk, and read the router's own client table during an episode. The older steps below still
+stand as fallbacks.
+
 ## Symptom
 
 | what | value in the bad state | value after a Wi‑Fi toggle, same load |
