@@ -53,10 +53,22 @@ every packet, so it is a fair first single change. Baseline is an episode roughl
 11-25 06:54) and "every few hours" in September. Read `~/wifi-diag/watch.log`: two clear days suggests it
 helped, an episode with QoS on rules it out. Change nothing else on the router meanwhile.
 
+**Router wireless settings (the user, 2026-11-25):** TWT off, OFDMA / MU‑MIMO off, Smart Connect off,
+**Airtime Fairness on**. That removes the September suspects (OFDMA, MU‑MIMO, steering) and leaves one
+feature that matches the measurements: Airtime Fairness is a per-client scheduler inside the router that
+budgets each client's transmit time, so a client it has throttled loses packets in proportion to their
+airtime (large ones first), has the survivors delayed in a queue, and shows clean radio statistics on its
+own side. **Leading candidate, not proven.**
+
+**Experiment 2, recommended in place of experiment 1: Airtime Fairness off, QoS back to off** (so exactly
+one setting differs from the configuration that produced the episodes). Two clear days in
+`~/wifi-diag/watch.log` supports it; an episode with it off rules it out. If the user keeps QoS on as
+well, a clean result cannot be attributed to either.
+
 **Next, in order.**
 
-1. **Still unknown on the router:** the on/off state of Airtime Fairness, OFDMA, MU‑MIMO, Smart Connect
-   and MLO, and the laptop's row in the client table during an episode.
+1. **Still unknown on the router:** MLO on or off, and the laptop's row in the client table during an
+   episode.
 2. **Router settings that act per client, one at a time:** any QoS / device priority / bandwidth limit /
    parental or security profile on the laptop; airtime fairness; OFDMA and MU‑MIMO; Smart Connect and
    multi-link. Update the firmware first if one is offered.
