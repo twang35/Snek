@@ -33,11 +33,14 @@ host-path candidate is ruled out.
 **The Wi‑Fi log shows nothing at the onset** (one routine auto-join retry 30 s earlier, which runs every
 8 minutes). The cause is not visible from the laptop.
 
+**The router** is a TP‑Link Archer BE600 (tri-band BE9700, Wi‑Fi 7), firmware 1.3.8 Build 20261119
+rel.16680. The build date is newer than the fault (first diagnosed 2026-09-04), so that firmware did not
+introduce it and has not fixed it.
+
 **Next, in order.**
 
-1. **Router side, during or right after an episode** (needs the admin login): model and firmware version;
-   the system log around the onset; this client's row in the client table. The login page was last
-   modified 2026-11-19, so check whether the firmware changed that day.
+1. **Router side, during or right after an episode** (needs the admin login): the system log around the
+   onset, and this client's row in the client table.
 2. **Router settings that act per client, one at a time:** any QoS / device priority / bandwidth limit /
    parental or security profile on the laptop; airtime fairness; OFDMA and MU‑MIMO; Smart Connect and
    multi-link. Update the firmware first if one is offered.
