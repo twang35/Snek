@@ -37,10 +37,26 @@ host-path candidate is ruled out.
 rel.16680. The build date is newer than the fault (first diagnosed 2026-09-04), so that firmware did not
 introduce it and has not fixed it.
 
+**The router's system log (saved 09:41 PT) records nothing about Wi‑Fi clients at all**, so it neither
+confirms nor contradicts the reading above: no line at the 06:54 onset or at the 11-24 episode. What it
+does give:
+
+| fact | from the log |
+|---|---|
+| last router boot | about 2026-11-23 03:02 PT (boot lines stamped with the default clock, then the first real timestamp). Both episodes came within 1.5–2.5 days of a fresh boot, so this is not a long-uptime fault |
+| clients | 11, all on Wi‑Fi |
+| HomeShield | no paid profile; its traffic-inspection (DPI) services were running until 09:37 |
+| QoS | off since boot; **turned on by the user at 09:37:09 PT, 2026-11-25**, no rules set. Turning it on stopped the DPI services |
+
+**Experiment 1, running: QoS on (no rules), from 09:37 PT 2026-11-25.** It changes how the router handles
+every packet, so it is a fair first single change. Baseline is an episode roughly daily (11-24 ~14:00,
+11-25 06:54) and "every few hours" in September. Read `~/wifi-diag/watch.log`: two clear days suggests it
+helped, an episode with QoS on rules it out. Change nothing else on the router meanwhile.
+
 **Next, in order.**
 
-1. **Router side, during or right after an episode** (needs the admin login): the system log around the
-   onset, and this client's row in the client table.
+1. **Still unknown on the router:** the on/off state of Airtime Fairness, OFDMA, MU‑MIMO, Smart Connect
+   and MLO, and the laptop's row in the client table during an episode.
 2. **Router settings that act per client, one at a time:** any QoS / device priority / bandwidth limit /
    parental or security profile on the laptop; airtime fairness; OFDMA and MU‑MIMO; Smart Connect and
    multi-link. Update the firmware first if one is offered.
