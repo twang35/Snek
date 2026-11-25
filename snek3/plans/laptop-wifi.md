@@ -6,6 +6,49 @@ happens every few hours, usually during heavy Claude Code plus training activity
 `git fetch`, a stalled `rsync` to the desktop and a timed-out auto-mode classifier all look like from
 inside a session. This page is the evidence, what was ruled out, and the steps to try, in order.
 
+## 2026-11-25 episode: the loss is inside the router
+
+**Status: located, not yet explained. The packets are lost in the router's handling of this one client;
+what puts the router into that state is unknown.** Onset 06:54:37–06:54:58 PT (the recorder's 20 s
+resolution), on AC power, load 2, 15 h into the association made by the 15:41 toggle the day before. It
+stayed bad for over two hours without a toggle. Four captures plus a live run agree:
+
+| test (bad state) | result | what it says |
+|---|---|---|
+| kernel echo replies counted vs replies `ping` got, 200 sent | 141 vs 140 | nothing is lost above the driver: GlobalProtect and the host stack are cleared |
+| ping to the laptop's own address | 0% lost | same |
+| ping to the desktop vs to the router | 18–44% vs 18–32% | every path through the router, not the router's own CPU |
+| 1,400-byte vs 64-byte pings, 10/s | 50–88% vs 18–32% lost | loss grows steeply with packet size |
+| 1,400-byte vs 32-byte pings, 1 every 1.1 s (live) | 72% vs 0% of 40 | the same, at its cleanest |
+| driver during those large pings | `txFail=0`; received frames marked retry 1–8%; beacons 99% | every frame the laptop sent was acknowledged by the router, and the router was not retrying frames at the laptop |
+| round trip | 40–100 ms typical, up to 670 ms | packets that survive are being held somewhere |
+| ssh / scp to the desktop | hang for minutes | TCP is unusable at this loss on full-size segments |
+
+A frame the laptop sent and the router acknowledged, whose reply never comes back and was never retried
+over the air, was dropped or held inside the router. Loss that scales with packet size while the radio
+statistics stay clean reads as a queue or limiter working in bytes on this client's traffic, not as radio
+errors. The power-save reading of 2026-11-24 does not explain the size dependence and is demoted; the
+host-path candidate is ruled out.
+
+**The Wi‑Fi log shows nothing at the onset** (one routine auto-join retry 30 s earlier, which runs every
+8 minutes). The cause is not visible from the laptop.
+
+**Next, in order.**
+
+1. **Router side, during or right after an episode** (needs the admin login): model and firmware version;
+   the system log around the onset; this client's row in the client table. The login page was last
+   modified 2026-11-19, so check whether the firmware changed that day.
+2. **Router settings that act per client, one at a time:** any QoS / device priority / bandwidth limit /
+   parental or security profile on the laptop; airtime fairness; OFDMA and MU‑MIMO; Smart Connect and
+   multi-link. Update the firmware first if one is offered.
+3. **A router reboot instead of a laptop toggle, once:** if a reboot alone clears the laptop's bad state,
+   that confirms the state lives in the router.
+4. Ethernet at the desk remains the certain workaround; a watchdog that re-associates on detection is the
+   automatic one.
+
+The recorder's `counters` parsing in the first captures reads 0 (a parsing slip in the summary, the raw
+files are right), and its desktop check now has a 45 s limit after hanging a capture for 25 minutes.
+
 ## 2026-11-24 episode: the Mac's radio layer does not see the loss
 
 **Status: root cause not proven. The 6 GHz move did not stick (the laptop was back on channel 153), and the
