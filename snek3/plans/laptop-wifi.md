@@ -65,6 +65,13 @@ one setting differs from the configuration that produced the episodes). Two clea
 `~/wifi-diag/watch.log` supports it; an episode with it off rules it out. If the user keeps QoS on as
 well, a clean result cannot be attributed to either.
 
+**Experiment 2 running.** The recorder logged the link down 10:38:34–10:40:14 PT 11-25, read as the
+router applying the Airtime Fairness change (the user confirmed it is off; QoS state not confirmed).
+Check at 15:51 PT, 5 h 10 m in: no episode, 0 checks at ≥15% loss of ~940, 8 with any loss, average
+round trip 4.7–6.2 ms per hour, 1,400 B pings 0/50 lost. **Not yet evidence:** the hours before the
+06:54 onset looked the same, and episodes were 15–17 h apart. First meaningful read is the morning of
+11-26; the verdict is two clear days (to ~10:40 PT 11-27).
+
 **Next, in order.**
 
 1. **Still unknown on the router:** MLO on or off, and the laptop's row in the client table during an
