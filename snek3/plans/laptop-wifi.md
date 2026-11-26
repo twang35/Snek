@@ -77,6 +77,11 @@ round trip 4.7–6.2 ms per hour, 1,400 B pings 0/50 lost. **Not yet evidence:**
 15–17 h gap between the earlier episodes, so it is the first real support for Airtime Fairness as the
 cause; one more clear day completes the test. QoS state still not confirmed.
 
+**15:15 PT 11-26: the laptop left the house**, still clean at 28.5 h (0 bad checks of 4,621). The
+recorder now logs `away gw=<ip>` and never captures unless the gateway's hardware address is the home
+router's (`HOME_MAC` in `wifi_watch.sh`; restarted, pid in `watch.pid`). The two-day clock counts only
+hours at home, so the verdict moves later by the time away.
+
 **Next, in order.**
 
 1. **Still unknown on the router:** MLO on or off, and the laptop's row in the client table during an
