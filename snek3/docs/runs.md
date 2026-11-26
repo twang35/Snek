@@ -17,7 +17,7 @@ are in git history before 2026-09-10.
   both cells beat b52's paper cell by a wide margin. Open, and the user's call: (1) done 2026-11-24 -- `b53a` @617000 promoted as the record: 29,979 /30k on seed 7 and
   29,979 again on seed 13, above `b32g` and `b52k` pooled (z = 3.1, 2.9); `b53f` @657000 fell 29,975 to 29,962 and is not admitted; (2) F2 (Agent57) -- its gate, F1 showing a cost, is
   met, but a bandit over β can at best find β = 0; (3) which of NGU's changes around R2D2 (Retrace, mixture inputs, target period,
-  Adam ε, IS 0) carries the gain over b52a-d. Nothing is queued on either box.
+  Adam ε, IS 0) carries the gain over b52a-d -- **b54, queued 2026-11-25**: the values alone, then Retrace without the discount family, 700k steps.
 - **Group E, memory** (b51 closed 2026-10-03, b52 closed 2026-10-09; **the group closed 2026-10-25**, user: no seed wave on the c51
   cell, the stage is finished as it stands and the series moves to Group F). Memory subtracts from PPO's window (b51) and is most of
   R2D2's edge over its dense control (b52). b52's c51 cell at 180k updates is at the PPO record (b52k 29,970 /30k twice). Open now:
@@ -88,6 +88,7 @@ are in git history before 2026-09-10.
 
 | batch | varies | base | cells × seeds | cap | prediction | result in one line |
 |---|---|---|---:|---:|---|---|
+| [b54](#b54--the-attribution-wave-which-of-ngus-changes-around-r2d2-carries-b53s-gain) | the chain from b52's R2D2 to b53's β = 0 cell, one link a cell: **r2d2nguvals** (b52's spec at NGU's Adam ε 1e-4, target 1,500, IS 0, η 1.0, α 8) / **ngu1mix** (b53's `ngubeta0` on one mixture: Retrace, prefill and the permuted ladder without the 32-discount family) | b52a-d below, b53e-h above: hist8, b2 reward, step penalty 0.01, shaping **off** | 2 × 4 | **700k steps** = 22.4M moves, 70k updates (the user, 2026-11-25) | `r2d2nguvals` arrives earlier than b52 and stays under 40% of 400k-700k rows ≥98%; `ngu1mix` level with `ngubeta0` — Retrace carries the gain | queued 2026-11-25 |
 | [b53](#b53--f1-ngu-the-papers-intrinsic-reward-agent-and-its-β--0-control) | the algorithm: NGU as its paper has it (`SNEK_ALGO=ngu`: R2D2's core with the mixture one-hot and both previous rewards into the LSTM, 32 (β, γ) mixtures one per lane, episodic k-NN × RND intrinsic reward on the board, transformed Retrace λ 0.95, PER 0.9 / IS 0 / η 1.0, Adam 1e-4 ε 1e-4, target 1,500, permuted ε ladder α 8) / the same at β_max 0 (`ngubeta0`) | b52's paper cell at NGU's values: hist8, b2 reward, step penalty 0.01, shaping **off** | 2 × 4 | 1.3M steps = 41.6M moves, **130k updates** (b52's; the paper's ~650k) | `ngu` trails b52 on onset, level or below on density; `ngubeta0` level with b52; mean r^i falls early — **both cells falsified upward; the intrinsic term's cost held** | **closed 2026-11-23.** The β = 0 control beats `ngu` (92.4% against 84.5% of rows ≥98%, 60 against 23 full 30k rows ≥99.8%), both far above r2d2paper (50.4%); `b53a` @617000 29,979 /30k, 29,979 again on seed 13, is the record (2026-11-24) |
 | [b52](#b52--r2d2-the-papers-recurrent-value-agent-its-feed-forward-control-and-its-c51-head) | the algorithm: R2D2 as its paper has it (`SNEK_ALGO=r2d2`: LSTM 512 with prev action and reward in, dueling 512 streams, 120-row windows = 40 burn-in + 80 loss, stride 40, n-step 5 double-Q under h(x), PER 0.9/0.6/η 0.9, Adam 1e-4, target copy 2,500, clip 40, the Ape-X ε ladder over 32 lanes) / the same with the LSTM replaced by a dense layer (`ffr2d2`) / the same with a C51 head and the rescaling off | none (paper): hist8, b2 reward, step penalty 0.01, shaping **off** | 3 × 4 | 1.3M steps = 41.6M moves, **130k updates** (shortfall against the 200k floor, stated); the c51 cell on to 1.8M (2026-10-07) and **2.4M = 240k updates** (2026-10-12) | paper 90%+ and holds, `ffr2d2` trails on the hold, c51 level; none at PPO's 99.8 | **closed 2026-10-09.** Memory is most of R2D2's edge (paper 50.4% vs `ffr2d2` 16.1% at ≥98%); the paper cell tops Rainbow on the peak, not the hold. The c51 cell, run on to 1.8M / 180k updates, is the value family's first arm at the PPO record: b52k 29,970 /30,000 (99.900%) twice, median of 66 full 30k rows 29,950; **confirmed on seed 13 2026-10-12** (29,960 /30k @1795000, tied with the `b32g` record, in the hall of fame); **2.4M extension landed 2026-10-14**: i and j arrived (97% / 93% of new rows ≥98), k and l held, 100.0 rows in all four, best30 99.72; **`hof30k` 2026-10-15: nothing above the tie** (k's new full rows median 29,949, best 29,965; l 29,941; i, j none) |
 | [b51](#b51--e1-recurrent-ppo-an-lstm-in-both-towers-on-b27s-config) | `SNEK_PPO_RECURRENT=lstm` (128, both towers, whole-lane minibatches of 2 x 256) at `SNEK_OBS_HISTORY` 8 / 0 | b27's hist8 config verbatim | 2 × 4 | 100M | `lstmhist0` well above hist0 and at or under hist8; `lstmhist8` level with hist8 | **half held**: `lstmhist0` 89.0% density (hist0 49, hist8 95.4); `lstmhist8` 74.4%, under hist8 on every seed; best30 99.55 both, no `hof30k` row at 99.8 |
@@ -165,6 +166,24 @@ the share of rows at ≥98% perfect (record density), then the collapse share (p
 evals below 50% and 80%), then best30. `hof5000` re-measures the top rows at 5,000 episodes and
 `hof30k` at 30,000 on seed 7, and only a 30,000-episode number is a record. n=4 separates cells only
 at complete separation (Mann-Whitney p=0.029). Details in [`protocol.md`](protocol.md).
+
+---
+
+## b54 — the attribution wave: which of NGU's changes around R2D2 carries b53's gain
+
+| | |
+|---|---|
+| base | b52a-d (`r2d2paper`) at the bottom of the chain and b53e-h (`ngubeta0`) at the top, both read on their rows ≤700k: hist8, b2 reward, step penalty 0.01, shaping **off**, `fc 320`, 32 lanes, `SNEK_REPLAY_RATIO` 1/320 |
+| varies | **r2d2nguvals** (a-d): b52's `r2d2` spec verbatim with `SNEK_ADAM_EPSILON` 1e-4, `SNEK_TARGET_UPDATE_PERIOD` 1500, `SNEK_R2D2_IS_BETA` 0, `SNEK_R2D2_PRIORITY_ETA` 1.0, `SNEK_APEX_ALPHA` 8 — the values alone / **ngu1mix** (e-h): b53's `ngubeta0` spec verbatim at `SNEK_NGU_MIXTURES=1 SNEK_NGU_ASSIGN=episode` — every lane at β 0, γ 0.997, so it adds Retrace λ 0.95 (with NGU's 6,250-window prefill and permuted ladder) and leaves out the discount family |
+| cells × seeds | 2 × 4, seeds pinned to the letter |
+| cap | **700k steps** = 22.4M moves, 70,000 updates (the user, 2026-11-25: the steps past 700k added little). On b53's data `ngubeta0` holds 92-96% of stage-A rows ≥98% over 400k-700k and 90-92% over 700k-1.3M, and the record row is @617000. Nothing in either algorithm reads the cap, so the references' rows ≤700k stand as they are |
+| control | the chain itself: b52a-d → `r2d2nguvals` (+ values) → `ngu1mix` (+ Retrace) → b53e-h (+ the 32 discounts and their one-hot). **Not separated**: Retrace from the prefill and the permutation; the previous-`r^i` input (0 at β 0) rides with Retrace |
+| predicted | the agent's, 2026-11-25: `r2d2nguvals` reaches 98% earlier than b52a-d (528k-880k) but stays under 40% of 400k-700k rows ≥98%; `ngu1mix` is level with `ngubeta0` within noise — Retrace carries most of the gain, the discount family little |
+
+**Why.** b53's β = 0 cell reads 92-96% of rows ≥98% over 400k-700k where b52's paper cell reads 0-5%, and first reaches 98% at
+93k-207k against 528k-880k, at one replay ratio. That gap set the record and is unexplained: the optimiser values, the estimator and
+the mixture family moved together. Both cells are knobs on built code. **The read is onset and 400k-700k density**: b52 has barely
+arrived at 700k, so a cell that looks like b52 is "not arrived by 700k", not "no gain at 1.3M".
 
 ---
 

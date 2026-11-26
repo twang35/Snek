@@ -541,5 +541,17 @@
   "after": "ngubeta0",
   "value": "r2d2paper",
   "knob": "name"
+ },
+ "b54": {
+  "arms": [
+   "b53e-ngubeta0-seed5",
+   "b53f-ngubeta0-seed6",
+   "b53g-ngubeta0-seed7",
+   "b53h-ngubeta0-seed8"
+  ],
+  "label": "reference: b53's beta = 0 cell (e-h, read to 700k of its 1.3M steps), the top of the chain -- b54a-d is b52's R2D2 paper cell at NGU's five values, b54e-h is the beta = 0 cell on one mixture (Retrace without the discount family); b52a-d is the bottom of the chain",
+  "after": "ngu1mix",
+  "value": "ngubeta0",
+  "knob": "name"
  }
 }
