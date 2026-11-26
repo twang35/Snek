@@ -72,6 +72,11 @@ round trip 4.7–6.2 ms per hour, 1,400 B pings 0/50 lost. **Not yet evidence:**
 06:54 onset looked the same, and episodes were 15–17 h apart. First meaningful read is the morning of
 11-26; the verdict is two clear days (to ~10:40 PT 11-27).
 
+**Check at 10:45 PT 11-26, 24 h 05 m in: held.** No episode, no drop, 0 checks at ≥15% loss of ~3,890,
+19 with any loss, hourly average round trip 4.6–5.5 ms, 1,400 B pings 0/50 lost. This is past the
+15–17 h gap between the earlier episodes, so it is the first real support for Airtime Fairness as the
+cause; one more clear day completes the test. QoS state still not confirmed.
+
 **Next, in order.**
 
 1. **Still unknown on the router:** MLO on or off, and the laptop's row in the client table during an
